@@ -1,0 +1,244 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap');
+
+body, html, #root, .grok-app-bg {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #181a20;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #fff;
+}
+
+.grok-app-bg {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.grok-header {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 24px 40px 0 0;
+  box-sizing: border-box;
+}
+
+.grok-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.grok-profile-icon {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1.5px solid #353945;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #b1b5c3;
+  transition: border 0.2s, color 0.2s, background 0.2s;
+}
+.grok-profile-icon:hover, .grok-login-btn:hover {
+  border: 1.5px solid #3772ff;
+  color: #3772ff;
+  background: #181a20;
+}
+.grok-profile-icon:active, .grok-login-btn:active {
+  background: #181a20;
+  color: #3772ff;
+}
+
+.grok-login-btn {
+  background: transparent;
+  color: #b1b5c3;
+  border: 1.5px solid #353945;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border 0.2s, color 0.2s, background 0.2s;
+  box-shadow: none;
+}
+
+.grok-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: -8vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.grok-greeting {
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 500;
+  margin-bottom: 36px;
+  word-break: break-word;
+  max-width: 90vw;
+}
+.grok-sub {
+  display: block;
+  font-size: 1.2rem;
+  color: #b1b5c3;
+  margin-top: 10px;
+  font-weight: 400;
+}
+
+.grok-input-form {
+  display: flex;
+  align-items: center;
+  background: #23262f;
+  border-radius: 16px;
+  padding: 8px 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+  width: 100%;
+  max-width: 540px;
+  min-width: 0;
+  transition: box-shadow 0.2s, border 0.2s;
+  border: 0.5px solid transparent;
+  position: relative;
+  z-index: 1;
+}
+.grok-input-form:focus-within {
+  border: 0.5px solid transparent;
+  background: #23262f;
+  box-shadow: 0 0 0 2px #23262f, 0 2px 16px rgba(50,50,50,0.10);
+  /* Perfectly smooth infinite animated border effect */
+  background-image:
+    linear-gradient(#23262f, #23262f),
+    repeating-linear-gradient(90deg, #353945 0%, #3772ff 20%, #b1b5c3 40%, #23262f 60%, #353945 80%, #3772ff 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border-radius: 16px;
+  animation: border-move-smooth 6s linear infinite;
+  background-size: 100% 100%, 400% 100%;
+  background-position: 0 0, 0% 50%;
+}
+
+@keyframes border-move-smooth {
+  0% {
+    background-position: 0 0, 0% 50%;
+  }
+  100% {
+    background-position: 0 0, 100% 50%;
+  }
+}
+
+.grok-input-box {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  padding: 16px 8px;
+  outline: none;
+  min-width: 0;
+  transition: box-shadow 0.2s, border 0.2s;
+}
+.grok-input-box:focus {
+  box-shadow: none;
+  border: none;
+  background: #23262f;
+}
+
+.grok-input-box::placeholder {
+  color: #b1b5c3;
+  font-size: 1.1rem;
+}
+
+.grok-input-btn {
+  background: #23262f;
+  color: #fff;
+  border: 1.5px solid #353945;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border 0.2s, color 0.2s, background 0.2s;
+  min-width: 40px;
+  box-shadow: none;
+}
+.grok-input-btn:hover {
+  border: 1.5px solid #3772ff;
+  color: #3772ff;
+  background: #181a20;
+}
+.grok-input-btn:active {
+  background: #181a20;
+  color: #3772ff;
+}
+
+@media (max-width: 900px) {
+  .grok-header {
+    padding: 16px 12px 0 0;
+  }
+  .grok-main {
+    padding: 0 8px;
+    margin-top: -4vh;
+  }
+  .grok-greeting {
+    font-size: 1.4rem;
+    margin-bottom: 24px;
+  }
+  .grok-input-form {
+    max-width: 98vw;
+    padding: 4px 6px;
+  }
+  .grok-input-box {
+    font-size: 1rem;
+    padding: 12px 6px;
+  }
+  .grok-input-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+    min-width: 36px;
+  }
+}
+
+@media (max-width: 600px) {
+  .grok-header {
+    padding: 10px 4px 0 0;
+  }
+  .grok-main {
+    padding: 0 4px;
+    margin-top: -2vh;
+  }
+  .grok-greeting {
+    font-size: 1.05rem;
+    margin-bottom: 16px;
+  }
+  .grok-input-form {
+    max-width: 100vw;
+    padding: 2px 2px;
+  }
+  .grok-input-box {
+    font-size: 0.98rem;
+    padding: 8px 2px;
+  }
+  .grok-input-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 1rem;
+    min-width: 30px;
+  }
+}
