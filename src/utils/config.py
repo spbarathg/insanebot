@@ -16,14 +16,11 @@ class Settings(BaseSettings):
     GROK_API_KEY: str = os.getenv("GROK_API_KEY", "")
     AWS_ACCESS_KEY: str = os.getenv("AWS_ACCESS_KEY", "")
     AWS_SECRET_KEY: str = os.getenv("AWS_SECRET_KEY", "")
-    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
-    ALERT_EMAIL: str = os.getenv("ALERT_EMAIL", "")
-    ALERT_EMAIL_PASSWORD: str = os.getenv("ALERT_EMAIL_PASSWORD", "")
     BIRDEYE_API_KEY: str = os.getenv("BIRDEYE_API_KEY", "")
     SOLANA_RPC_URL: str = os.getenv("SOLANA_RPC_URL", "")
 
     # Alert Settings
+    ALERT_EMAIL: str = os.getenv("ALERT_EMAIL", "")
     ALERT_EMAIL_PASSWORD: str = os.getenv("ALERT_EMAIL_PASSWORD", "")
 
     # Trading Parameters
@@ -100,8 +97,7 @@ class Settings(BaseSettings):
     SIMULATION_MODE: bool = True
     SIMULATION_CAPITAL: float = 0.1  # SOL
 
-    # Continuous Learning
-    LEARNING_WINDOW: int = 3  # days
+    # Feature Weights
     FEATURE_WEIGHTS: Dict[str, float] = {
         'sentiment': 0.3,
         'whale_activity': 0.2,
@@ -126,26 +122,19 @@ class Settings(BaseSettings):
     MIN_TRADES_PER_HOUR: int = 10
 
     # Local LLM Settings
-    LLM_MODEL_PATH: str = "mistralai/Mistral-7B-v0.1"  # Path to local model
-    LLM_DEVICE: str = "cuda"  # Device to run model on (cuda/cpu)
-    LLM_BATCH_SIZE: int = 1  # Batch size for inference
-    LLM_MAX_LENGTH: int = 512  # Maximum sequence length
-    LLM_TEMPERATURE: float = 0.7  # Sampling temperature
-    LLM_TOP_P: float = 0.9  # Top-p sampling
-    LLM_CACHE_SIZE: int = 100  # Number of decisions to cache
-    LLM_CACHE_TTL: int = 30  # Cache TTL in seconds
+    LLM_MODEL_PATH: str = "mistralai/Mistral-7B-v0.1"
+    LLM_DEVICE: str = "cuda"
+    LLM_BATCH_SIZE: int = 1
+    LLM_MAX_LENGTH: int = 512
+    LLM_TEMPERATURE: float = 0.7
+    LLM_TOP_P: float = 0.9
+    LLM_CACHE_SIZE: int = 100
+    LLM_CACHE_TTL: int = 30
     
     # Learning Parameters
-    LEARNING_RATE: float = 0.001  # Learning rate for model updates
-    MIN_SAMPLES_FOR_LEARNING: int = 10  # Minimum samples before learning
-    MAX_SAMPLES_FOR_LEARNING: int = 1000  # Maximum samples to keep for learning
-    
-    # Alert Threshold
-    ALERT_THRESHOLD: float = 0.05  # Alert threshold for significant changes
-    MONITORING_INTERVAL: int = 60  # Monitoring interval in seconds
-
-    # Telegram Settings
-    TELEGRAM_CHAT_IDS: list = os.getenv("TELEGRAM_CHAT_IDS", "").split(",")
+    LEARNING_RATE: float = 0.001
+    MIN_SAMPLES_FOR_LEARNING: int = 10
+    MAX_SAMPLES_FOR_LEARNING: int = 1000
     
     # File Paths
     BASE_DIR: Path = Path(__file__).parent.parent.parent
@@ -174,82 +163,10 @@ class Settings(BaseSettings):
         'max_position_size': 5.0,  # Maximum position size in SOL
         'min_adjustment': 0.1,  # Minimum position size adjustment in SOL
     }
-    
-    # Trading Parameters
-    FEATURE_WEIGHTS: Dict = {
-        'sentiment': 0.3,
-        'whale_activity': 0.3,
-        'price_momentum': 0.2,
-        'volume': 0.2,
-    }
-    
-    CONFIDENCE_THRESHOLD: float = 0.7
-    MIN_WHALE_BUYS: int = 3
-    MIN_WHALE_BUY_SIZE: float = 1.0  # SOL
-    MIN_HOLDERS: int = 100
-    MAX_TOKEN_AGE: int = 7  # days
-    
-    # Tiered Exit Strategy
-    TIERED_EXITS: Dict = {
-        0.1: 0.25,  # Sell 25% at 10% profit
-        0.2: 0.25,  # Sell 25% at 20% profit
-        0.3: 0.25,  # Sell 25% at 30% profit
-        0.5: 0.25,  # Sell 25% at 50% profit
-    }
-    
+
     def __init__(self, **data):
         super().__init__(**data)
-        self._load_settings()
         self._create_directories()
-
-    def _load_settings(self) -> None:
-        """Load settings from config file"""
-        try:
-            with open('config/whales.json', 'r') as f:
-                config = json.load(f)
-                self.settings = config['settings']
-        except Exception as e:
-            print(f"Error loading settings: {str(e)}")
-            self.settings = {}
-
-    @property
-    def WHALE_ANALYSIS_INTERVAL(self) -> int:
-        """Interval between whale analyses in seconds"""
-        return self.settings.get('analysisInterval', 300)
-
-    @property
-    def WHALE_CONFIDENCE_THRESHOLD(self) -> float:
-        """Minimum confidence threshold for whale signals"""
-        return self.settings.get('confidenceThreshold', 0.7)
-
-    @property
-    def WHALE_SUCCESS_RATE_THRESHOLD(self) -> float:
-        """Minimum success rate threshold for whale signals"""
-        return self.settings.get('successRateThreshold', 75)
-
-    @property
-    def WHALE_LARGE_TRADE_THRESHOLD(self) -> float:
-        """Threshold for considering a trade as large"""
-        return self.settings.get('largeTradeThreshold', 100000)
-
-    @property
-    def MAX_TRACKED_WHALES(self) -> int:
-        """Maximum number of whales to track"""
-        return self.settings.get('maxTrackedWhales', 10)
-
-    @property
-    def ALERT_CHANNELS(self) -> list:
-        """Channels to send alerts to"""
-        return self.settings.get('alertChannels', ['telegram', 'discord'])
-
-    @property
-    def RISK_LEVELS(self) -> Dict[str, Dict[str, Any]]:
-        """Risk level configurations"""
-        return self.settings.get('riskLevels', {
-            'low': {'minSuccessRate': 80, 'maxDrawdown': 10},
-            'medium': {'minSuccessRate': 60, 'maxDrawdown': 20},
-            'high': {'minSuccessRate': 40, 'maxDrawdown': 30}
-        })
 
     def _create_directories(self) -> None:
         """Create necessary directories"""

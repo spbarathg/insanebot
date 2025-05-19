@@ -1,18 +1,74 @@
+"""
+Secure wallet management for Solana trading bot.
+"""
 import os
-from typing import Optional
+import json
+import base64
+import time
+from typing import Optional, Dict, Any
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from loguru import logger
 from dotenv import load_dotenv
+import asyncio
+
+async def await_confirmation(rpc_client, signature, timeout=30, poll_interval=1):
+    """Poll Solana RPC for transaction confirmation."""
+    start = time.time()
+    while time.time() - start < timeout:
+        resp = await rpc_client.get_signature_statuses([signature])
+        status = resp['result']['value'][0]
+        if status and status.get('confirmationStatus') in ('confirmed', 'finalized'):
+            return True
+        await asyncio.sleep(poll_interval)
+    return False
 
 class WalletManager:
+    """
+    Secure wallet management with encrypted key storage.
+    
+    Attributes:
+        rpc_client: Solana RPC client
+        keypair: Encrypted wallet keypair
+        _fernet: Fernet instance for encryption
+    """
+    
     def __init__(self, rpc_client: AsyncClient):
         self.rpc_client = rpc_client
         self.keypair: Optional[Keypair] = None
+        self._fernet = None
+        self._initialize_encryption()
         self._balance_cache = None
         self._load_wallet()
         
+    def _initialize_encryption(self) -> None:
+        """Initialize encryption with environment-based key derivation."""
+        try:
+            # Get encryption key from environment
+            salt = os.getenv("WALLET_SALT", "").encode()
+            password = os.getenv("WALLET_PASSWORD", "").encode()
+            
+            if not salt or not password:
+                raise ValueError("Missing WALLET_SALT or WALLET_PASSWORD environment variables")
+            
+            # Derive encryption key
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=salt,
+                iterations=100000,
+            )
+            key = base64.urlsafe_b64encode(kdf.derive(password))
+            self._fernet = Fernet(key)
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize encryption: {e}")
+            raise
+    
     def _load_wallet(self) -> None:
         """Load wallet from private key."""
         try:
@@ -40,29 +96,100 @@ class WalletManager:
             # Use a dummy keypair for testing
             self.keypair = Keypair()
             
-    async def get_balance(self) -> Optional[float]:
-        """Get wallet SOL balance."""
-        try:
-            if not self.keypair:
-                raise ValueError("Wallet not loaded")
+    def load_wallet(self, encrypted_key_path: str) -> None:
+        """
+        Load encrypted wallet from file.
+        
+        Args:
+            encrypted_key_path: Path to encrypted wallet file
             
-            # Use cache if available
-            if self._balance_cache is not None:
-                return self._balance_cache
-                
-            response = await self.rpc_client.get_balance(self.keypair.public_key)
-            if not response or not response.get("result", {}).get("value"):
-                return 0.0
-                
-            # Convert lamports to SOL
-            balance = response["result"]["value"] / 1e9
-            self._balance_cache = balance
-            return balance
+        Raises:
+            ValueError: If wallet file is invalid or decryption fails
+        """
+        try:
+            with open(encrypted_key_path, "rb") as f:
+                encrypted_data = f.read()
+            
+            # Decrypt wallet data
+            decrypted_data = self._fernet.decrypt(encrypted_data)
+            wallet_data = json.loads(decrypted_data)
+            
+            # Create keypair from decrypted data
+            self.keypair = Keypair.from_secret_key(bytes(wallet_data["secret_key"]))
+            logger.info("Wallet loaded successfully")
             
         except Exception as e:
-            logger.error(f"Error getting balance: {str(e)}")
-            return None
+            logger.error(f"Failed to load wallet: {e}")
+            raise ValueError("Invalid wallet file or decryption failed")
+    
+    def save_wallet(self, keypair: Keypair, encrypted_key_path: str) -> None:
+        """
+        Save wallet with encryption.
+        
+        Args:
+            keypair: Keypair to save
+            encrypted_key_path: Path to save encrypted wallet
             
+        Raises:
+            ValueError: If encryption fails
+        """
+        try:
+            # Prepare wallet data
+            wallet_data = {
+                "public_key": str(keypair.public_key),
+                "secret_key": list(keypair.secret_key)
+            }
+            
+            # Encrypt wallet data
+            encrypted_data = self._fernet.encrypt(json.dumps(wallet_data).encode())
+            
+            # Save encrypted data
+            with open(encrypted_key_path, "wb") as f:
+                f.write(encrypted_data)
+            
+            logger.info("Wallet saved successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to save wallet: {e}")
+            raise ValueError("Failed to encrypt wallet")
+    
+    def get_keypair(self) -> Keypair:
+        """
+        Get the current keypair.
+        
+        Returns:
+            Keypair: The current wallet keypair
+            
+        Raises:
+            ValueError: If wallet is not loaded
+        """
+        if not self.keypair:
+            raise ValueError("Wallet not loaded")
+        return self.keypair
+    
+    async def get_balance(self) -> float:
+        """
+        Get wallet balance in SOL.
+        
+        Returns:
+            float: Wallet balance in SOL
+            
+        Raises:
+            ValueError: If wallet is not loaded
+        """
+        if not self.keypair:
+            raise ValueError("Wallet not loaded")
+            
+        try:
+            if not self._balance_cache:
+                response = await self.rpc_client.get_balance(self.keypair.public_key)
+                self._balance_cache = response["result"]["value"] / 1e9  # Convert lamports to SOL
+            return self._balance_cache
+            
+        except Exception as e:
+            logger.error(f"Failed to get balance: {e}")
+            raise
+    
     async def get_token_balance(self, token_address: str) -> Optional[float]:
         """Get token balance for a specific token."""
         try:
@@ -104,8 +231,45 @@ class WalletManager:
             raise ValueError("Wallet not loaded")
         return self.keypair.public_key
         
-    def get_keypair(self) -> Keypair:
-        """Get wallet keypair."""
+    async def send_transaction(self, transaction: Any) -> bool:
+        """
+        Send a transaction with retry logic, error handling, and confirmation monitoring.
+        
+        Args:
+            transaction: Transaction to send
+            
+        Returns:
+            bool: True if transaction was successful
+            
+        Raises:
+            ValueError: If wallet is not loaded
+        """
         if not self.keypair:
             raise ValueError("Wallet not loaded")
-        return self.keypair 
+        max_retries = 3
+        retry_delay = 1
+        for attempt in range(max_retries):
+            try:
+                transaction.sign(self.keypair)
+                response = await self.rpc_client.send_transaction(
+                    transaction,
+                    opts={"skip_preflight": False}
+                )
+                if "result" in response:
+                    signature = response["result"]
+                    logger.info(f"Transaction sent: {signature}")
+                    # Wait for confirmation
+                    confirmed = await await_confirmation(self.rpc_client, signature)
+                    if confirmed:
+                        logger.info(f"Transaction {signature} confirmed.")
+                        return True
+                    else:
+                        logger.error(f"Transaction {signature} not confirmed in time.")
+                        return False
+            except Exception as e:
+                logger.warning(f"Transaction attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (attempt + 1))
+                continue
+        logger.error("All transaction attempts failed")
+        return False 

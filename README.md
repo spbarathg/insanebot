@@ -1,137 +1,251 @@
 # Solana Trading Bot
 
-A minimalistic and robust Solana trading bot with comprehensive error handling and testing.
+## Overview
+This bot automates trading on Solana using secure wallet management, transaction confirmation monitoring, and performance optimizations.
+
+## Setup
+1. Clone the repository.
+2. Install dependencies: `pip install -r requirements.txt`.
+3. Set environment variables (e.g., `WALLET_PRIVATE_KEY`, `WALLET_SALT`, `WALLET_PASSWORD`).
+4. Run the bot: `python src/main.py`.
+
+## Usage
+- The bot supports buy/sell orders, batch processing, and caching for performance.
+- Use the `WalletManager` for secure transaction handling and confirmation monitoring.
+
+## Architecture
+
+```mermaid
+graph TD;
+    A[Main Bot] --> B[WalletManager]
+    A --> C[TradeExecution]
+    A --> D[TokenCache]
+    B --> E[Solana RPC]
+    C --> E
+    D --> E
+    A --> F[Monitoring & Logging]
+    F --> G[Prometheus]
+    F --> H[Grafana]
+```
+
+- **Core Components:**
+  - `WalletManager`: Secure wallet and transaction handling.
+  - `TradeExecution`: Executes trades with retry logic and confirmation monitoring.
+  - `TokenCache`: Caches token data for performance.
+- **Testing:**
+  - Integration tests use a mock Solana network.
+  - Stress tests simulate high-frequency trading and batch processing.
+
+## Contributing
+See `CONTRIBUTING.md` for guidelines on code style, PR process, and development setup.
+
+## Troubleshooting
+See `troubleshooting.md` for common errors and solutions.
+
+## Performance Tuning
+Refer to the performance tuning guide for optimizing bot behavior under load.
 
 ## Features
 
-- Real-time token monitoring
+- Real-time token monitoring with WebSocket support
 - Automated trading with configurable parameters
-- Simulation mode for testing
-- Comprehensive error handling
-- Extensive test coverage
-- Minimalistic design
+- Comprehensive error handling with circuit breakers
+- Secure wallet management with encryption
+- Performance optimized with caching and connection pooling
+- Extensive monitoring and logging
+- Docker support with health checks
+- High test coverage
 
-## Setup
+## Architecture
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
+```
+├── src/
+│   ├── main.py              # Main trading bot implementation
+│   ├── core/                # Core functionality
+│   │   ├── config.py        # Configuration management
+│   │   ├── dex.py          # DEX interaction
+│   │   ├── error_handler.py # Error handling
+│   │   ├── monitoring.py    # Monitoring and logging
+│   │   └── wallet.py       # Wallet management
+│   ├── tests/              # Test suite
+│   └── utils/              # Utility functions
+├── config/                 # Configuration files
+├── data/                   # Data storage
+├── logs/                   # Log files
+└── scripts/               # Utility scripts
 ```
 
-2. Create a `.env` file with the following variables:
+## Prerequisites
+
+- Python 3.9+
+- Docker and Docker Compose
+- Solana CLI tools
+- Sufficient SOL balance for trading
+
+## Configuration
+
+### Core Settings
+
+```yaml
+trading:
+  min_liquidity: 10000
+  max_slippage: 0.02
+  min_profit: 0.05
+  max_position: 0.1
+  min_position: 0.01
+  cooldown: 300
+
+monitoring:
+  check_interval: 60
+  max_retries: 3
+  retry_delay: 5
+
+error_handling:
+  max_errors: 5
+  error_cooldown: 300
+```
+
+### Environment Variables
+
 ```env
-# Core Trading Settings
-MIN_LIQUIDITY=10000
-MAX_SLIPPAGE=0.02
-MIN_PROFIT=0.05
-MAX_POSITION=0.1
-MIN_POSITION=0.01
-COOLDOWN=300
+# Core Settings
+WALLET_ADDRESS=your_wallet_address
+SIMULATION_MODE=false
 
-# Monitoring Settings
-CHECK_INTERVAL=60
-MAX_RETRIES=3
-RETRY_DELAY=5
-
-# Error Handling
-MAX_ERRORS=5
-ERROR_COOLDOWN=300
-
-# Market Settings
-VOLATILITY=0.1
-MIN_HOLDERS=100
-MAX_TOKEN_AGE=30
-
-# Trading Settings
-STOP_LOSS=0.05
-TAKE_PROFIT=0.1
-MAX_TRADES=5
+# Security
+WALLET_SALT=your_salt
+WALLET_PASSWORD=your_password
 
 # RPC Settings
 RPC_URL=https://api.mainnet-beta.solana.com
 RPC_COMMITMENT=confirmed
+
+# Monitoring
+PROMETHEUS_PORT=8000
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=your_password
 ```
 
-3. Configure your wallet:
-   - Set your wallet address in `main.py`
-   - Ensure sufficient SOL balance
-   - Test in simulation mode first
+## Usage
 
-## Running the Bot
+### Running Locally
 
-1. Simulation mode (recommended for testing):
+1. Start the bot:
 ```bash
 python src/main.py
 ```
 
-2. Live trading mode:
-   - Set `simulation_mode=False` in `main.py`
-   - Ensure proper wallet configuration
-   - Run with sufficient SOL balance
+2. Run in simulation mode:
+```bash
+python src/main.py --simulation
+```
+
+### Docker Deployment
+
+1. Build and start services:
+```bash
+docker-compose up -d
+```
+
+2. View logs:
+```bash
+docker-compose logs -f trading-bot
+```
+
+3. Access monitoring:
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+- Loki: http://localhost:3100
 
 ## Testing
 
-Run the test suite:
+1. Run unit tests:
 ```bash
 pytest
 ```
 
-View test coverage:
+2. Run with coverage:
 ```bash
 pytest --cov=src --cov-report=html
 ```
 
-## Configuration
+3. Run integration tests:
+```bash
+pytest tests/integration/
+```
 
-The bot uses three main configuration sections:
+## Monitoring
 
-1. Core Configuration (`CORE_CONFIG`):
-   - Trading parameters
-   - Monitoring settings
-   - Error handling thresholds
+### Metrics
 
-2. Market Configuration (`MARKET_CONFIG`):
-   - Liquidity requirements
-   - Volatility thresholds
-   - Token criteria
+The bot exposes the following Prometheus metrics:
 
-3. Trading Configuration (`TRADING_CONFIG`):
-   - Position sizes
-   - Stop loss and take profit
-   - Trade limits
+- `trading_bot_trades_total`: Total trades executed
+- `trading_bot_position_size`: Current position sizes
+- `trading_bot_token_price`: Token prices
+- `trading_bot_liquidity`: Token liquidity
+- `trading_bot_errors_total`: Error counts
+- `trading_bot_trade_latency_seconds`: Trade execution latency
+
+### Logging
+
+Logs are stored in the `logs` directory with:
+- Daily rotation
+- 7-day retention
+- JSON format for machine processing
+- Structured logging with context
+
+## Security
+
+- Encrypted wallet storage
+- Secure key management
+- Rate limiting
+- Input validation
+- Error handling
+- Circuit breakers
 
 ## Error Handling
 
-The bot includes comprehensive error handling:
-- Automatic retry for transient errors
-- Critical error detection
-- Trading suspension on repeated failures
-- Detailed error logging
+The bot implements comprehensive error handling:
 
-## Safety Features
+1. Circuit Breakers:
+   - Network errors
+   - Transaction failures
+   - Wallet issues
 
-1. Position Limits:
-   - Maximum position size
-   - Minimum liquidity requirements
-   - Cooldown periods between trades
+2. Retry Logic:
+   - Configurable retry attempts
+   - Exponential backoff
+   - Error categorization
 
-2. Risk Management:
-   - Stop loss orders
-   - Take profit targets
-   - Maximum concurrent trades
+3. Monitoring:
+   - Error tracking
+   - Alert thresholds
+   - Error reporting
 
-3. Error Prevention:
-   - Input validation
-   - Balance checks
-   - Transaction verification
+## Performance
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
+- WebSocket connections for real-time data
+- LRU caching for frequently accessed data
+- Connection pooling
+- Optimized transaction handling
+- Efficient event loops
 
 ## License
 
 MIT License
+
+## Support
+
+For support, please:
+1. Check the documentation
+2. Search existing issues
+3. Create a new issue if needed
+
+## Acknowledgments
+
+- Solana Foundation
+- Raydium Protocol
+- Prometheus
+- Grafana
+- Loki

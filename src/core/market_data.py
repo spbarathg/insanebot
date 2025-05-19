@@ -1,11 +1,17 @@
 import aiohttp
 import asyncio
-from typing import Dict, Optional, Tuple
+import logging
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime, timedelta
 from ..utils.config import settings
 from ..utils.logging_config import (
     market_logger, error_logger, handle_errors, log_performance,
     MarketDataError, NetworkError
 )
+from .middleware import rate_limit, error_handler
+from .cache import market_data_cache, token_cache, price_cache
+
+logger = logging.getLogger(__name__)
 
 class MarketData:
     def __init__(self):
@@ -15,6 +21,7 @@ class MarketData:
         self.price_cache = {}
         self.liquidity_cache = {}
         self.cache_ttl = 30  # seconds
+        self.update_interval = 60  # 1 minute
         market_logger.info("MarketData instance initialized")
 
     @handle_errors(market_logger)
@@ -43,208 +50,85 @@ class MarketData:
             raise MarketDataError(error_msg)
 
     @handle_errors(market_logger)
-    @log_performance(market_logger)
+    @rate_limit(max_requests=30, time_window=60)  # 30 requests per minute
     async def get_token_data(self, token_address: str) -> Optional[Dict]:
-        """Get detailed data for a specific token"""
+        """Get token data with caching"""
         try:
-            # Check cache
-            current_time = asyncio.get_event_loop().time()
-            if (token_address in self.token_cache and 
-                current_time - self.last_update.get(token_address, 0) < settings.DATA_REFRESH_INTERVAL):
-                market_logger.debug(f"Returning cached data for token {token_address}")
-                return self.token_cache[token_address]
+            # Check cache first
+            cached_data = token_cache.get(token_address)
+            if cached_data:
+                return cached_data
 
-            # Fetch data from multiple sources
-            async with asyncio.TaskGroup() as group:
-                birdeye_task = group.create_task(self._fetch_birdeye_token_data(token_address))
-                dexscreener_task = group.create_task(self._fetch_dexscreener_token_data(token_address))
-
-            # Get results
-            birdeye_data = await birdeye_task
-            dexscreener_data = await dexscreener_task
-
-            # Combine data
-            token_data = self._combine_token_data(birdeye_data, dexscreener_data)
-            if token_data:
-                self.token_cache[token_address] = token_data
-                self.last_update[token_address] = current_time
-                market_logger.info(f"Updated token data for {token_address}")
-            else:
-                market_logger.warning(f"No data available for token {token_address}")
-
-            return token_data
-
-        except Exception as e:
-            error_msg = f"Error getting token data for {token_address}: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
-
-    @handle_errors(market_logger)
-    @log_performance(market_logger)
-    async def _fetch_birdeye_token_data(self, token_address: str) -> Optional[Dict]:
-        """Fetch token data from Birdeye"""
-        try:
-            headers = {
-                'X-API-KEY': settings.BIRDEYE_API_KEY,
-                'Accept': 'application/json'
-            }
-            
+            # Get fresh data
             async with self.session.get(
-                f"{settings.BIRDEYE_API_URL}/tokens/{token_address}",
-                headers=headers
+                f"https://api.dexscreener.com/latest/dex/tokens/{token_address}"
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    market_logger.debug(f"Successfully fetched Birdeye data for {token_address}")
-                    return self._process_birdeye_token_data(data)
-                else:
-                    error_msg = f"Birdeye API error: {response.status}"
-                    market_logger.error(error_msg)
-                    raise NetworkError(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error fetching Birdeye token data for {token_address}: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
-
-    @handle_errors(market_logger)
-    @log_performance(market_logger)
-    async def _fetch_dexscreener_token_data(self, token_address: str) -> Optional[Dict]:
-        """Fetch token data from DexScreener"""
-        try:
-            async with self.session.get(
-                f"{settings.DEXSCREENER_API_URL}/tokens/{token_address}"
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    market_logger.debug(f"Successfully fetched DexScreener data for {token_address}")
-                    return self._process_dexscreener_token_data(data)
-                else:
-                    error_msg = f"DexScreener API error: {response.status}"
-                    market_logger.error(error_msg)
-                    raise NetworkError(error_msg)
-
-        except Exception as e:
-            error_msg = f"Error fetching DexScreener token data for {token_address}: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
-
-    @handle_errors(market_logger)
-    def _process_birdeye_token_data(self, data: Dict) -> Optional[Dict]:
-        """Process raw Birdeye token data"""
-        try:
-            token = data.get('token', {})
-            processed_data = {
-                'address': token.get('address'),
-                'symbol': token.get('symbol'),
-                'price': float(token.get('price', 0)),
-                'volume_24h': float(token.get('volume24h', 0)),
-                'liquidity': float(token.get('liquidity', 0)),
-                'market_cap': float(token.get('marketCap', 0)),
-                'holders': int(token.get('holders', 0)),
-                'transactions_24h': int(token.get('transactions24h', 0)),
-                'source': 'birdeye'
-            }
-            market_logger.debug(f"Processed Birdeye data: {processed_data}")
-            return processed_data
-        except Exception as e:
-            error_msg = f"Error processing Birdeye token data: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
-
-    @handle_errors(market_logger)
-    def _process_dexscreener_token_data(self, data: Dict) -> Optional[Dict]:
-        """Process raw DexScreener token data"""
-        try:
-            pair = data.get('pair', {})
-            token = pair.get('baseToken', {})
-            processed_data = {
-                'address': token.get('address'),
-                'symbol': token.get('symbol'),
-                'price': float(pair.get('priceUsd', 0)),
-                'volume_24h': float(pair.get('volume24h', 0)),
-                'liquidity': float(pair.get('liquidity', {}).get('usd', 0)),
-                'market_cap': float(pair.get('marketCap', 0)),
-                'holders': int(pair.get('holders', 0)),
-                'transactions_24h': int(pair.get('transactions24h', 0)),
-                'source': 'dexscreener'
-            }
-            market_logger.debug(f"Processed DexScreener data: {processed_data}")
-            return processed_data
-        except Exception as e:
-            error_msg = f"Error processing DexScreener token data: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
-
-    @handle_errors(market_logger)
-    def _combine_token_data(self, birdeye_data: Optional[Dict], dexscreener_data: Optional[Dict]) -> Optional[Dict]:
-        """Combine data from multiple sources"""
-        try:
-            if not birdeye_data and not dexscreener_data:
-                market_logger.warning("No data available from either source")
+                    if data and 'pairs' in data:
+                        token_data = self._process_token_data(data['pairs'][0])
+                        if token_data:
+                            token_cache.set(token_address, token_data)
+                        return token_data
                 return None
 
-            # Use Birdeye data as base if available
-            if birdeye_data:
-                base_data = birdeye_data.copy()
-            else:
-                base_data = dexscreener_data.copy()
-
-            # Add DexScreener data if available
-            if dexscreener_data:
-                # Average prices if both sources available
-                if birdeye_data:
-                    base_data['price'] = (birdeye_data['price'] + dexscreener_data['price']) / 2
-                    base_data['volume_24h'] = (birdeye_data['volume_24h'] + dexscreener_data['volume_24h']) / 2
-                    base_data['liquidity'] = (birdeye_data['liquidity'] + dexscreener_data['liquidity']) / 2
-                    base_data['market_cap'] = (birdeye_data['market_cap'] + dexscreener_data['market_cap']) / 2
-                    base_data['holders'] = max(birdeye_data['holders'], dexscreener_data['holders'])
-                    base_data['transactions_24h'] = max(birdeye_data['transactions_24h'], dexscreener_data['transactions_24h'])
-                else:
-                    base_data.update(dexscreener_data)
-
-            market_logger.debug(f"Combined token data: {base_data}")
-            return base_data
-
         except Exception as e:
-            error_msg = f"Error combining token data: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
+            await error_handler.handle_error(e, "get_token_data")
+            return None
 
     @handle_errors(market_logger)
-    @log_performance(market_logger)
-    async def get_token_price(self, token_address: str) -> Optional[float]:
-        """Get token price from Birdeye API"""
+    @rate_limit(max_requests=10, time_window=60)  # 10 requests per minute
+    async def get_price_data(self, token_address: str) -> Optional[Dict]:
+        """Get price data with caching"""
         try:
-            if not self.session:
-                await self.initialize()
-
             # Check cache first
-            if token_address in self.price_cache:
-                cache_time, price = self.price_cache[token_address]
-                if asyncio.get_event_loop().time() - cache_time < self.cache_ttl:
-                    market_logger.debug(f"Returning cached price for {token_address}: {price}")
-                    return price
+            cached_data = price_cache.get(token_address)
+            if cached_data:
+                return cached_data
 
-            headers = {"X-API-KEY": settings.BIRDEYE_API_KEY}
-            url = f"{settings.BIRDEYE_API_URL}/public/price?address={token_address}"
-            
-            async with self.session.get(url, headers=headers) as response:
+            # Get fresh data
+            async with self.session.get(
+                f"https://public-api.birdeye.so/public/price?address={token_address}"
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    price = float(data.get("data", {}).get("value", 0))
-                    self.price_cache[token_address] = (asyncio.get_event_loop().time(), price)
-                    market_logger.info(f"Updated price for {token_address}: {price}")
-                    return price
-                else:
-                    error_msg = f"Failed to get price for {token_address}: {response.status}"
-                    market_logger.error(error_msg)
-                    raise NetworkError(error_msg)
+                    if data and 'data' in data:
+                        price_data = self._process_price_data(data['data'])
+                        if price_data:
+                            price_cache.set(token_address, price_data)
+                        return price_data
+                return None
 
         except Exception as e:
-            error_msg = f"Error getting token price for {token_address}: {str(e)}"
-            market_logger.error(error_msg)
-            raise MarketDataError(error_msg)
+            await error_handler.handle_error(e, "get_price_data")
+            return None
+
+    def _process_token_data(self, data: Dict) -> Optional[Dict]:
+        """Process raw token data"""
+        try:
+            return {
+                'address': data['baseToken']['address'],
+                'symbol': data['baseToken']['symbol'],
+                'price': float(data['priceUsd']),
+                'volume_24h': float(data['volume']['h24']),
+                'liquidity': float(data['liquidity']['usd']),
+                'market_cap': float(data['marketCap']),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error processing token data: {e}")
+            return None
+
+    def _process_price_data(self, data: Dict) -> Optional[Dict]:
+        """Process raw price data"""
+        try:
+            return {
+                'price': float(data['value']),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error processing price data: {e}")
+            return None
 
     @handle_errors(market_logger)
     @log_performance(market_logger)
@@ -378,4 +262,10 @@ class MarketData:
         except Exception as e:
             error_msg = f"Error checking rug risk for {token_address}: {str(e)}"
             market_logger.error(error_msg)
-            raise MarketDataError(error_msg) 
+            raise MarketDataError(error_msg)
+
+    async def cleanup(self) -> None:
+        """Clean up expired cache entries"""
+        market_data_cache.cleanup()
+        token_cache.cleanup()
+        price_cache.cleanup() 

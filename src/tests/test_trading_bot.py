@@ -1,211 +1,247 @@
 """
-Test suite for the main trading bot functionality.
+Comprehensive test suite for the Solana trading bot.
 """
 import pytest
 import asyncio
-from datetime import datetime
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import Mock, patch, AsyncMock
+from datetime import datetime, timedelta
+from typing import Dict, Any
 
-# Create a mock SimpleTradingBot for testing
-class MockSimpleTradingBot:
-    def __init__(self, wallet_address=None, simulation_mode=False):
-        self.wallet_address = wallet_address or "test_wallet"
-        self.simulation_mode = simulation_mode
-        self.is_running = False
-        self.known_tokens = set()
-        self.active_trades = {}
-        self.last_trade_time = 0
-        self.rpc_client = None
-        self.wallet = None
-        self.dex = None
-        self.simulator = None
-        self.error_handler = MagicMock()
-        self.error_handler.errors = []
-        
-    async def initialize(self):
-        """Initialize bot components."""
-        pass
-        
-    async def _get_tokens_to_check(self):
-        """Get tokens to check."""
-        return ["test_token"]
-        
-    async def _get_token_data(self, token_address):
-        """Get token data."""
-        return {
-            "address": token_address,
-            "liquidity": 1000,
-            "price": 1.0,
-            "should_buy": True,
-            "should_sell": False
-        }
-        
-    async def execute_trade(self, token_address, is_buy=True):
-        """Execute a trade."""
-        # Check for cooldown
-        current_time = datetime.now().timestamp()
-        if current_time - self.last_trade_time < 10:  # 10 second cooldown
-            return False
-            
-        self.last_trade_time = current_time
-        return True
-        
-    async def run(self):
-        """Run the bot."""
-        self.is_running = True
-        
-    async def close(self):
-        """Close bot connections."""
-        self.is_running = False
-        if self.rpc_client:
-            await self.rpc_client.close()
+from src.main import SimpleTradingBot
+from src.core.error_handler import ErrorHandler, CircuitBreaker
+from src.core.dex import RaydiumDEX
+from src.core.wallet import WalletManager
 
 @pytest.fixture
-async def trading_bot(mock_rpc_client, mock_wallet, mock_dex, mock_simulator):
-    """Create a trading bot instance with mocked dependencies."""
-    bot = MockSimpleTradingBot(
+def mock_rpc_client():
+    """Mock Solana RPC client."""
+    client = AsyncMock()
+    client.get_balance.return_value = {"result": {"value": 1000000000}}  # 1 SOL
+    return client
+
+@pytest.fixture
+def mock_dex():
+    """Mock DEX interface."""
+    dex = Mock(spec=RaydiumDEX)
+    dex.get_token_price.return_value = {
+        "price": 0.01,
+        "price_change_1h": 0.05,
+        "volume_change_1h": 0.03
+    }
+    dex.get_liquidity.return_value = 50000.0
+    return dex
+
+@pytest.fixture
+def mock_wallet():
+    """Mock wallet manager."""
+    wallet = Mock(spec=WalletManager)
+    wallet.get_balance.return_value = 1.0
+    return wallet
+
+@pytest.fixture
+def trading_bot(mock_rpc_client, mock_dex, mock_wallet):
+    """Create trading bot instance with mocks."""
+    return SimpleTradingBot(
         wallet_address="test_wallet",
         simulation_mode=True
     )
-    bot.rpc_client = mock_rpc_client
-    bot.wallet = mock_wallet
-    bot.dex = mock_dex
-    bot.simulator = mock_simulator
-    await bot.initialize()
-    return bot
 
-@pytest.mark.asyncio
-async def test_bot_initialization(trading_bot):
-    """Test bot initialization and setup."""
-    assert trading_bot.wallet_address == "test_wallet"
-    assert trading_bot.simulation_mode is True
-    assert trading_bot.is_running is False
-    assert isinstance(trading_bot.known_tokens, set)
-    assert len(trading_bot.active_trades) == 0
+class TestTradingBot:
+    """Test suite for trading bot functionality."""
+    
+    @pytest.mark.asyncio
+    async def test_initialization(self, trading_bot):
+        """Test bot initialization."""
+        await trading_bot.initialize()
+        assert trading_bot.is_running is False
+        assert len(trading_bot.known_tokens) == 0
+    
+    @pytest.mark.asyncio
+    async def test_token_discovery(self, trading_bot, mock_rpc_client):
+        """Test token discovery functionality."""
+        # Mock RPC response
+        mock_rpc_client.get_program_accounts.return_value = {
+            "result": [
+                {"pubkey": "token1"},
+                {"pubkey": "token2"}
+            ]
+        }
+        
+        tokens = await trading_bot._get_tokens_to_check()
+        assert len(tokens) == 2
+        assert "token1" in tokens
+        assert "token2" in tokens
+    
+    @pytest.mark.asyncio
+    async def test_token_data_validation(self, trading_bot, mock_dex):
+        """Test token data validation."""
+        token_data = await trading_bot._get_token_data("test_token")
+        assert token_data is not None
+        assert "price" in token_data
+        assert "liquidity" in token_data
+        assert "should_buy" in token_data
+        assert "should_sell" in token_data
+    
+    @pytest.mark.asyncio
+    async def test_trade_execution(self, trading_bot, mock_dex, mock_wallet):
+        """Test trade execution."""
+        # Mock successful trade
+        mock_wallet.send_transaction.return_value = True
+        
+        success = await trading_bot.execute_trade("test_token", is_buy=True)
+        assert success is True
+        assert "test_token" in trading_bot.active_trades
+    
+    @pytest.mark.asyncio
+    async def test_error_handling(self, trading_bot):
+        """Test error handling and circuit breaker."""
+        # Simulate network error
+        with patch.object(trading_bot.rpc_client, 'get_balance', side_effect=Exception("Network error")):
+            with pytest.raises(Exception):
+                await trading_bot._initialize_wallet()
+        
+        # Check error handler state
+        assert trading_bot.error_handler.should_stop_trading() is False
+    
+    @pytest.mark.asyncio
+    async def test_trading_cycle(self, trading_bot, mock_rpc_client, mock_dex):
+        """Test complete trading cycle."""
+        # Mock token discovery
+        mock_rpc_client.get_program_accounts.return_value = {
+            "result": [{"pubkey": "test_token"}]
+        }
+        
+        # Mock successful trade
+        mock_dex.create_swap_transaction.return_value = True
+        
+        # Run one trading cycle
+        await trading_bot._process_trading_cycle()
+        
+        # Verify state
+        assert len(trading_bot.active_trades) > 0
+    
+    @pytest.mark.asyncio
+    async def test_cleanup(self, trading_bot):
+        """Test cleanup and shutdown."""
+        await trading_bot.close()
+        assert trading_bot.is_running is False
 
-@pytest.mark.asyncio
-async def test_get_tokens_to_check(trading_bot):
-    """Test token discovery functionality."""
-    tokens = await trading_bot._get_tokens_to_check()
-    assert isinstance(tokens, list)
-    assert all(isinstance(token, str) for token in tokens)
+class TestErrorHandler:
+    """Test suite for error handling functionality."""
+    
+    def test_circuit_breaker(self):
+        """Test circuit breaker functionality."""
+        breaker = CircuitBreaker(failure_threshold=3, reset_timeout=1)
+        
+        # Simulate failures
+        for _ in range(3):
+            breaker.record_failure()
+        
+        assert breaker.is_open is True
+        assert breaker.can_execute() is False
+        
+        # Wait for reset
+        breaker.last_failure_time = 0
+        assert breaker.can_execute() is True
+    
+    def test_error_recording(self):
+        """Test error recording and categorization."""
+        handler = ErrorHandler()
+        
+        # Record different types of errors
+        handler.add_error(Exception("Network error"), "network")
+        handler.add_error(Exception("Transaction failed"), "transaction")
+        
+        summary = handler.get_error_summary()
+        assert summary["total_errors"] == 2
+        assert "network" in summary["error_types"]
+        assert "transaction" in summary["error_types"]
+    
+    def test_error_cooldown(self):
+        """Test error cooldown mechanism."""
+        handler = ErrorHandler(error_cooldown=1)
+        
+        # Record errors
+        for _ in range(5):
+            handler.add_error(Exception("Test error"))
+        
+        # Should stop trading due to error frequency
+        assert handler.should_stop_trading() is True
+        
+        # Clear errors
+        handler.clear_errors()
+        assert handler.should_stop_trading() is False
 
-@pytest.mark.asyncio
-async def test_get_token_data(trading_bot):
-    """Test token data retrieval."""
-    token_address = "test_token_address"
-    token_data = await trading_bot._get_token_data(token_address)
+class TestDEX:
+    """Test suite for DEX interaction."""
     
-    assert token_data is not None
-    assert "address" in token_data
-    assert "liquidity" in token_data
-    assert "price" in token_data
-    assert "should_buy" in token_data
-    assert "should_sell" in token_data
+    @pytest.mark.asyncio
+    async def test_price_caching(self, mock_rpc_client):
+        """Test price caching mechanism."""
+        dex = RaydiumDEX(mock_rpc_client)
+        
+        # First call should cache
+        price1 = await dex.get_token_price("test_token")
+        price2 = await dex.get_token_price("test_token")
+        
+        assert price1 == price2
+        assert "test_token" in dex._price_cache
+    
+    @pytest.mark.asyncio
+    async def test_liquidity_caching(self, mock_rpc_client):
+        """Test liquidity caching mechanism."""
+        dex = RaydiumDEX(mock_rpc_client)
+        
+        # First call should cache
+        liq1 = await dex.get_liquidity("test_token")
+        liq2 = await dex.get_liquidity("test_token")
+        
+        assert liq1 == liq2
+        assert "test_token" in dex._liquidity_cache
+    
+    @pytest.mark.asyncio
+    async def test_swap_transaction(self, mock_rpc_client):
+        """Test swap transaction creation."""
+        dex = RaydiumDEX(mock_rpc_client)
+        
+        # Mock successful transaction creation
+        transaction = await dex.create_swap_transaction(
+            "test_token",
+            1.0,
+            True,
+            Mock()
+        )
+        
+        assert transaction is not None
 
-@pytest.mark.asyncio
-async def test_create_trade_transaction(trading_bot):
-    """Test trade transaction creation."""
-    token_address = "test_token_address"
-    amount = 1.0
-    is_buy = True
+class TestWallet:
+    """Test suite for wallet management."""
     
-    transaction = await trading_bot.dex.create_swap_transaction(
-        token_address,
-        amount,
-        is_buy,
-        trading_bot.wallet.get_keypair()
-    )
+    def test_wallet_encryption(self, mock_rpc_client):
+        """Test wallet encryption and decryption."""
+        wallet = WalletManager(mock_rpc_client)
+        
+        # Test wallet loading
+        wallet.load_wallet("test_wallet.enc")
+        assert wallet.keypair is not None
     
-    assert transaction is not None
-    trading_bot.dex.create_swap_transaction.assert_called_once_with(
-        token_address,
-        amount,
-        is_buy,
-        trading_bot.wallet.get_keypair()
-    )
-
-@pytest.mark.asyncio
-async def test_execute_trade(trading_bot):
-    """Test trade execution."""
-    token_address = "test_token_address"
+    @pytest.mark.asyncio
+    async def test_balance_check(self, mock_rpc_client):
+        """Test balance checking functionality."""
+        wallet = WalletManager(mock_rpc_client)
+        wallet.load_wallet("test_wallet.enc")
+        
+        balance = await wallet.get_balance()
+        assert balance > 0
     
-    # Need to mock execute_trade method to return True - the test assumes it's pre-mocked
-    trading_bot.execute_trade = AsyncMock(return_value=True)
-    
-    # Test buy trade
-    success = await trading_bot.execute_trade(token_address, is_buy=True)
-    assert success is True
-    
-    # Test sell trade
-    success = await trading_bot.execute_trade(token_address, is_buy=False)
-    assert success is True
-
-@pytest.mark.asyncio
-async def test_trade_cooldown(trading_bot):
-    """Test trade cooldown mechanism."""
-    token_address = "test_token_address"
-    
-    # Execute first trade
-    await trading_bot.execute_trade(token_address, is_buy=True)
-    first_trade_time = trading_bot.last_trade_time
-    
-    # Try to execute another trade immediately
-    success = await trading_bot.execute_trade(token_address, is_buy=True)
-    assert success is False  # Should fail due to cooldown
-    
-    # Verify cooldown period
-    assert trading_bot.last_trade_time == first_trade_time
-
-@pytest.mark.asyncio
-async def test_error_handling(trading_bot):
-    """Test error handling in trade execution."""
-    # Mock a failed trade
-    trading_bot.dex.create_swap_transaction.side_effect = Exception("Test error")
-    
-    # This should be caught and handled by execute_trade
-    token_address = "test_token_address"
-    trading_bot.execute_trade = AsyncMock(return_value=False)
-    
-    success = await trading_bot.execute_trade(token_address, is_buy=True)
-    assert success is False
-
-@pytest.mark.asyncio
-async def test_bot_run_cycle(trading_bot):
-    """Test complete bot run cycle."""
-    # Mock token discovery
-    trading_bot._get_tokens_to_check = AsyncMock(return_value=["test_token"])
-    
-    # Mock token data
-    trading_bot._get_token_data = AsyncMock(return_value={
-        "address": "test_token",
-        "liquidity": 1000,
-        "price": 1.0,
-        "should_buy": True,
-        "should_sell": False
-    })
-    
-    # Run one cycle
-    await trading_bot.run()
-    
-    # Verify bot state
-    assert trading_bot.is_running is True
-    assert len(trading_bot.active_trades) >= 0
-
-@pytest.mark.asyncio
-async def test_bot_cleanup(trading_bot):
-    """Test bot cleanup and shutdown."""
-    await trading_bot.close()
-    assert trading_bot.is_running is False
-    assert trading_bot.rpc_client.close.called
-
-@pytest.mark.asyncio
-async def test_simulation_mode(trading_bot):
-    """Test simulation mode functionality."""
-    assert trading_bot.simulation_mode is True
-    assert trading_bot.simulator is not None
-    
-    # Test simulated trade
-    token_address = "test_token_address"
-    success = await trading_bot.execute_trade(token_address, is_buy=True)
-    assert success is True 
+    @pytest.mark.asyncio
+    async def test_transaction_sending(self, mock_rpc_client):
+        """Test transaction sending with retry logic."""
+        wallet = WalletManager(mock_rpc_client)
+        wallet.load_wallet("test_wallet.enc")
+        
+        # Mock successful transaction
+        mock_rpc_client.send_transaction.return_value = {"result": "success"}
+        
+        success = await wallet.send_transaction(Mock())
+        assert success is True 

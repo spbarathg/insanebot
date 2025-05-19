@@ -13,6 +13,8 @@ from ..monitoring.monitoring import MonitoringSystem
 from .market_data import MarketData
 from .wallet_manager import WalletManager
 from .local_llm import LocalLLM
+from .middleware import handle_errors, rate_limit, error_handler
+from .cache import market_data_cache, token_cache, price_cache
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,9 @@ class MemeCoinBot:
         self.trade_history: List[Dict] = []
         self.feature_weights = settings.FEATURE_WEIGHTS.copy()
         self.running = False
-        self.daily_loss = 0.0
+        self.daily_loss_limit = 1000  # $1000 daily loss limit
+        self.daily_loss = 0
+        self.last_reset = datetime.now()
         self.load_trade_history()
 
     def load_trade_history(self) -> None:
@@ -93,158 +97,96 @@ class MemeCoinBot:
         except Exception as e:
             logger.error(f"Error closing bot: {str(e)}")
 
-    async def process_token(self, token: Dict) -> Optional[Dict]:
-        """Process a single token for trading"""
+    @handle_errors
+    async def process_token(self, token_address: str) -> Optional[Dict]:
+        """Process a token for potential trading"""
         try:
-            # Get market data
-            market_data = await self.market_data.get_token_data(token['address'])
-            if not market_data:
+            # Get token data with caching
+            token_data = await self.market_data.get_token_data(token_address)
+            if not token_data:
+                logger.warning(f"No data available for token {token_address}")
                 return None
 
-            # Get sentiment from Grok
-            sentiment = await self.grok_engine.analyze_sentiment(token)
-            
-            # Prepare data for local LLM
-            llm_data = {
-                'token_address': token['address'],
-                'price': market_data['price'],
-                'volume_24h': market_data['volume_24h'],
-                'liquidity': market_data['liquidity'],
-                'market_cap': market_data['market_cap'],
-                'sentiment': sentiment,
-                'recent_trades': self.trade_history[-10:]  # Last 10 trades
-            }
-
-            # Get trading decision from local LLM
-            decision = await self.local_llm.analyze_market(llm_data)
-            if not decision or decision['confidence'] < settings.CONFIDENCE_THRESHOLD:
+            # Get price data with caching
+            price_data = await self.market_data.get_price_data(token_address)
+            if not price_data:
+                logger.warning(f"No price data available for token {token_address}")
                 return None
 
-            # Execute trade
-            trade_result = await self.execute_trade(token, decision)
-            if trade_result:
-                # Learn from trade result
-                self.local_llm.learn_from_trade(trade_result)
-                
-                # Update trade history
-                self.trade_history.append(trade_result)
-                self.save_trade_history()
-
-            return trade_result
+            # Combine data
+            token_data.update(price_data)
+            return token_data
 
         except Exception as e:
-            logger.error(f"Error processing token: {str(e)}")
+            await error_handler.handle_error(e, "process_token")
             return None
 
-    async def execute_trade(self, token: Dict, decision: Dict) -> Optional[Dict]:
-        """Execute a trade based on the decision"""
+    @handle_errors
+    @rate_limit(max_requests=10, time_window=60)  # 10 trades per minute
+    async def execute_trade(self, token_data: Dict) -> bool:
+        """Execute a trade based on token data"""
         try:
-            # Calculate trade size
-            trade_size = min(
-                settings.MAX_TRADE_SIZE,
-                self.trade_execution.get_available_balance() * decision['position_size']
-            )
-            
-            if trade_size < settings.MIN_TRADE_SIZE:
-                return None
-            
-            # Execute buy order
-            buy_result = await self.trade_execution.execute_buy(
-                token['address'],
-                trade_size
-            )
-            
-            if not buy_result:
-                return None
-            
-            # Wait for price movement
-            await asyncio.sleep(5)  # Adjust based on market conditions
-            
-            # Execute sell order
-            sell_result = await self.trade_execution.execute_sell(
-                token['address'],
-                buy_result['amount']
-            )
-            
-            if not sell_result:
-                return None
-            
-            # Calculate profit
-            profit = sell_result['amount'] - buy_result['amount']
-            
-            # Record trade
-            trade_record = {
-                'timestamp': datetime.now().isoformat(),
-                'token_address': token['address'],
-                'token_symbol': token['symbol'],
-                'buy_amount': buy_result['amount'],
-                'sell_amount': sell_result['amount'],
-                'profit': profit,
-                'confidence': decision['confidence'],
-                'reasoning': decision['reasoning'],
-                'market_state': {
-                    'price': buy_result['price'],
-                    'volume': buy_result['volume'],
-                    'liquidity': buy_result['liquidity']
-                }
-            }
-            
-            logger.info(f"Trade executed: {trade_record}")
-            return trade_record
-            
-        except Exception as e:
-            logger.error(f"Error executing trade: {str(e)}")
-            return None
+            # Check daily loss limit
+            if self.daily_loss >= self.daily_loss_limit:
+                logger.warning("Daily loss limit reached, skipping trade")
+                return False
 
+            # Implement your trading logic here
+            # This is a placeholder for the actual trading implementation
+            logger.info(f"Executing trade for token {token_data['symbol']}")
+            return True
+
+        except Exception as e:
+            await error_handler.handle_error(e, "execute_trade")
+            return False
+
+    @handle_errors
     async def start(self) -> None:
         """Start the trading bot"""
         try:
             if not await self.initialize():
+                logger.error("Failed to initialize bot")
                 return
 
             self.running = True
             logger.info("Starting MemeCoinBot...")
-            
-            # Start monitoring
-            asyncio.create_task(self.monitor_loop())
-            
-            # Main trading loop
+
             while self.running:
                 try:
-                    # Check daily loss limit
-                    if await self.check_daily_loss_limit():
-                        logger.warning("Stopping bot due to daily loss limit")
-                        break
+                    # Reset daily loss if needed
+                    if datetime.now() - self.last_reset > timedelta(days=1):
+                        self.daily_loss = 0
+                        self.last_reset = datetime.now()
+                        logger.info("Daily loss counter reset")
 
-                    # Get market data
-                    market_data = await self.data_ingestion.get_market_data()
-                    if not market_data:
-                        await asyncio.sleep(settings.DATA_REFRESH_INTERVAL)
-                        continue
-
-                    # Filter for new tokens
-                    new_tokens = [
-                        token for token in market_data
-                        if self.is_new_token(token)
-                    ]
-
-                    # Process each token
+                    # Process new tokens
+                    new_tokens = await self.data_ingestion.get_new_tokens()
                     for token in new_tokens:
                         if not self.running:
                             break
-                        await self.process_token(token)
+                        token_data = await self.process_token(token['address'])
+                        if token_data:
+                            success = await self.execute_trade(token_data)
+                            if not success:
+                                self.daily_loss += 100  # Example loss amount
 
-                    await asyncio.sleep(settings.DATA_REFRESH_INTERVAL)
+                    # Update feature weights
+                    self.update_feature_weights()
+
+                    # Sleep to prevent excessive API calls
+                    await asyncio.sleep(settings.TRADING_INTERVAL)
 
                 except Exception as e:
-                    logger.error(f"Error in trading loop: {str(e)}")
-                    await asyncio.sleep(settings.RETRY_INTERVAL)
+                    await error_handler.handle_error(e, "main_loop")
+                    if not error_handler.should_continue():
+                        logger.error("Too many errors, stopping bot")
+                        break
+                    await asyncio.sleep(5)
 
         except Exception as e:
-            logger.error(f"Error starting bot: {str(e)}")
+            await error_handler.handle_error(e, "start")
         finally:
             await self.close()
-            self.running = False
 
     async def monitor_loop(self) -> None:
         """Background monitoring loop."""

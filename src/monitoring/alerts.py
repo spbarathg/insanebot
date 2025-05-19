@@ -1,7 +1,3 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import requests
 import json
 from datetime import datetime
 from loguru import logger
@@ -15,56 +11,18 @@ class AlertSystem:
     def _load_alert_history(self):
         """Load alert history from file"""
         try:
-            with open('alerts.json', 'r') as f:
+            with open(settings.ALERT_LOG_FILE, 'r') as f:
                 self.alert_history = json.load(f)
         except FileNotFoundError:
             self.alert_history = []
 
     def _save_alert_history(self):
         """Save alert history to file"""
-        with open('alerts.json', 'w') as f:
+        with open(settings.ALERT_LOG_FILE, 'w') as f:
             json.dump(self.alert_history, f)
 
-    def send_email_alert(self, subject: str, message: str):
-        """Send email alert"""
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = settings.ALERT_EMAIL
-            msg['To'] = settings.ALERT_EMAIL
-            msg['Subject'] = f"[Meme Bot Alert] {subject}"
-
-            msg.attach(MIMEText(message, 'plain'))
-
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(settings.ALERT_EMAIL, settings.ALERT_EMAIL_PASSWORD)
-            server.send_message(msg)
-            server.quit()
-
-            logger.info(f"Email alert sent: {subject}")
-
-        except Exception as e:
-            logger.error(f"Send email alert error: {e}")
-
-    def send_telegram_alert(self, message: str):
-        """Send Telegram alert"""
-        try:
-            url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-            data = {
-                "chat_id": settings.TELEGRAM_CHAT_ID,
-                "text": message,
-                "parse_mode": "HTML"
-            }
-            response = requests.post(url, data=data)
-            response.raise_for_status()
-
-            logger.info(f"Telegram alert sent: {message}")
-
-        except Exception as e:
-            logger.error(f"Send Telegram alert error: {e}")
-
     def alert(self, level: str, subject: str, message: str):
-        """Send alert through all channels"""
+        """Record alert in history"""
         try:
             # Record alert
             alert_record = {
@@ -76,12 +34,11 @@ class AlertSystem:
             self.alert_history.append(alert_record)
             self._save_alert_history()
 
-            # Send alerts based on level
+            # Log alert
             if level in ['critical', 'error']:
-                self.send_email_alert(subject, message)
-                self.send_telegram_alert(f"🚨 {subject}\n\n{message}")
+                logger.error(f"🚨 {subject} - {message}")
             elif level == 'warning':
-                self.send_telegram_alert(f"⚠️ {subject}\n\n{message}")
+                logger.warning(f"⚠️ {subject} - {message}")
             else:
                 logger.info(f"Alert: {subject} - {message}")
 
@@ -89,10 +46,10 @@ class AlertSystem:
             logger.error(f"Alert error: {e}")
 
     def check_system_health(self, metrics: dict):
-        """Check system health and send alerts if needed"""
+        """Check system health and record alerts if needed"""
         try:
             # Check CPU usage
-            if metrics['cpu_percent'] > 90:
+            if metrics['cpu_percent'] > settings.CPU_WARNING_THRESHOLD:
                 self.alert(
                     'warning',
                     'High CPU Usage',
@@ -100,7 +57,7 @@ class AlertSystem:
                 )
 
             # Check memory usage
-            if metrics['memory_percent'] > 90:
+            if metrics['memory_percent'] > settings.MEMORY_WARNING_THRESHOLD:
                 self.alert(
                     'warning',
                     'High Memory Usage',
@@ -108,7 +65,7 @@ class AlertSystem:
                 )
 
             # Check disk usage
-            if metrics['disk_percent'] > 90:
+            if metrics['disk_percent'] > settings.DISK_WARNING_THRESHOLD:
                 self.alert(
                     'critical',
                     'Low Disk Space',
@@ -119,10 +76,10 @@ class AlertSystem:
             logger.error(f"Check system health error: {e}")
 
     def check_trading_health(self, metrics: dict):
-        """Check trading health and send alerts if needed"""
+        """Check trading health and record alerts if needed"""
         try:
             # Check win rate
-            if metrics['win_rate'] < 50:
+            if metrics['win_rate'] < settings.WIN_RATE_WARNING_THRESHOLD:
                 self.alert(
                     'warning',
                     'Low Win Rate',
@@ -130,7 +87,7 @@ class AlertSystem:
                 )
 
             # Check total profit
-            if metrics['total_profit'] < -0.1:  # -10%
+            if metrics['total_profit'] < settings.PROFIT_WARNING_THRESHOLD:
                 self.alert(
                     'error',
                     'Significant Loss',
@@ -138,7 +95,7 @@ class AlertSystem:
                 )
 
             # Check trade frequency
-            if metrics['total_trades'] < 10:  # Less than 10 trades per hour
+            if metrics['total_trades'] < settings.MIN_TRADES_PER_HOUR:
                 self.alert(
                     'warning',
                     'Low Trade Frequency',

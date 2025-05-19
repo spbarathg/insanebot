@@ -1,0 +1,47 @@
+groups:
+  - name: trading_bot
+    rules:
+      - alert: HighErrorRate
+        expr: rate(trading_bot_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate detected
+          description: "Error rate is {{ $value }} per second over the last 5 minutes"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(trading_bot_trade_latency_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High trade latency detected
+          description: "95th percentile latency is {{ $value }} seconds over the last 5 minutes"
+
+      - alert: LowTradeRate
+        expr: rate(trading_bot_trades_total[5m]) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Low trade rate detected
+          description: "Trade rate is {{ $value }} per second over the last 5 minutes"
+
+      - alert: HighPositionSize
+        expr: trading_bot_position_size > 1000000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Large position size detected
+          description: "Position size is {{ $value }} tokens"
+
+      - alert: PriceDeviation
+        expr: abs(trading_bot_token_price - trading_bot_token_price offset 5m) / trading_bot_token_price offset 5m > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Large price deviation detected
+          description: "Price has changed by {{ $value | humanizePercentage }} in the last 5 minutes" 
