@@ -7,8 +7,8 @@ from functools import lru_cache
 from solana.rpc.async_api import AsyncClient
 from solders.transaction import Transaction
 from solders.keypair import Keypair
-from solana.publickey import PublicKey
-from solana.instruction import Instruction, AccountMeta
+from solders.pubkey import Pubkey
+from solders.instruction import Instruction, AccountMeta
 from loguru import logger
 import base58
 import json
@@ -28,8 +28,8 @@ class RaydiumDEX:
     
     def __init__(self, rpc_client: AsyncClient):
         self.rpc_client = rpc_client
-        self.program_id = PublicKey("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")  # Raydium program ID
-        self.wsol_mint = PublicKey("So11111111111111111111111111111111111111112")  # Wrapped SOL mint
+        self.program_id = Pubkey.from_string("675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8")  # Raydium program ID
+        self.wsol_mint = Pubkey.from_string("So11111111111111111111111111111111111111112")  # Wrapped SOL mint
         self.pools_cache: Dict[str, Dict] = {}
         self._price_cache = {}
         self._liquidity_cache = {}
@@ -274,22 +274,22 @@ class RaydiumDEX:
             logger.error(f"Error getting pool info: {str(e)}")
             return None
             
-    async def _find_pool_address(self, token_address: str) -> Optional[PublicKey]:
+    async def _find_pool_address(self, token_address: str) -> Optional[Pubkey]:
         """Find Raydium pool address for a token pair."""
         try:
             # For testing, just return a fixed address
             if token_address == "test_token_address":
-                return PublicKey("7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G6")
+                return Pubkey.from_string("7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G6")
             
             # Get all Raydium pools
             pools = await self._get_raydium_pools()
             
             # Find pool for token pair
-            token_mint = PublicKey(token_address)
+            token_mint = Pubkey.from_string(token_address)
             for pool in pools:
                 if (pool["token_a"] == str(token_mint) and pool["token_b"] == str(self.wsol_mint)) or \
                    (pool["token_a"] == str(self.wsol_mint) and pool["token_b"] == str(token_mint)):
-                    return PublicKey(pool["address"])
+                    return Pubkey.from_string(pool["address"])
                     
             return None
             
@@ -313,7 +313,7 @@ class RaydiumDEX:
         pool_info: Dict,
         amount: float,
         is_buy: bool,
-        wallet_pubkey: PublicKey
+        wallet_pubkey: Pubkey
     ) -> Optional[Instruction]:
         """Create Raydium swap instruction."""
         try:
@@ -332,20 +332,20 @@ class RaydiumDEX:
             
             # Create accounts list
             accounts = [
-                AccountMeta(pubkey=PublicKey(pool_info["amm_id"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["amm_authority"]), is_signer=False, is_writable=False),
-                AccountMeta(pubkey=PublicKey(pool_info["amm_open_orders"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["amm_target_orders"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["pool_coin_token_account"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["pool_pc_token_account"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_program_id"]), is_signer=False, is_writable=False),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_market"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_bids"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_asks"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_event_queue"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_coin_vault_account"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_pc_vault_account"]), is_signer=False, is_writable=True),
-                AccountMeta(pubkey=PublicKey(pool_info["serum_vault_signer"]), is_signer=False, is_writable=False),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["amm_id"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["amm_authority"]), is_signer=False, is_writable=False),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["amm_open_orders"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["amm_target_orders"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["pool_coin_token_account"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["pool_pc_token_account"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_program_id"]), is_signer=False, is_writable=False),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_market"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_bids"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_asks"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_event_queue"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_coin_vault_account"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_pc_vault_account"]), is_signer=False, is_writable=True),
+                AccountMeta(pubkey=Pubkey.from_string(pool_info["serum_vault_signer"]), is_signer=False, is_writable=False),
                 AccountMeta(pubkey=wallet_pubkey, is_signer=True, is_writable=False),
                 AccountMeta(pubkey=user_token_accounts["source"], is_signer=False, is_writable=True),
                 AccountMeta(pubkey=user_token_accounts["destination"], is_signer=False, is_writable=True)
@@ -363,14 +363,14 @@ class RaydiumDEX:
             
     async def _get_user_token_accounts(
         self,
-        wallet_pubkey: PublicKey,
+        wallet_pubkey: Pubkey,
         is_buy: bool
-    ) -> Dict[str, PublicKey]:
+    ) -> Dict[str, Pubkey]:
         """Get user's token accounts for the swap."""
         try:
             # For testing, just return dummy accounts
-            wsol_account = PublicKey("So11111111111111111111111111111111111111112")
-            token_account = PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+            wsol_account = Pubkey.from_string("So11111111111111111111111111111111111111112")
+            token_account = Pubkey.from_string("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
                 
             return {
                 "source": wsol_account if is_buy else token_account,
