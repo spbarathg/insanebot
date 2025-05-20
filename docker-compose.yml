@@ -200,14 +200,10 @@ services:
 volumes:
   prometheus_data:
     driver: local
-    driver_opts:
-      o: size=5G
   grafana_data:
     driver: local
   loki_data:
     driver: local
-    driver_opts:
-      o: size=10G
 
 networks:
   trading-network:
