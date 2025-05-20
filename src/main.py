@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Set, Tuple, Any
 from dataclasses import dataclass
 from loguru import logger
 from solana.rpc.async_api import AsyncClient
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 from solana.keypair import Keypair
 from solana.rpc.commitment import Confirmed
 from core.config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG

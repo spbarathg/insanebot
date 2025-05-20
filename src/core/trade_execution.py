@@ -9,7 +9,7 @@ from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 import base58
 from ..utils.config import settings
 from .jupiter_service import JupiterService

@@ -12,7 +12,7 @@ from solana.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 from solana.system_program import transfer
 
 # Try to import SPL token functions, but continue even if they're not available
