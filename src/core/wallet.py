@@ -9,12 +9,16 @@ from typing import Optional, Dict, Any
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from solana.keypair import Keypair
-from solana.publickey import PublicKey
+from solders.keypair import Keypair
+from solders.transaction import Transaction
+from solders.pubkey import Pubkey
 from solana.rpc.async_api import AsyncClient
 from loguru import logger
 from dotenv import load_dotenv
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 async def await_confirmation(rpc_client, signature, timeout=30, poll_interval=1):
     """Poll Solana RPC for transaction confirmation."""
@@ -41,7 +45,6 @@ class WalletManager:
         self.rpc_client = rpc_client
         self.keypair: Optional[Keypair] = None
         self._fernet = None
-        self._initialize_encryption()
         self._balance_cache = None
         self._load_wallet()
         
@@ -167,7 +170,7 @@ class WalletManager:
             raise ValueError("Wallet not loaded")
         return self.keypair
     
-    async def get_balance(self) -> float:
+    async def get_balance(self) -> Optional[float]:
         """
         Get wallet balance in SOL.
         
@@ -182,13 +185,14 @@ class WalletManager:
             
         try:
             if not self._balance_cache:
-                response = await self.rpc_client.get_balance(self.keypair.public_key)
+                pubkey = self.keypair.pubkey()
+                response = await self.rpc_client.get_balance(str(pubkey))
                 self._balance_cache = response["result"]["value"] / 1e9  # Convert lamports to SOL
             return self._balance_cache
             
         except Exception as e:
             logger.error(f"Failed to get balance: {e}")
-            raise
+            return None
     
     async def get_token_balance(self, token_address: str) -> Optional[float]:
         """Get token balance for a specific token."""
@@ -202,7 +206,7 @@ class WalletManager:
             # Get token account
             token_account = await self.rpc_client.get_token_accounts_by_owner(
                 self.keypair.public_key,
-                {"mint": PublicKey(token_address)}
+                {"mint": Pubkey(token_address)}
             )
             
             if not token_account or not token_account.get("result", {}).get("value"):
@@ -225,13 +229,13 @@ class WalletManager:
             logger.error(f"Error getting token balance: {str(e)}")
             return None
             
-    def get_public_key(self) -> PublicKey:
+    def get_public_key(self) -> Pubkey:
         """Get wallet public key."""
         if not self.keypair:
             raise ValueError("Wallet not loaded")
-        return self.keypair.public_key
+        return self.keypair.pubkey()
         
-    async def send_transaction(self, transaction: Any) -> bool:
+    async def send_transaction(self, transaction: Transaction) -> bool:
         """
         Send a transaction with retry logic, error handling, and confirmation monitoring.
         
@@ -250,11 +254,8 @@ class WalletManager:
         retry_delay = 1
         for attempt in range(max_retries):
             try:
-                transaction.sign(self.keypair)
-                response = await self.rpc_client.send_transaction(
-                    transaction,
-                    opts={"skip_preflight": False}
-                )
+                transaction.sign([self.keypair])
+                response = await self.rpc_client.send_transaction(transaction)
                 if "result" in response:
                     signature = response["result"]
                     logger.info(f"Transaction sent: {signature}")
@@ -272,4 +273,21 @@ class WalletManager:
                     await asyncio.sleep(retry_delay * (attempt + 1))
                 continue
         logger.error("All transaction attempts failed")
-        return False 
+        return False
+
+    async def initialize(self) -> bool:
+        """Initialize the wallet manager."""
+        try:
+            # Initialize wallet here
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize wallet: {str(e)}")
+            return False
+
+    async def close(self) -> None:
+        """Close the wallet manager."""
+        try:
+            # Cleanup here
+            pass
+        except Exception as e:
+            logger.error(f"Error closing wallet: {str(e)}") 

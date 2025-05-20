@@ -1,476 +1,363 @@
+"""
+Trade execution service for Solana trading bot.
+"""
 import asyncio
-import json
+import logging
 import time
-from typing import Dict, List, Optional, Tuple
-from loguru import logger
-import aiohttp
-from solana.rpc.async_api import AsyncClient
-from solana.transaction import Transaction
+from typing import Dict, List, Optional, Any
 from solana.keypair import Keypair
+from solana.publickey import PublicKey
+from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
-from spl.token.instructions import get_associated_token_address
-from spl.token.constants import TOKEN_PROGRAM_ID
-from src.core.config import CORE_CONFIG, TRADING_CONFIG
+from solana.transaction import Transaction
+import base58
+from ..utils.config import settings
+from .jupiter_service import JupiterService
+from .helius_service import HeliusService
+from .wallet_manager import WalletManager
+
+logger = logging.getLogger(__name__)
 
 class TradeExecution:
+    """Trade execution service for Solana trading bot."""
+    
     def __init__(self):
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.solana_client: Optional[AsyncClient] = None
-        self.active_trades: Dict[str, Dict] = {}
-        self.pre_signed_txs: List[Transaction] = []
-        self.current_rpc_index = 0
-        self.last_rpc_switch = time.time()
-        self.priority_fee = 0.000005  # Base priority fee in SOL
-        self._load_wallet()
-
-    def _load_wallet(self):
-        """Load wallet from private key"""
+        self.wallet_manager = WalletManager()
+        self.jupiter = JupiterService()
+        self.helius = HeliusService()
+        self.session = None
+        self.solana_client = None
+        self.wallet = None
+        self.wsol_mint = "So11111111111111111111111111111111111111112"
+        self.usdc_mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"  # USDC on Solana
+        self.last_trade_time = 0
+        self.trades_in_progress = {}
+        self.trade_history = []
+        
+    async def initialize(self) -> bool:
+        """Initialize trade execution service."""
         try:
-            private_key = bytes.fromhex(CORE_CONFIG.SOLANA_PRIVATE_KEY)
-            self.wallet = Keypair.from_secret_key(private_key)
-        except Exception as e:
-            logger.error(f"Load wallet error: {e}")
-            raise
-
-    async def initialize(self):
-        """Initialize trade execution"""
-        self.session = aiohttp.ClientSession()
-        self.solana_client = AsyncClient(CORE_CONFIG.RPC_ENDPOINTS[0])
-        await self._refresh_pre_signed_txs()
-
-    async def close(self):
-        """Close trade execution"""
-        if self.session:
-            await self.session.close()
-        if self.solana_client:
-            await self.solana_client.close()
-
-    async def _refresh_pre_signed_txs(self):
-        """Refresh pool of pre-signed transactions"""
-        try:
-            # Create new transactions
-            new_txs = []
-            for _ in range(5):  # Keep 5 pre-signed transactions
-                tx = await self._create_swap_transaction()
-                if tx:
-                    new_txs.append(tx)
-
-            self.pre_signed_txs = new_txs
-            logger.info(f"Refreshed {len(new_txs)} pre-signed transactions")
-
-        except Exception as e:
-            logger.error(f"Refresh pre-signed transactions error: {e}")
-
-    async def _get_liquidity_info(self, token: str) -> Optional[Dict]:
-        """Get token liquidity information"""
-        try:
-            async with self.session.get(
-                f"https://api.dexscreener.com/latest/dex/tokens/{token}"
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get('pairs'):
-                        pair = data['pairs'][0]  # Get most liquid pair
-                        return {
-                            'amount': float(pair.get('liquidity', {}).get('usd', 0)),
-                            'lock_time': int(pair.get('lockTime', 0)),
-                            'market_cap': float(pair.get('fdv', 0))
-                        }
-                return None
-        except Exception as e:
-            logger.error(f"Get liquidity info error: {e}")
-            return None
-
-    async def _get_token_info(self, token: str) -> Optional[Dict]:
-        """Get token information"""
-        try:
-            async with self.session.get(
-                f"https://public-api.birdeye.so/public/token_info?address={token}",
-                headers={'X-API-KEY': TRADING_CONFIG.BIRDEYE_API_KEY}
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {
-                        'holder_count': data.get('holderCount', 0),
-                        'owner_concentration': data.get('ownerConcentration', 1.0),
-                        'age': data.get('age', 0)
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Get token info error: {e}")
-            return None
-
-    async def _calculate_price_impact(self, token: str, amount: float) -> float:
-        """Calculate price impact of trade"""
-        try:
-            async with self.session.get(
-                f"https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint={token}&amount={int(amount * 1e9)}"
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return float(data.get('priceImpactPct', 1.0))
-                return 1.0
-        except Exception as e:
-            logger.error(f"Calculate price impact error: {e}")
-            return 1.0
-
-    async def _create_swap_transaction(self) -> Optional[Transaction]:
-        """Create a pre-signed swap transaction"""
-        try:
-            # Get quote from Jupiter
-            quote = await self._get_swap_quote()
-            if not quote:
-                return None
-
-            # Create transaction
-            tx = Transaction()
+            logger.info("Initializing trade execution service...")
             
-            # Add swap instruction
-            swap_ix = await self._create_swap_instruction(quote)
-            if not swap_ix:
+            # Initialize wallet manager
+            await self.wallet_manager.initialize()
+            self.wallet = self.wallet_manager.get_keypair()
+            
+            # Initialize Solana client
+            self.solana_client = AsyncClient(settings.RPC_ENDPOINTS[0], commitment=Confirmed)
+            
+            # Initialize Jupiter
+            await self.jupiter.initialize()
+            
+            # Initialize Helius
+            await self.helius.initialize()
+            
+            # Load trade history if available
+            self._load_trade_history()
+            
+            logger.info("Trade execution service initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize trade execution service: {str(e)}")
+            return False
+            
+    def _load_trade_history(self):
+        """Load trade history from file."""
+        try:
+            # Implementation of loading trade history
+            pass
+        except Exception as e:
+            logger.error(f"Error loading trade history: {e}")
+            
+    def _save_trade_history(self):
+        """Save trade history to file."""
+        try:
+            # Implementation of saving trade history
+            pass
+        except Exception as e:
+            logger.error(f"Error saving trade history: {e}")
+            
+    async def close(self):
+        """Close trade execution service."""
+        try:
+            await self.jupiter.close()
+            await self.helius.close()
+            await self.solana_client.close()
+            logger.info("Trade execution service closed")
+        except Exception as e:
+            logger.error(f"Error closing trade execution service: {e}")
+            
+    async def execute_buy(self, token_address: str, amount_sol: float) -> Optional[Dict]:
+        """Execute buy trade for a token using SOL."""
+        try:
+            # Check if we should execute trade
+            if not self._can_execute_trade(token_address):
                 return None
                 
-            tx.add(swap_ix)
-            
-            # Sign transaction
-            tx.sign(self.wallet)
-            
-            return tx
-        except Exception as e:
-            logger.error(f"Create swap transaction error: {e}")
-            return None
-
-    async def _get_swap_quote(self) -> Optional[Dict]:
-        """Get swap quote from Jupiter"""
-        try:
-            async with self.session.get(
-                "https://quote-api.jup.ag/v6/quote",
-                params={
-                    "inputMint": "So11111111111111111111111111111111111111112",
-                    "outputMint": "YOUR_TOKEN_MINT",
-                    "amount": "1000000000"  # 1 SOL
-                }
-            ) as response:
-                if response.status == 200:
-                    return await response.json()
-                return None
-        except Exception as e:
-            logger.error(f"Get swap quote error: {e}")
-            return None
-
-    async def _create_swap_instruction(self, quote: Dict) -> Optional[Instruction]:
-        """Create swap instruction from quote"""
-        try:
-            # Get swap instruction from Jupiter
-            async with self.session.post(
-                "https://quote-api.jup.ag/v6/swap",
-                json={
-                    "quoteResponse": quote,
-                    "userPublicKey": str(self.wallet.public_key),
-                    "wrapUnwrapSOL": True
-                }
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get('swapInstruction')
-                return None
-        except Exception as e:
-            logger.error(f"Create swap instruction error: {e}")
-            return None
-
-    async def _execute_buy_order(self, token: str, amount: float, fee: float) -> Optional[Dict]:
-        """Execute buy order"""
-        try:
-            # Get quote
-            quote = await self._get_swap_quote()
-            if not quote:
-                return None
-
-            # Create and sign transaction
-            tx = await self._create_swap_transaction()
-            if not tx:
-                return None
-
-            # Send transaction
-            result = await self.solana_client.send_transaction(
-                tx,
-                self.wallet,
-                opts={
-                    'skip_preflight': True,
-                    'max_retries': 3,
-                    'preflight_commitment': Confirmed
-                }
-            )
-
-            if result.get('result'):
-                return {
-                    'signature': result['result'],
-                    'price': float(quote.get('outAmount', 0)) / float(quote.get('inAmount', 1)),
-                    'amount': amount
-                }
-            return None
-
-        except Exception as e:
-            logger.error(f"Execute buy order error: {e}")
-            return None
-
-    async def _execute_sell_order(self, token: str, amount: float, fee: float) -> Optional[Dict]:
-        """Execute sell order"""
-        try:
-            # Get quote (reverse of buy)
-            quote = await self._get_swap_quote()
-            if not quote:
-                return None
-
-            # Create and sign transaction
-            tx = await self._create_swap_transaction()
-            if not tx:
-                return None
-
-            # Send transaction
-            result = await self.solana_client.send_transaction(
-                tx,
-                self.wallet,
-                opts={
-                    'skip_preflight': True,
-                    'max_retries': 3,
-                    'preflight_commitment': Confirmed
-                }
-            )
-
-            if result.get('result'):
-                return {
-                    'signature': result['result'],
-                    'price': float(quote.get('outAmount', 0)) / float(quote.get('inAmount', 1)),
-                    'amount': amount
-                }
-            return None
-
-        except Exception as e:
-            logger.error(f"Execute sell order error: {e}")
-            return None
-
-    async def _get_price_data(self, token: str) -> Optional[Dict]:
-        """Get token price data"""
-        try:
-            async with self.session.get(
-                f"https://public-api.birdeye.so/public/price?address={token}",
-                headers={'X-API-KEY': TRADING_CONFIG.BIRDEYE_API_KEY}
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return {
-                        'current_price': float(data.get('value', 0)),
-                        'prev_price': float(data.get('prevValue', 0))
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Get price data error: {e}")
-            return None
-
-    def _get_current_rpc(self) -> str:
-        """Get current RPC endpoint with failover"""
-        try:
-            if time.time() - self.last_rpc_switch > TRADING_CONFIG.RPC_FAILOVER_TIMEOUT:
-                self.current_rpc_index = (self.current_rpc_index + 1) % len(CORE_CONFIG.RPC_ENDPOINTS)
-                self.last_rpc_switch = time.time()
-            return CORE_CONFIG.RPC_ENDPOINTS[self.current_rpc_index]
-        except Exception as e:
-            logger.error(f"Get current RPC error: {e}")
-            return CORE_CONFIG.RPC_ENDPOINTS[0]
-
-    async def _execute_with_retry(self, func, *args, **kwargs) -> Optional[Dict]:
-        """Execute function with retry logic"""
-        for attempt in range(TRADING_CONFIG.MAX_RPC_RETRIES):
-            try:
-                return await func(*args, **kwargs)
-            except Exception as e:
-                if attempt == TRADING_CONFIG.MAX_RPC_RETRIES - 1:
-                    logger.error(f"Max retries reached: {e}")
-                    return None
-                await asyncio.sleep(TRADING_CONFIG.RETRY_INTERVAL * (attempt + 1))
-                self.current_rpc_index = (self.current_rpc_index + 1) % len(CORE_CONFIG.RPC_ENDPOINTS)
-
-    async def check_liquidity(self, token: str) -> bool:
-        """Check token liquidity and lock status"""
-        try:
-            # Get liquidity info
-            liquidity_info = await self._execute_with_retry(
-                self._get_liquidity_info,
-                token
-            )
-            if not liquidity_info:
-                return False
-
-            # Check minimum liquidity
-            if liquidity_info['amount'] < TRADING_CONFIG.MIN_LIQUIDITY:
-                return False
-
-            # Check lock time
-            if liquidity_info['lock_time'] < TRADING_CONFIG.MIN_LIQUIDITY_LOCK_TIME:
-                return False
-
-            # Check liquidity ratio
-            liquidity_ratio = liquidity_info['amount'] / liquidity_info['market_cap']
-            if liquidity_ratio < TRADING_CONFIG.MIN_LIQUIDITY_RATIO:
-                return False
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Check liquidity error: {e}")
-            return False
-
-    async def check_rug_risk(self, token: str) -> bool:
-        """Check for rug pull risk"""
-        try:
-            # Get token info
-            token_info = await self._execute_with_retry(
-                self._get_token_info,
-                token
-            )
-            if not token_info:
-                return True  # Assume risk if can't get info
-
-            # Check holder count
-            if token_info['holder_count'] < TRADING_CONFIG.MIN_HOLDER_COUNT:
-                return True
-
-            # Check owner concentration
-            if token_info['owner_concentration'] > TRADING_CONFIG.MAX_OWNER_CONCENTRATION:
-                return True
-
-            # Check token age
-            if token_info['age'] > TRADING_CONFIG.MAX_TOKEN_AGE:
-                return True
-
-            return False
-
-        except Exception as e:
-            logger.error(f"Check rug risk error: {e}")
-            return True
-
-    async def execute_buy(self, token: str, amount: float) -> Optional[Dict]:
-        """Execute buy order with enhanced checks"""
-        try:
-            # Check liquidity
-            if not await self.check_liquidity(token):
-                logger.warning(f"Insufficient liquidity for {token}")
-                return None
-
-            # Check rug risk
-            if await self.check_rug_risk(token):
-                logger.warning(f"High rug risk for {token}")
-                return None
-
-            # Calculate price impact
-            price_impact = await self._calculate_price_impact(token, amount)
-            if price_impact > TRADING_CONFIG.MAX_PRICE_IMPACT:
-                logger.warning(f"Price impact too high: {price_impact}")
-                return None
-
-            # Adjust priority fee based on network congestion
-            current_fee = self.priority_fee * TRADING_CONFIG.PRIORITY_FEE_MULTIPLIER
-
-            # Execute buy
-            result = await self._execute_with_retry(
-                self._execute_buy_order,
-                token,
-                amount,
-                current_fee
-            )
-
-            if result:
-                self.active_trades[token] = {
-                    'amount': amount,
-                    'price': result['price'],
-                    'timestamp': time.time()
-                }
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Execute buy error: {e}")
-            return None
-
-    async def execute_sell(self, token: str, amount: float) -> Optional[Dict]:
-        """Execute sell order with enhanced checks"""
-        try:
-            # Check volatility
-            if await self._check_volatility(token):
-                logger.warning(f"High volatility for {token}")
-                return None
-
-            # Adjust priority fee based on network congestion
-            current_fee = self.priority_fee * TRADING_CONFIG.PRIORITY_FEE_MULTIPLIER
-
-            # Execute sell
-            result = await self._execute_with_retry(
-                self._execute_sell_order,
-                token,
-                amount,
-                current_fee
-            )
-
-            if result:
-                if token in self.active_trades:
-                    del self.active_trades[token]
-
-            return result
-
-        except Exception as e:
-            logger.error(f"Execute sell error: {e}")
-            return None
-
-    async def _check_volatility(self, token: str) -> bool:
-        """Check if token price is too volatile"""
-        try:
-            price_data = await self._execute_with_retry(
-                self._get_price_data,
-                token
-            )
+            # Get current SOL price for token
+            price_data = await self.helius.get_token_price(token_address)
             if not price_data:
-                return True
-
-            # Calculate price change
-            price_change = abs(
-                (price_data['current_price'] - price_data['prev_price'])
-                / price_data['prev_price']
+                logger.warning(f"No price data for token {token_address}")
+                return None
+                
+            # Check if trade meets criteria
+            if not self._validate_trade(token_address, True, amount_sol, price_data):
+                return None
+                
+            # Get swap quote
+            quote = await self.jupiter.get_swap_quote(
+                self.wsol_mint,  # Input is SOL
+                token_address,   # Output is token
+                amount_sol       # Amount in SOL
             )
-
-            return price_change > TRADING_CONFIG.VOLATILITY_THRESHOLD
-
+            
+            if not quote:
+                logger.warning(f"Could not get swap quote for {token_address}")
+                return None
+                
+            # Create swap transaction
+            swap_tx_data = await self.jupiter.create_swap_transaction(
+                quote, 
+                str(self.wallet.public_key)
+            )
+            
+            if not swap_tx_data:
+                logger.warning(f"Could not create swap transaction for {token_address}")
+                return None
+                
+            # Process and send transaction
+            tx_result = await self._process_and_send_transaction(swap_tx_data.get('swapTransaction'))
+            
+            if not tx_result:
+                logger.warning(f"Transaction failed for {token_address}")
+                return None
+                
+            # Record trade
+            trade_record = {
+                'type': 'buy',
+                'token': token_address,
+                'amount_sol': amount_sol,
+                'price': swap_tx_data.get('price'),
+                'token_amount': float(swap_tx_data.get('expectedOutputAmount', 0)) / 1e9,
+                'timestamp': time.time(),
+                'transaction': tx_result
+            }
+            
+            # Update trade history
+            self.trade_history.append(trade_record)
+            self._save_trade_history()
+            
+            logger.info(f"Buy executed: {amount_sol} SOL → {trade_record['token_amount']} tokens at {trade_record['price']}")
+            return trade_record
+            
         except Exception as e:
-            logger.error(f"Check volatility error: {e}")
+            logger.error(f"Error executing buy: {str(e)}")
+            return None
+            
+    async def execute_sell(self, token_address: str, amount: float) -> Optional[Dict]:
+        """Execute sell trade for a token to SOL."""
+        try:
+            # Check if we should execute trade
+            if not self._can_execute_trade(token_address):
+                return None
+                
+            # Get current token data
+            price_data = await self.helius.get_token_price(token_address)
+            if not price_data:
+                logger.warning(f"No price data for token {token_address}")
+                return None
+                
+            # Check if trade meets criteria
+            if not self._validate_trade(token_address, False, amount, price_data):
+                return None
+                
+            # Get swap quote
+            quote = await self.jupiter.get_swap_quote(
+                token_address,  # Input is token
+                self.wsol_mint,  # Output is SOL
+                amount          # Amount in tokens
+            )
+            
+            if not quote:
+                logger.warning(f"Could not get swap quote for {token_address}")
+                return None
+                
+            # Create swap transaction
+            swap_tx_data = await self.jupiter.create_swap_transaction(
+                quote, 
+                str(self.wallet.public_key)
+            )
+            
+            if not swap_tx_data:
+                logger.warning(f"Could not create swap transaction for {token_address}")
+                return None
+                
+            # Process and send transaction
+            tx_result = await self._process_and_send_transaction(swap_tx_data.get('swapTransaction'))
+            
+            if not tx_result:
+                logger.warning(f"Transaction failed for {token_address}")
+                return None
+                
+            # Record trade
+            trade_record = {
+                'type': 'sell',
+                'token': token_address,
+                'amount_tokens': amount,
+                'price': swap_tx_data.get('price'),
+                'sol_amount': float(swap_tx_data.get('expectedOutputAmount', 0)) / 1e9,
+                'timestamp': time.time(),
+                'transaction': tx_result
+            }
+            
+            # Update trade history
+            self.trade_history.append(trade_record)
+            self._save_trade_history()
+            
+            logger.info(f"Sell executed: {amount} tokens → {trade_record['sol_amount']} SOL at {trade_record['price']}")
+            return trade_record
+            
+        except Exception as e:
+            logger.error(f"Error executing sell: {str(e)}")
+            return None
+    
+    async def _process_and_send_transaction(self, transaction_base64: str) -> Optional[str]:
+        """Process and send a transaction."""
+        try:
+            # Decode the transaction
+            decoded_tx = base58.b58decode(transaction_base64)
+            
+            # Create transaction object
+            tx = Transaction.deserialize(decoded_tx)
+            
+            # Send the transaction
+            result = await self.solana_client.send_raw_transaction(
+                decoded_tx,
+                opts={
+                    'skip_preflight': True,
+                    'max_retries': settings.MAX_RPC_RETRIES,
+                    'preflight_commitment': Confirmed
+                }
+            )
+            
+            if not result or 'result' not in result:
+                logger.error(f"Failed to send transaction: {result}")
+                return None
+                
+            tx_signature = result['result']
+            
+            # Monitor for confirmation
+            confirmed = await self._wait_for_confirmation(tx_signature)
+            if not confirmed:
+                logger.warning(f"Transaction not confirmed: {tx_signature}")
+                return None
+                
+            return tx_signature
+            
+        except Exception as e:
+            logger.error(f"Error processing transaction: {str(e)}")
+            return None
+            
+    async def _wait_for_confirmation(self, signature: str, max_retries: int = 30) -> bool:
+        """Wait for transaction confirmation."""
+        retries = 0
+        while retries < max_retries:
+            try:
+                result = await self.solana_client.get_signature_statuses([signature])
+                if result and 'result' in result and result['result']['value'][0]:
+                    status = result['result']['value'][0]
+                    if status.get('confirmationStatus') == 'confirmed' or status.get('confirmationStatus') == 'finalized':
+                        return True
+            except Exception as e:
+                logger.error(f"Error checking confirmation: {str(e)}")
+                
+            await asyncio.sleep(1)
+            retries += 1
+            
+        return False
+        
+    def _can_execute_trade(self, token_address: str) -> bool:
+        """Check if we can execute a trade for this token."""
+        # Check if we have an active trade for this token
+        if token_address in self.trades_in_progress:
+            logger.warning(f"Trade already in progress for {token_address}")
+            return False
+            
+        # Check cooldown period
+        current_time = time.time()
+        if current_time - self.last_trade_time < settings.TRADE_COOLDOWN:
+            logger.warning(f"Trade cooldown in effect, wait {settings.TRADE_COOLDOWN - (current_time - self.last_trade_time)} seconds")
+            return False
+            
+        return True
+        
+    async def _validate_trade(self, token_address: str, is_buy: bool, amount: float, price_data: Dict) -> bool:
+        """Validate if trade meets criteria."""
+        try:
+            # Get token info from Helius
+            token_info = await self.helius.get_token_metadata(token_address)
+            if not token_info:
+                logger.warning(f"No token info for {token_address}")
+                return False
+                
+            # Get liquidity info
+            liquidity_data = await self.helius.get_token_liquidity(token_address)
+            if not liquidity_data:
+                logger.warning(f"No liquidity data for {token_address}")
+                return False
+                
+            # Check minimum liquidity
+            liquidity = liquidity_data.get('liquidity', 0)
+            if liquidity < settings.MIN_LIQUIDITY:
+                logger.warning(f"Insufficient liquidity for {token_address}: {liquidity} < {settings.MIN_LIQUIDITY}")
+                return False
+                
+            # Check token age for buys
+            if is_buy:
+                token_age = time.time() - token_info.get('created_at', time.time())
+                if token_age < settings.MAX_TOKEN_AGE:
+                    logger.warning(f"Token too new for {token_address}: {token_age} < {settings.MAX_TOKEN_AGE}")
+                    return False
+                
+            # Check price impact
+            price_impact = await self._calculate_price_impact(token_address, amount, is_buy)
+            if price_impact > settings.MAX_PRICE_IMPACT:
+                logger.warning(f"Price impact too high for {token_address}: {price_impact} > {settings.MAX_PRICE_IMPACT}")
+                return False
+                
             return True
-
-    def get_available_balance(self) -> float:
-        """Get available balance for trading"""
-        try:
-            # Calculate used capital
-            used_capital = sum(
-                trade['amount'] for trade in self.active_trades.values()
-            )
-
-            # Calculate available capital
-            available = TRADING_CONFIG.STARTING_CAPITAL - used_capital
-
-            # Apply capital efficiency threshold
-            return available * TRADING_CONFIG.CAPITAL_EFFICIENCY_THRESHOLD
-
+            
         except Exception as e:
-            logger.error(f"Get available balance error: {e}")
-            return 0.0
-
-    def get_trade_pnl(self, token: str, current_price: float) -> float:
-        """Calculate PnL for a trade"""
+            logger.error(f"Error validating trade: {str(e)}")
+            return False
+            
+    async def _calculate_price_impact(self, token_address: str, amount: float, is_buy: bool) -> float:
+        """Calculate price impact of a trade."""
         try:
-            trade = self.active_trades.get(token)
-            if not trade:
-                return 0.0
-
-            return (current_price - trade['price']) / trade['price']
-
+            # For buy, input is SOL, output is token
+            # For sell, input is token, output is SOL
+            input_token = self.wsol_mint if is_buy else token_address
+            output_token = token_address if is_buy else self.wsol_mint
+            
+            # Get quote
+            quote = await self.jupiter.get_swap_quote(input_token, output_token, amount)
+            if not quote:
+                return 1.0  # Default to high impact if no quote
+                
+            # Extract price impact
+            price_impact = float(quote.get('priceImpactPct', 0))
+            
+            return price_impact
+            
         except Exception as e:
-            logger.error(f"Get trade PnL error: {e}")
-            return 0.0 
+            logger.error(f"Error calculating price impact: {str(e)}")
+            return 1.0  # Default to high impact on error
+            
+    async def get_wallet_balance(self) -> Optional[Dict]:
+        """Get wallet balances."""
+        try:
+            balances = await self.helius.get_token_balances(str(self.wallet.public_key))
+            return balances
+        except Exception as e:
+            logger.error(f"Error getting wallet balance: {str(e)}")
+            return None 

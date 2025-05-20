@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 import os
+import time
+import json
+import threading
 from typing import Dict, List
 import aiohttp
 import asyncio
@@ -34,8 +37,23 @@ if os.path.exists(personality_path):
 else:
     PERSONALITY_CONTEXT = "You are Ant Princess, Barath's personal Solana memecoin trading assistant."
 
-# In-memory conversation history (replace with DB for persistence)
-conversation_history = []
+# Persistent conversation history
+HISTORY_FILE = os.path.join(os.path.dirname(__file__), "chat_history.json")
+try:
+    with open(HISTORY_FILE, "r") as f:
+        conversation_history = json.load(f)
+    logger.info(f"Loaded {len(conversation_history)} messages from history")
+except Exception as e:
+    logger.warning(f"Could not load history file: {e}. Starting with empty history.")
+    conversation_history = []
+
+def save_history():
+    """Save chat history to file"""
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(conversation_history, f)
+    except Exception as e:
+        logger.error(f"Error saving history: {e}")
 
 def build_prompt(user_message, market_data="", recent_trades="", portfolio_status="", last_5_messages=""):
     context = f"""
@@ -52,6 +70,15 @@ Ant Princess:
 @app.route('/chat', methods=['POST'])
 async def chat():
     user_message = request.json.get('message', '')
+    current_time = time.time()
+    
+    # Add user message to history with timestamp
+    conversation_history.append({
+        "role": "user", 
+        "content": user_message,
+        "timestamp": current_time
+    })
+    save_history()
     
     # Get real market data
     market_data = await get_market_data()
@@ -66,10 +93,31 @@ async def chat():
         "stream": False
     })
     ai_response = response.json()["response"]
-    conversation_history.append({"role": "user", "content": user_message})
-    conversation_history.append({"role": "ai", "content": ai_response})
+    
+    # Add AI response to history with timestamp
+    conversation_history.append({
+        "role": "ai", 
+        "content": ai_response,
+        "timestamp": time.time()
+    })
+    save_history()
 
     return jsonify({"response": ai_response})
+
+@app.route('/messages/poll', methods=['GET'])
+def poll_messages():
+    """Return recent messages for frontend polling"""
+    # Get since parameter (timestamp) if provided
+    since = request.args.get('since', 0, type=float)
+    
+    # Return messages newer than the since timestamp
+    if since > 0:
+        recent_messages = [m for m in conversation_history if m.get('timestamp', 0) > since]
+    else:
+        # Return last 20 messages if no since parameter
+        recent_messages = conversation_history[-20:]
+        
+    return jsonify(recent_messages)
 
 async def get_market_data() -> str:
     """Get real-time market data from multiple sources"""
@@ -134,6 +182,49 @@ async def get_market_data() -> str:
     except Exception as e:
         logger.error(f"Error getting market data: {e}")
         return "Error fetching market data"
+
+# Proactive messaging function
+def proactive_bot():
+    """Background task to send proactive messages"""
+    logger.info("Starting proactive bot background task")
+    while True:
+        try:
+            time.sleep(60)  # Check every minute
+            
+            # Skip if no history yet
+            if not conversation_history:
+                continue
+                
+            now = time.time()
+            last_msg = conversation_history[-1]
+            last_time = last_msg.get('timestamp', now)
+            
+            # Check if a significant time has passed (10 minutes)
+            if now - last_time > 600:  # 10 minutes
+                # Generate a proactive message
+                time_since = int((now - last_time) / 60)
+                
+                # Get market data for context (simplified)
+                ai_msg = {
+                    'role': 'ai',
+                    'content': f"Hey, it's been {time_since} minutes since we last chatted! Want me to give you an update on your trading bot or the market?",
+                    'timestamp': now
+                }
+                
+                # Only send if the last message wasn't also from AI
+                if last_msg.get('role') != 'ai':
+                    conversation_history.append(ai_msg)
+                    save_history()
+                    logger.info("Sent proactive message")
+                
+            # Check for major market moves (placeholder for custom logic)
+            # Add your custom significant event detection here
+        
+        except Exception as e:
+            logger.error(f"Error in proactive bot: {e}")
+
+# Start the proactive bot in a background thread
+threading.Thread(target=proactive_bot, daemon=True).start()
 
 async def get_recent_trades() -> str:
     """Get recent trading activity"""
@@ -291,5 +382,5 @@ def _process_raydium_data(data: Dict) -> List[Dict]:
         logger.error(f"Error processing Raydium data: {e}")
         return []
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True) 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True) 

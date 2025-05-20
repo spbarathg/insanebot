@@ -1,280 +1,519 @@
+"""
+Main bot implementation for Solana trading bot.
+"""
 import asyncio
 import json
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
-from loguru import logger
+from typing import Dict, List, Optional, Any
 from ..utils.config import settings
-from .data_ingestion import DataIngestion
-from .grok_engine import GrokEngine
-from .trade_execution import TradeExecution
-from ..monitoring.monitoring import MonitoringSystem
 from .market_data import MarketData
+from .trade_execution import TradeExecution
 from .wallet_manager import WalletManager
 from .local_llm import LocalLLM
-from .middleware import handle_errors, rate_limit, error_handler
-from .cache import market_data_cache, token_cache, price_cache
+from .helius_service import HeliusService
+from .jupiter_service import JupiterService
 
 logger = logging.getLogger(__name__)
 
 class MemeCoinBot:
+    """
+    Main Solana trading bot implementation that combines market data,
+    trade execution, local LLM for trading decisions, and monitoring.
+    """
+    
     def __init__(self):
-        self.data_ingestion = DataIngestion()
-        self.grok_engine = GrokEngine()
-        self.trade_execution = TradeExecution()
-        self.monitoring = MonitoringSystem()
         self.market_data = MarketData()
+        self.trade_execution = TradeExecution()
         self.wallet_manager = WalletManager()
         self.local_llm = LocalLLM()
-        self.trade_history: List[Dict] = []
-        self.feature_weights = settings.FEATURE_WEIGHTS.copy()
+        self.helius = HeliusService()
+        self.jupiter = JupiterService()
+        self.trade_history = []
+        self.active_trades = {}
         self.running = False
-        self.daily_loss_limit = 1000  # $1000 daily loss limit
         self.daily_loss = 0
         self.last_reset = datetime.now()
-        self.load_trade_history()
-
-    def load_trade_history(self) -> None:
+        self.token_watchlist = []
+        
+    async def initialize(self) -> bool:
+        """Initialize all bot components."""
+        try:
+            logger.info("Initializing MemeCoin trading bot...")
+            
+            # Initialize services
+            if not await self.helius.initialize():
+                logger.error("Failed to initialize Helius service")
+                return False
+                
+            if not await self.jupiter.initialize():
+                logger.error("Failed to initialize Jupiter service")
+                return False
+                
+            if not await self.market_data.initialize():
+                logger.error("Failed to initialize market data service")
+                return False
+                
+            if not await self.wallet_manager.initialize():
+                logger.error("Failed to initialize wallet manager")
+                return False
+                
+            if not await self.trade_execution.initialize():
+                logger.error("Failed to initialize trade execution")
+                return False
+                
+            # Initialize LLM for trading decisions if enabled
+            if settings.USE_LOCAL_LLM:
+                if not await self.local_llm.initialize():
+                    logger.error("Failed to initialize local LLM")
+                    # Continue without LLM if it fails
+            
+            # Load trade history
+            self._load_trade_history()
+            
+            # Load token watchlist
+            self._load_token_watchlist()
+            
+            logger.info("MemeCoin trading bot initialized successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error initializing bot: {str(e)}")
+            return False
+            
+    def _load_trade_history(self) -> None:
         """Load trade history from file."""
         try:
-            with open(settings.TRADE_LOG_FILE, 'r') as f:
-                self.trade_history = json.load(f)
-            logger.info(f"Loaded {len(self.trade_history)} trades from history")
-        except FileNotFoundError:
-            logger.info("No trade history found, starting fresh")
-            self.trade_history = []
+            if not settings.DATA_DIR.exists():
+                settings.DATA_DIR.mkdir(parents=True)
+                
+            history_file = settings.DATA_DIR / "trade_history.json"
+            if history_file.exists():
+                with open(history_file, "r") as f:
+                    self.trade_history = json.load(f)
+                logger.info(f"Loaded {len(self.trade_history)} trades from history")
+            else:
+                logger.info("No trade history found, starting fresh")
+                self.trade_history = []
         except Exception as e:
-            logger.error(f"Error loading trade history: {e}")
+            logger.error(f"Error loading trade history: {str(e)}")
             self.trade_history = []
-
-    def save_trade_history(self) -> None:
+            
+    def _save_trade_history(self) -> None:
         """Save trade history to file."""
         try:
-            with open(settings.TRADE_LOG_FILE, 'w') as f:
+            if not settings.DATA_DIR.exists():
+                settings.DATA_DIR.mkdir(parents=True)
+                
+            history_file = settings.DATA_DIR / "trade_history.json"
+            with open(history_file, "w") as f:
                 json.dump(self.trade_history, f, indent=2)
             logger.info(f"Saved {len(self.trade_history)} trades to history")
         except Exception as e:
-            logger.error(f"Error saving trade history: {e}")
-
-    async def initialize(self):
-        """Initialize all components"""
+            logger.error(f"Error saving trade history: {str(e)}")
+            
+    def _load_token_watchlist(self) -> None:
+        """Load token watchlist from file."""
         try:
-            # Initialize components
-            await self.data_ingestion.start()
-            await self.trade_execution.initialize()
-            await self.market_data.initialize()
-            await self.wallet_manager.initialize()
-            await self.grok_engine.initialize()
-            await self.local_llm.initialize()
-
-            logger.info("Bot initialized successfully")
-            return True
-
+            if not settings.DATA_DIR.exists():
+                settings.DATA_DIR.mkdir(parents=True)
+                
+            watchlist_file = settings.DATA_DIR / "token_watchlist.json"
+            if watchlist_file.exists():
+                with open(watchlist_file, "r") as f:
+                    self.token_watchlist = json.load(f)
+                logger.info(f"Loaded {len(self.token_watchlist)} tokens from watchlist")
+            else:
+                logger.info("No token watchlist found, starting fresh")
+                self.token_watchlist = []
         except Exception as e:
-            logger.error(f"Failed to initialize bot: {str(e)}")
-            return False
-
-    async def close(self):
-        """Close all components"""
+            logger.error(f"Error loading token watchlist: {str(e)}")
+            self.token_watchlist = []
+            
+    def _save_token_watchlist(self) -> None:
+        """Save token watchlist to file."""
         try:
-            self.running = False
-            logger.info("Stopping MemeCoinBot...")
+            if not settings.DATA_DIR.exists():
+                settings.DATA_DIR.mkdir(parents=True)
+                
+            watchlist_file = settings.DATA_DIR / "token_watchlist.json"
+            with open(watchlist_file, "w") as f:
+                json.dump(self.token_watchlist, f, indent=2)
+            logger.info(f"Saved {len(self.token_watchlist)} tokens to watchlist")
+        except Exception as e:
+            logger.error(f"Error saving token watchlist: {str(e)}")
+    
+    async def close(self) -> None:
+        """Close all services."""
+        try:
+            # Save data
+            self._save_trade_history()
+            self._save_token_watchlist()
             
-            # Save trade history
-            self.save_trade_history()
-            
-            # Close components
-            await self.data_ingestion.close()
-            await self.trade_execution.close()
+            # Close services
+            await self.helius.close()
+            await self.jupiter.close()
             await self.market_data.close()
             await self.wallet_manager.close()
-            await self.grok_engine.close()
-            await self.local_llm.close()
+            await self.trade_execution.close()
             
-            logger.info("MemeCoinBot stopped")
+            if settings.USE_LOCAL_LLM:
+                await self.local_llm.close()
+                
+            logger.info("All services closed successfully")
+        except Exception as e:
+            logger.error(f"Error closing services: {str(e)}")
             
-        except Exception as e:
-            logger.error(f"Error closing bot: {str(e)}")
-
-    @handle_errors
-    async def process_token(self, token_address: str) -> Optional[Dict]:
-        """Process a token for potential trading"""
+    async def add_token_to_watchlist(self, token_address: str) -> bool:
+        """Add a token to the watchlist."""
         try:
-            # Get token data with caching
-            token_data = await self.market_data.get_token_data(token_address)
-            if not token_data:
-                logger.warning(f"No data available for token {token_address}")
-                return None
-
-            # Get price data with caching
-            price_data = await self.market_data.get_price_data(token_address)
-            if not price_data:
-                logger.warning(f"No price data available for token {token_address}")
-                return None
-
-            # Combine data
-            token_data.update(price_data)
-            return token_data
-
-        except Exception as e:
-            await error_handler.handle_error(e, "process_token")
-            return None
-
-    @handle_errors
-    @rate_limit(max_requests=10, time_window=60)  # 10 trades per minute
-    async def execute_trade(self, token_data: Dict) -> bool:
-        """Execute a trade based on token data"""
-        try:
-            # Check daily loss limit
-            if self.daily_loss >= self.daily_loss_limit:
-                logger.warning("Daily loss limit reached, skipping trade")
+            # Check if token is valid
+            token_info = await self.market_data.get_token_metadata(token_address)
+            if not token_info:
+                logger.warning(f"Invalid token: {token_address}")
                 return False
-
-            # Implement your trading logic here
-            # This is a placeholder for the actual trading implementation
-            logger.info(f"Executing trade for token {token_data['symbol']}")
-            return True
-
+                
+            # Add to watchlist if not already there
+            if token_address not in self.token_watchlist:
+                self.token_watchlist.append(token_address)
+                self._save_token_watchlist()
+                logger.info(f"Added {token_address} to watchlist")
+                return True
+            else:
+                logger.info(f"Token {token_address} already in watchlist")
+                return True
+                
         except Exception as e:
-            await error_handler.handle_error(e, "execute_trade")
+            logger.error(f"Error adding token to watchlist: {str(e)}")
             return False
-
-    @handle_errors
-    async def start(self) -> None:
-        """Start the trading bot"""
+            
+    async def remove_token_from_watchlist(self, token_address: str) -> bool:
+        """Remove a token from the watchlist."""
         try:
-            if not await self.initialize():
-                logger.error("Failed to initialize bot")
-                return
-
+            if token_address in self.token_watchlist:
+                self.token_watchlist.remove(token_address)
+                self._save_token_watchlist()
+                logger.info(f"Removed {token_address} from watchlist")
+                return True
+            else:
+                logger.info(f"Token {token_address} not in watchlist")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error removing token from watchlist: {str(e)}")
+            return False
+            
+    async def process_token(self, token_address: str) -> Optional[Dict]:
+        """Process a token for potential trading."""
+        try:
+            # Get token data
+            token_data = await self.market_data.get_token_full_data(token_address)
+            if not token_data:
+                logger.warning(f"No data for token: {token_address}")
+                return None
+                
+            # Analyze using LLM if available
+            llm_analysis = None
+            if settings.USE_LOCAL_LLM:
+                llm_analysis = await self.local_llm.analyze_market(token_data)
+                
+            # Combine data
+            result = {
+                "token": token_data,
+                "analysis": llm_analysis,
+                "timestamp": time.time()
+            }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing token: {str(e)}")
+            return None
+            
+    async def execute_buy(self, token_address: str, amount_sol: float) -> Optional[Dict]:
+        """Execute a buy trade."""
+        try:
+            # Process token first
+            token_data = await self.process_token(token_address)
+            if not token_data:
+                logger.warning(f"Cannot buy token without data: {token_address}")
+                return None
+                
+            # Check daily loss limit
+            if self.daily_loss >= settings.DAILY_LOSS_LIMIT:
+                logger.warning(f"Daily loss limit reached: {self.daily_loss} >= {settings.DAILY_LOSS_LIMIT}")
+                return None
+                
+            # Execute trade
+            result = await self.trade_execution.execute_buy(token_address, amount_sol)
+            if result:
+                # Add to active trades
+                self.active_trades[token_address] = {
+                    "type": "buy",
+                    "amount_sol": amount_sol,
+                    "amount_tokens": result["token_amount"],
+                    "price": result["price"],
+                    "timestamp": result["timestamp"],
+                }
+                
+                # Add to trade history
+                self.trade_history.append(result)
+                self._save_trade_history()
+                
+                # If using LLM, have it learn from the trade
+                if settings.USE_LOCAL_LLM:
+                    self.local_llm.learn_from_trade({
+                        "token": token_address,
+                        "market_state": token_data["token"],
+                        "decision": "buy",
+                        "amount": amount_sol,
+                        "price": result["price"],
+                        "profit": 0,  # No profit yet
+                        "timestamp": result["timestamp"]
+                    })
+                    
+                logger.info(f"Buy executed: {amount_sol} SOL → {result['token_amount']} tokens at {result['price']}")
+                return result
+            else:
+                logger.warning(f"Buy failed for {token_address}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error executing buy: {str(e)}")
+            return None
+            
+    async def execute_sell(self, token_address: str, amount_tokens: float) -> Optional[Dict]:
+        """Execute a sell trade."""
+        try:
+            # Check if we have active trade
+            if token_address not in self.active_trades:
+                logger.warning(f"No active trade for token: {token_address}")
+                return None
+                
+            # Execute trade
+            result = await self.trade_execution.execute_sell(token_address, amount_tokens)
+            if result:
+                # Calculate profit/loss
+                buy_data = self.active_trades[token_address]
+                buy_value = buy_data["amount_sol"]
+                sell_value = result["sol_amount"]
+                profit = sell_value - buy_value
+                profit_percentage = (profit / buy_value) * 100 if buy_value > 0 else 0
+                
+                # Update result with profit info
+                result["buy_value"] = buy_value
+                result["profit"] = profit
+                result["profit_percentage"] = profit_percentage
+                
+                # Update daily loss if negative
+                if profit < 0:
+                    self.daily_loss += abs(profit)
+                    
+                # Remove from active trades
+                del self.active_trades[token_address]
+                
+                # Add to trade history
+                self.trade_history.append(result)
+                self._save_trade_history()
+                
+                # If using LLM, have it learn from the trade
+                if settings.USE_LOCAL_LLM:
+                    token_data = await self.market_data.get_token_full_data(token_address)
+                    if token_data:
+                        self.local_llm.learn_from_trade({
+                            "token": token_address,
+                            "market_state": token_data,
+                            "decision": "sell",
+                            "amount": amount_tokens,
+                            "price": result["price"],
+                            "profit": profit,
+                            "timestamp": result["timestamp"]
+                        })
+                        
+                logger.info(f"Sell executed: {amount_tokens} tokens → {result['sol_amount']} SOL, Profit: {profit} SOL ({profit_percentage:.2f}%)")
+                return result
+            else:
+                logger.warning(f"Sell failed for {token_address}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error executing sell: {str(e)}")
+            return None
+            
+    async def start(self) -> None:
+        """Start the trading bot."""
+        try:
             self.running = True
-            logger.info("Starting MemeCoinBot...")
-
+            logger.info("Starting MemeCoin trading bot...")
+            
+            # Reset daily loss if it's a new day
+            self._check_daily_reset()
+            
+            # Main bot loop
             while self.running:
                 try:
-                    # Reset daily loss if needed
-                    if datetime.now() - self.last_reset > timedelta(days=1):
-                        self.daily_loss = 0
-                        self.last_reset = datetime.now()
-                        logger.info("Daily loss counter reset")
-
-                    # Process new tokens
-                    new_tokens = await self.data_ingestion.get_new_tokens()
-                    for token in new_tokens:
-                        if not self.running:
-                            break
-                        token_data = await self.process_token(token['address'])
-                        if token_data:
-                            success = await self.execute_trade(token_data)
-                            if not success:
-                                self.daily_loss += 100  # Example loss amount
-
-                    # Update feature weights
-                    self.update_feature_weights()
-
-                    # Sleep to prevent excessive API calls
-                    await asyncio.sleep(settings.TRADING_INTERVAL)
-
+                    # Process watchlist tokens
+                    for token_address in self.token_watchlist:
+                        await self._process_watchlist_token(token_address)
+                        
+                    # Check active trades for potential sells
+                    for token_address, trade_data in list(self.active_trades.items()):
+                        await self._check_active_trade(token_address, trade_data)
+                        
+                    # Sleep to avoid excessive API calls
+                    await asyncio.sleep(settings.LOOP_INTERVAL)
+                    
                 except Exception as e:
-                    await error_handler.handle_error(e, "main_loop")
-                    if not error_handler.should_continue():
-                        logger.error("Too many errors, stopping bot")
-                        break
-                    await asyncio.sleep(5)
-
-        except Exception as e:
-            await error_handler.handle_error(e, "start")
-        finally:
-            await self.close()
-
-    async def monitor_loop(self) -> None:
-        """Background monitoring loop."""
-        while self.running:
-            try:
-                # Check system and trading health
-                self.monitoring.check_health(self.trade_history)
-                
-                # Save metrics
-                self.monitoring.save_metrics(self.trade_history)
-                
-                # Create backup if needed
-                self.monitoring.create_backup()
-                
-                await asyncio.sleep(settings.HEALTH_CHECK_INTERVAL)
-                
-            except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
-                await asyncio.sleep(settings.RETRY_INTERVAL)
-
-    async def check_daily_loss_limit(self) -> bool:
-        """Check if daily loss limit reached"""
-        try:
-            balance = await self.wallet_manager.get_balance()
-            if balance is None:
-                return True
-
-            initial_balance = settings.STARTING_CAPITAL
-            self.daily_loss = (initial_balance - balance) / initial_balance
+                    logger.error(f"Error in bot loop: {str(e)}")
+                    await asyncio.sleep(10)  # Sleep longer on error
+                    
+            logger.info("Bot stopped")
             
-            if self.daily_loss >= settings.DAILY_LOSS_LIMIT:
-                logger.warning(f"Daily loss limit reached: {self.daily_loss:.2%}")
-                return True
-            return False
-
         except Exception as e:
-            logger.error(f"Error checking daily loss: {str(e)}")
-            return True
-
-    def update_feature_weights(self) -> None:
-        """Update feature weights based on recent trade performance."""
-        try:
-            # Get recent trades
-            cutoff_time = datetime.now() - timedelta(days=settings.LEARNING_WINDOW)
-            recent_trades = [
-                trade for trade in self.trade_history
-                if datetime.fromisoformat(trade['timestamp']) > cutoff_time
-            ]
+            logger.error(f"Error starting bot: {str(e)}")
+            self.running = False
             
-            if not recent_trades:
+    def stop(self) -> None:
+        """Stop the trading bot."""
+        self.running = False
+        logger.info("Bot scheduled to stop")
+        
+    def _check_daily_reset(self) -> None:
+        """Check and reset daily loss counter if it's a new day."""
+        now = datetime.now()
+        if now.date() > self.last_reset.date():
+            logger.info(f"Resetting daily loss from {self.daily_loss} to 0")
+            self.daily_loss = 0
+            self.last_reset = now
+            
+    async def _process_watchlist_token(self, token_address: str) -> None:
+        """Process a token from the watchlist."""
+        try:
+            # Get token data
+            token_data = await self.process_token(token_address)
+            if not token_data:
                 return
+                
+            # Skip if already in active trades
+            if token_address in self.active_trades:
+                return
+                
+            # Check if this token should be bought based on analysis
+            should_buy = False
+            amount_sol = 0
             
-            # Calculate win rates for each feature
-            feature_wins = {feature: 0 for feature in self.feature_weights}
-            feature_trades = {feature: 0 for feature in self.feature_weights}
-            
-            for trade in recent_trades:
-                for feature in self.feature_weights:
-                    if trade.get(feature, False):
-                        feature_trades[feature] += 1
-                        if trade['profit'] > 0:
-                            feature_wins[feature] += 1
-            
-            # Update weights based on win rates
-            for feature in self.feature_weights:
-                if feature_trades[feature] > 0:
-                    win_rate = feature_wins[feature] / feature_trades[feature]
-                    self.feature_weights[feature] = win_rate
-            
-            # Normalize weights
-            total_weight = sum(self.feature_weights.values())
-            if total_weight > 0:
-                for feature in self.feature_weights:
-                    self.feature_weights[feature] /= total_weight
-            
-            logger.info(f"Updated feature weights: {self.feature_weights}")
-            
+            if settings.USE_LOCAL_LLM:
+                # Use LLM recommendation if available
+                if token_data.get("analysis"):
+                    action = token_data["analysis"].get("action")
+                    confidence = token_data["analysis"].get("confidence", 0)
+                    if action == "buy" and confidence >= settings.MIN_CONFIDENCE:
+                        should_buy = True
+                        amount_sol = token_data["analysis"].get("position_size", settings.DEFAULT_POSITION_SIZE)
+            else:
+                # Use basic rules if no LLM
+                token_info = token_data["token"]
+                liquidity = token_info.get("liquidity_usd", 0)
+                if liquidity >= settings.MIN_LIQUIDITY:
+                    should_buy = True
+                    amount_sol = settings.DEFAULT_POSITION_SIZE
+                    
+            # Execute buy if conditions met
+            if should_buy and amount_sol > 0:
+                await self.execute_buy(token_address, amount_sol)
+                
         except Exception as e:
-            logger.error(f"Error updating feature weights: {e}")
-
-    def is_new_token(self, token: Dict) -> bool:
-        """Check if token is new enough to trade."""
+            logger.error(f"Error processing watchlist token {token_address}: {str(e)}")
+            
+    async def _check_active_trade(self, token_address: str, trade_data: Dict) -> None:
+        """Check an active trade for potential sell."""
         try:
-            token_age = time.time() - token['created_at']
-            return token_age <= settings.MAX_TOKEN_AGE
+            # Get current token data
+            token_data = await self.process_token(token_address)
+            if not token_data:
+                return
+                
+            # Get current price
+            current_price_usd = token_data["token"].get("price_usd", 0)
+            buy_price = trade_data.get("price", 0)
+            
+            # Calculate current profit/loss
+            profit_percentage = 0
+            if buy_price > 0:
+                profit_percentage = ((current_price_usd / buy_price) - 1) * 100
+                
+            # Determine if we should sell
+            should_sell = False
+            
+            if settings.USE_LOCAL_LLM:
+                # Use LLM recommendation if available
+                if token_data.get("analysis"):
+                    action = token_data["analysis"].get("action")
+                    confidence = token_data["analysis"].get("confidence", 0)
+                    if action == "sell" and confidence >= settings.MIN_CONFIDENCE:
+                        should_sell = True
+            else:
+                # Use basic rules if no LLM
+                # Sell if reached target profit or stop loss
+                if profit_percentage >= settings.TARGET_PROFIT or profit_percentage <= -settings.STOP_LOSS:
+                    should_sell = True
+                    
+            # Execute sell if conditions met
+            if should_sell:
+                amount_tokens = trade_data.get("amount_tokens", 0)
+                if amount_tokens > 0:
+                    await self.execute_sell(token_address, amount_tokens)
+                    
         except Exception as e:
-            logger.error(f"Error checking token age: {e}")
-            return False
+            logger.error(f"Error checking active trade {token_address}: {str(e)}")
+            
+    async def get_portfolio_status(self) -> Dict:
+        """Get current portfolio status."""
+        try:
+            # Get wallet balance
+            sol_balance = await self.wallet_manager.check_balance()
+            
+            # Calculate total investment and current value
+            total_investment = 0
+            current_value = 0
+            
+            for token_address, trade_data in self.active_trades.items():
+                token_data = await self.process_token(token_address)
+                if token_data:
+                    # Calculate investment value
+                    investment = trade_data.get("amount_sol", 0)
+                    total_investment += investment
+                    
+                    # Calculate current value
+                    amount_tokens = trade_data.get("amount_tokens", 0)
+                    current_price = token_data["token"].get("price_sol", 0)
+                    if current_price > 0:
+                        token_value = amount_tokens * current_price
+                        current_value += token_value
+                        
+            # Calculate overall profit/loss
+            overall_profit = current_value - total_investment
+            overall_profit_percentage = (overall_profit / total_investment) * 100 if total_investment > 0 else 0
+            
+            return {
+                "sol_balance": sol_balance,
+                "total_investment": total_investment,
+                "current_value": current_value,
+                "overall_profit": overall_profit,
+                "overall_profit_percentage": overall_profit_percentage,
+                "active_trades": len(self.active_trades),
+                "total_trades": len(self.trade_history),
+                "daily_loss": self.daily_loss,
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting portfolio status: {str(e)}")
+            return {
+                "error": str(e),
+                "timestamp": time.time()
+            }
 
 if __name__ == "__main__":
     # Configure logging

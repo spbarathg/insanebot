@@ -1,251 +1,113 @@
 # Solana Trading Bot
 
-## Overview
-This bot automates trading on Solana using secure wallet management, transaction confirmation monitoring, and performance optimizations.
-
-## Setup
-1. Clone the repository.
-2. Install dependencies: `pip install -r requirements.txt`.
-3. Set environment variables (e.g., `WALLET_PRIVATE_KEY`, `WALLET_SALT`, `WALLET_PASSWORD`).
-4. Run the bot: `python src/main.py`.
-
-## Usage
-- The bot supports buy/sell orders, batch processing, and caching for performance.
-- Use the `WalletManager` for secure transaction handling and confirmation monitoring.
-
-## Architecture
-
-```mermaid
-graph TD;
-    A[Main Bot] --> B[WalletManager]
-    A --> C[TradeExecution]
-    A --> D[TokenCache]
-    B --> E[Solana RPC]
-    C --> E
-    D --> E
-    A --> F[Monitoring & Logging]
-    F --> G[Prometheus]
-    F --> H[Grafana]
-```
-
-- **Core Components:**
-  - `WalletManager`: Secure wallet and transaction handling.
-  - `TradeExecution`: Executes trades with retry logic and confirmation monitoring.
-  - `TokenCache`: Caches token data for performance.
-- **Testing:**
-  - Integration tests use a mock Solana network.
-  - Stress tests simulate high-frequency trading and batch processing.
-
-## Contributing
-See `CONTRIBUTING.md` for guidelines on code style, PR process, and development setup.
-
-## Troubleshooting
-See `troubleshooting.md` for common errors and solutions.
-
-## Performance Tuning
-Refer to the performance tuning guide for optimizing bot behavior under load.
+A comprehensive trading bot for Solana utilizing Jupiter and Helius APIs.
 
 ## Features
 
-- Real-time token monitoring with WebSocket support
-- Automated trading with configurable parameters
-- Comprehensive error handling with circuit breakers
-- Secure wallet management with encryption
-- Performance optimized with caching and connection pooling
-- Extensive monitoring and logging
-- Docker support with health checks
-- High test coverage
-
-## Architecture
-
-```
-├── src/
-│   ├── main.py              # Main trading bot implementation
-│   ├── core/                # Core functionality
-│   │   ├── config.py        # Configuration management
-│   │   ├── dex.py          # DEX interaction
-│   │   ├── error_handler.py # Error handling
-│   │   ├── monitoring.py    # Monitoring and logging
-│   │   └── wallet.py       # Wallet management
-│   ├── tests/              # Test suite
-│   └── utils/              # Utility functions
-├── config/                 # Configuration files
-├── data/                   # Data storage
-├── logs/                   # Log files
-└── scripts/               # Utility scripts
-```
+- Automated trading on Jupiter DEX
+- Token analysis via Helius API
+- Risk management and position sizing
+- Transaction monitoring and history tracking
+- Optional local LLM integration for market analysis
+- Simulation mode for testing strategies
 
 ## Prerequisites
 
-- Python 3.9+
-- Docker and Docker Compose
-- Solana CLI tools
-- Sufficient SOL balance for trading
+- Python 3.10+ (3.13 may have compatibility issues with solana-py)
+- Solana wallet with SOL
+- Helius API key (https://helius.xyz/)
 
-## Configuration
+## Installation
 
-### Core Settings
-
-```yaml
-trading:
-  min_liquidity: 10000
-  max_slippage: 0.02
-  min_profit: 0.05
-  max_position: 0.1
-  min_position: 0.01
-  cooldown: 300
-
-monitoring:
-  check_interval: 60
-  max_retries: 3
-  retry_delay: 5
-
-error_handling:
-  max_errors: 5
-  error_cooldown: 300
+1. Clone this repository:
+```bash
+git clone https://github.com/yourusername/solana-trading-bot.git
+cd solana-trading-bot
 ```
 
-### Environment Variables
+2. Create and activate a virtual environment:
+```bash
+python -m venv venv
+# On Windows
+venv\Scripts\activate
+# On Unix/Linux
+source venv/bin/activate
+```
 
-```env
-# Core Settings
-WALLET_ADDRESS=your_wallet_address
-SIMULATION_MODE=false
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-# Security
-WALLET_SALT=your_salt
-WALLET_PASSWORD=your_password
+4. Create a `.env` file from the example:
+```bash
+cp env.example .env
+```
 
-# RPC Settings
-RPC_URL=https://api.mainnet-beta.solana.com
-RPC_COMMITMENT=confirmed
+5. Edit the `.env` file with your API keys and settings.
 
-# Monitoring
-PROMETHEUS_PORT=8000
-GRAFANA_ADMIN_USER=admin
-GRAFANA_ADMIN_PASSWORD=your_password
+## Directory Structure
+
+```
+├── data/               # Data storage (trade history, watchlist)
+├── logs/               # Application logs
+├── models/             # LLM model storage (if using local LLM)
+├── src/                # Source code
+│   ├── core/           # Core components
+│   │   ├── helius_service.py    # Helius API integration
+│   │   ├── jupiter_service.py   # Jupiter API integration
+│   │   ├── local_llm.py         # Local LLM for analysis
+│   │   ├── main.py              # Main bot implementation
+│   │   ├── market_data.py       # Market data collection
+│   │   ├── trade_execution.py   # Trade execution
+│   │   └── wallet_manager.py    # Wallet operations
+│   └── utils/          # Utilities
+│       ├── config.py           # Configuration
+│       └── logging_config.py   # Logging setup
+├── .env                # Environment variables (create from env.example)
+├── env.example         # Example environment file
+├── main.py             # Entry point
+└── requirements.txt    # Dependencies
 ```
 
 ## Usage
 
-### Running Locally
-
 1. Start the bot:
 ```bash
-python src/main.py
+python main.py
 ```
 
-2. Run in simulation mode:
-```bash
-python src/main.py --simulation
-```
+2. For simulation mode (no real trading), set `SIMULATION_MODE=True` in your `.env` file.
 
-### Docker Deployment
+## Trading Strategies
 
-1. Build and start services:
-```bash
-docker-compose up -d
-```
+The bot supports both rule-based and ML-based (if using local LLM) trading strategies:
 
-2. View logs:
-```bash
-docker-compose logs -f trading-bot
-```
+### Rule-based Strategy
+- Buy tokens with high liquidity (above threshold in settings)
+- Set stop-loss and take-profit levels based on settings
+- Scale position size based on liquidity and risk parameters
 
-3. Access monitoring:
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000
-- Loki: http://localhost:3100
+### ML-based Strategy (Optional)
+- Use local LLM to analyze market data and make predictions
+- Learn from trade outcomes to improve future decisions
+- Adjust confidence levels based on historical performance
 
-## Testing
+## Configuration
 
-1. Run unit tests:
-```bash
-pytest
-```
+All trading parameters can be adjusted in the `.env` file:
 
-2. Run with coverage:
-```bash
-pytest --cov=src --cov-report=html
-```
-
-3. Run integration tests:
-```bash
-pytest tests/integration/
-```
-
-## Monitoring
-
-### Metrics
-
-The bot exposes the following Prometheus metrics:
-
-- `trading_bot_trades_total`: Total trades executed
-- `trading_bot_position_size`: Current position sizes
-- `trading_bot_token_price`: Token prices
-- `trading_bot_liquidity`: Token liquidity
-- `trading_bot_errors_total`: Error counts
-- `trading_bot_trade_latency_seconds`: Trade execution latency
-
-### Logging
-
-Logs are stored in the `logs` directory with:
-- Daily rotation
-- 7-day retention
-- JSON format for machine processing
-- Structured logging with context
-
-## Security
-
-- Encrypted wallet storage
-- Secure key management
-- Rate limiting
-- Input validation
-- Error handling
-- Circuit breakers
-
-## Error Handling
-
-The bot implements comprehensive error handling:
-
-1. Circuit Breakers:
-   - Network errors
-   - Transaction failures
-   - Wallet issues
-
-2. Retry Logic:
-   - Configurable retry attempts
-   - Exponential backoff
-   - Error categorization
-
-3. Monitoring:
-   - Error tracking
-   - Alert thresholds
-   - Error reporting
-
-## Performance
-
-- WebSocket connections for real-time data
-- LRU caching for frequently accessed data
-- Connection pooling
-- Optimized transaction handling
-- Efficient event loops
+- `MIN_LIQUIDITY`: Minimum liquidity threshold for trading
+- `MAX_PRICE_IMPACT`: Maximum allowed price impact
+- `TARGET_PROFIT`: Target profit percentage
+- `STOP_LOSS`: Stop loss percentage
+- `DAILY_LOSS_LIMIT`: Maximum daily loss in SOL
+- `POSITION_SIZE` parameters: Control trade sizes
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Support
+## Disclaimer
 
-For support, please:
-1. Check the documentation
-2. Search existing issues
-3. Create a new issue if needed
-
-## Acknowledgments
-
-- Solana Foundation
-- Raydium Protocol
-- Prometheus
-- Grafana
-- Loki
+This software is for educational purposes only. Use at your own risk. Trading cryptocurrencies involves significant risk of loss.

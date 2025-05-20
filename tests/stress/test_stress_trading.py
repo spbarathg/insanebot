@@ -2,6 +2,7 @@ import pytest
 import asyncio
 import time
 from unittest.mock import AsyncMock
+from solders.keypair import Keypair
 from src.core.wallet import WalletManager
 
 @pytest.mark.asyncio

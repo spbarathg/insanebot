@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock
-from solana.keypair import Keypair
+from solders.keypair import Keypair
 from src.core.wallet import WalletManager
 
 @pytest.mark.asyncio

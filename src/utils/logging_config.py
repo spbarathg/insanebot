@@ -1,3 +1,6 @@
+"""
+Logging configuration for Solana trading bot.
+"""
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
@@ -7,6 +10,8 @@ import traceback
 import functools
 import time
 from typing import Callable, Any
+from pathlib import Path
+from .config import settings
 
 # Create logs directory if it doesn't exist
 os.makedirs('logs', exist_ok=True)
@@ -165,4 +170,37 @@ def log_async_performance(logger: logging.Logger) -> Callable:
             )
             return result
         return wrapper
-    return decorator 
+    return decorator
+
+# Initialize log directories
+def initialize_logging():
+    """Initialize logging directories and files."""
+    try:
+        # Create log directory if it doesn't exist
+        if not settings.LOG_DIR.exists():
+            settings.LOG_DIR.mkdir(parents=True)
+            
+        # Create an empty log file if it doesn't exist
+        if not settings.LOG_FILE.exists():
+            with open(settings.LOG_FILE, "w") as f:
+                f.write("")
+                
+        if not settings.ERROR_LOG_FILE.exists():
+            with open(settings.ERROR_LOG_FILE, "w") as f:
+                f.write("")
+                
+        # Create other log files
+        for log_file in ["wallet.log", "trades.log", "api.log"]:
+            log_path = settings.LOG_DIR / log_file
+            if not log_path.exists():
+                with open(log_path, "w") as f:
+                    f.write("")
+                    
+        logging.info("Logging initialized successfully")
+        return True
+    except Exception as e:
+        print(f"Error initializing logging: {str(e)}")
+        return False
+
+# Initialize logging when module is imported
+initialize_logging() 
