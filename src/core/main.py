@@ -216,7 +216,19 @@ class MemeCoinBot:
             # Analyze using LLM if available
             llm_analysis = None
             if settings.USE_LOCAL_LLM:
-                llm_analysis = await self.local_llm.analyze_market(token_data)
+                try:
+                    # Set a timeout for the LLM analysis to prevent hanging
+                    llm_timeout = getattr(settings, 'LLM_INFERENCE_TIMEOUT', 5)  # Default 5 seconds if not specified
+                    llm_analysis = await asyncio.wait_for(
+                        self.local_llm.analyze_market(token_data),
+                        timeout=llm_timeout
+                    )
+                    if not llm_analysis:
+                        logger.warning(f"LLM analysis timed out after {llm_timeout}s for {token_address}")
+                except asyncio.TimeoutError:
+                    logger.warning(f"LLM analysis timed out after {llm_timeout}s for {token_address}")
+                except Exception as e:
+                    logger.error(f"Error during LLM analysis: {str(e)}")
                 
             # Combine data
             result = {
@@ -342,37 +354,47 @@ class MemeCoinBot:
             return None
             
     async def start(self) -> None:
-        """Start the trading bot."""
+        """Start the bot."""
         try:
             self.running = True
-            logger.info("Starting MemeCoin trading bot...")
+            logger.info("Bot started")
             
-            # Reset daily loss if it's a new day
-            self._check_daily_reset()
-            
-            # Main bot loop
             while self.running:
                 try:
-                    # Process watchlist tokens
+                    # Check and reset daily loss if needed
+                    self._check_daily_reset()
+                    
+                    # Check system load before processing
+                    current_load = self._get_system_load()
+                    if current_load > settings.MAX_SYSTEM_LOAD:
+                        logger.warning(f"System load too high: {current_load}% > {settings.MAX_SYSTEM_LOAD}%. Sleeping...")
+                        await asyncio.sleep(settings.LOOP_INTERVAL * 2)
+                        continue
+                        
+                    # Apply throttling if load is high but below max
+                    throttled_interval = settings.LOOP_INTERVAL
+                    if current_load > settings.THROTTLE_TRADES_AT_LOAD:
+                        throttling_factor = (current_load - settings.THROTTLE_TRADES_AT_LOAD) / (settings.MAX_SYSTEM_LOAD - settings.THROTTLE_TRADES_AT_LOAD)
+                        throttled_interval = settings.LOOP_INTERVAL * (1 + throttling_factor * 2)
+                        logger.info(f"Throttling trading frequency due to system load: {current_load}%. New interval: {throttled_interval:.1f}s")
+                    
+                    # Process each token in watchlist
                     for token_address in self.token_watchlist:
                         await self._process_watchlist_token(token_address)
                         
-                    # Check active trades for potential sells
+                    # Process active trades
                     for token_address, trade_data in list(self.active_trades.items()):
                         await self._check_active_trade(token_address, trade_data)
                         
-                    # Sleep to avoid excessive API calls
-                    await asyncio.sleep(settings.LOOP_INTERVAL)
+                    # Sleep until next cycle
+                    await asyncio.sleep(throttled_interval)
                     
                 except Exception as e:
                     logger.error(f"Error in bot loop: {str(e)}")
-                    await asyncio.sleep(10)  # Sleep longer on error
-                    
-            logger.info("Bot stopped")
+                    await asyncio.sleep(settings.LOOP_INTERVAL)
             
         except Exception as e:
             logger.error(f"Error starting bot: {str(e)}")
-            self.running = False
             
     def stop(self) -> None:
         """Stop the trading bot."""
@@ -514,6 +536,20 @@ class MemeCoinBot:
                 "error": str(e),
                 "timestamp": time.time()
             }
+
+    def _get_system_load(self) -> float:
+        """Get current system load percentage."""
+        try:
+            import psutil
+            # Get CPU usage as percentage
+            cpu_percent = psutil.cpu_percent(interval=1)
+            # Get memory usage as percentage
+            memory_percent = psutil.virtual_memory().percent
+            # Return the higher of the two as the system load
+            return max(cpu_percent, memory_percent)
+        except Exception as e:
+            logger.error(f"Error getting system load: {str(e)}")
+            return 0.0  # Return 0 on error so we don't throttle unnecessarily
 
 if __name__ == "__main__":
     # Configure logging

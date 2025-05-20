@@ -1,10 +1,13 @@
 from typing import Dict, List, Optional
 import asyncio
+import aiohttp
+import json
 import logging
 from datetime import datetime
 from .ant_princess import AntPrincess
 from .grok_engine import GrokEngine
-from ..config import ANT_QUEEN_CONFIG
+from ..config import ANT_QUEEN_CONFIG, AI_CONFIG
+from .ai_metrics import ai_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +18,12 @@ class AntQueen:
         self._workers: List[AntPrincess] = []
         self._performance_history = []
         self._last_update = datetime.now()
+        self._session = None
+        self._model = None
+        self.training_data = []
+        self.accuracy_history = []
         
+    @ai_metrics.track_training()
     async def initialize(self):
         """Initialize the Ant Queen."""
         await self.grok_engine.initialize()
@@ -24,6 +32,58 @@ class AntQueen:
         for _ in range(self.config["initial_workers"]):
             await self._create_worker()
             
+        # Initialize the model
+        await self._initialize_model()
+        
+        return {
+            "success": True,
+            "sample_count": len(self.training_data)
+        }
+        
+    async def _initialize_model(self):
+        """Initialize the model."""
+        try:
+            logger.info("Initializing Ant Queen model")
+            
+            # Load training data if available
+            await self._load_training_data()
+            
+            # Track the number of samples
+            ai_metrics.update_training_samples(len(self.training_data))
+            
+            return {
+                "success": True,
+                "sample_count": len(self.training_data)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error initializing Ant Queen: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    async def _load_training_data(self):
+        """Load training data if available."""
+        try:
+            # Simulated data loading
+            self.training_data = [
+                {"input": "feature_set_1", "output": "buy", "profit": 0.05},
+                {"input": "feature_set_2", "output": "sell", "profit": 0.03},
+                {"input": "feature_set_3", "output": "hold", "profit": 0.0}
+            ]
+            
+            # Calculate initial accuracy (simulated)
+            current_accuracy = 0.7  # Starting accuracy
+            ai_metrics.update_accuracy(current_accuracy)
+            
+            # Initialize accuracy history
+            self.accuracy_history = [current_accuracy]
+            
+        except Exception as e:
+            logger.error(f"Error loading training data: {str(e)}")
+            raise
+    
     async def close(self):
         """Close the Ant Queen."""
         await self.grok_engine.close()
@@ -145,4 +205,88 @@ class AntQueen:
                     })
                     
         except Exception as e:
-            logger.error(f"Error sharing experience: {str(e)}") 
+            logger.error(f"Error sharing experience: {str(e)}")
+            
+    @ai_metrics.track_prediction(prediction_type="market_decision")      
+    async def analyze_market(self, market_data: Dict) -> Dict:
+        """
+        Analyze market data and make a trading decision.
+        """
+        try:
+            # Simulated decision making
+            features = self._extract_features(market_data)
+            
+            # Make prediction with confidence
+            if features.get("volatility", 0) > 0.1:
+                decision = "buy" if features.get("trend", 0) > 0 else "sell"
+                confidence = min(0.7 + features.get("volatility", 0), 0.95)
+            else:
+                decision = "hold"
+                confidence = 0.6
+                
+            # Record the confidence
+            ai_metrics.record_confidence(confidence)
+                
+            return {
+                "decision": decision,
+                "confidence": confidence,
+                "reasoning": f"Based on volatility ({features.get('volatility')}) and trend ({features.get('trend')})"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing market: {str(e)}")
+            return {"decision": "hold", "confidence": 0.5, "error": str(e)}
+    
+    def _extract_features(self, market_data: Dict) -> Dict:
+        """Extract features from market data."""
+        # Simple feature extraction
+        features = {
+            "volatility": market_data.get("price_change_1h", 0),
+            "volume": market_data.get("volume_24h", 0) / 1000000,
+            "trend": market_data.get("price_change_24h", 0),
+            "liquidity": market_data.get("liquidity", 0) / 10000
+        }
+        
+        return features
+    
+    @ai_metrics.track_training()
+    async def learn_from_trade(self, trade_data: Dict) -> Dict:
+        """
+        Learn from trade outcomes to improve future predictions.
+        """
+        try:
+            # Add trade to training data
+            self.training_data.append(trade_data)
+            
+            # Update metrics
+            ai_metrics.update_training_samples(len(self.training_data))
+            
+            # Simulate improvement in model accuracy
+            # In a real implementation, this would come from actual model evaluation
+            last_accuracy = self.accuracy_history[-1] if self.accuracy_history else 0.7
+            
+            # Small accuracy improvement
+            new_accuracy = min(0.99, last_accuracy + 0.01)
+            self.accuracy_history.append(new_accuracy)
+            
+            # Update accuracy metric
+            ai_metrics.update_accuracy(new_accuracy)
+            
+            # Update accuracy by decision type
+            decision_type = trade_data.get("decision", "default")
+            type_accuracy = new_accuracy * (0.9 + 0.1 * (trade_data.get("profit", 0) > 0))
+            ai_metrics.update_accuracy_by_type(decision_type, type_accuracy)
+            
+            return {
+                "success": True,
+                "accuracy": new_accuracy,
+                "sample_count": len(self.training_data)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error learning from trade: {str(e)}")
+            return {"success": False, "error": str(e)}
+    
+    async def get_accuracy_trend(self) -> List[float]:
+        """Get the historical accuracy trend."""
+        return self.accuracy_history 

@@ -1,0 +1,60 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: bot_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: bot_logs
+          __path__: /var/log/*.log
+          host: trading-bot
+          component: trading-bot
+
+  - job_name: trading_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: trading_logs
+          __path__: /var/log/trading_*.log
+          host: trading-bot
+          component: trading
+
+  - job_name: ai_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: ai_logs
+          __path__: /var/log/ai_*.log
+          host: trading-bot
+          component: ai
+
+  - job_name: api_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: api_logs
+          __path__: /var/log/api_*.log
+          host: trading-bot
+          component: api
+
+  - job_name: system_logs
+    journal:
+      max_age: 12h
+      labels:
+        job: systemd-journal
+        host: trading-bot
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit' 

@@ -1,0 +1,75 @@
+groups:
+  - name: trading_alerts
+    rules:
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container_name="solana-trading-bot"} > 1.8 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on trading bot"
+          description: "Trading bot is using more than 90% of allocated memory for over 5 minutes"
+
+      - alert: HighCpuUsage
+        expr: rate(container_cpu_usage_seconds_total{container_name="solana-trading-bot"}[5m]) > 1.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on trading bot"
+          description: "Trading bot is using more than 90% of allocated CPU for over 10 minutes"
+
+      - alert: TradeExecutionFailure
+        expr: rate(trade_execution_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Trade execution failures detected"
+          description: "Bot has experienced trade execution failures in the last 15 minutes"
+
+      - alert: APILatencyHigh
+        expr: api_request_duration_seconds{endpoint=~"jupiter|helius"} > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency detected"
+          description: "API requests to {{ $labels.endpoint }} are taking more than 2 seconds"
+          
+      - alert: DailyLossLimitApproaching
+        expr: daily_loss_sol > daily_loss_limit_sol * 0.8
+        labels:
+          severity: warning
+        annotations:
+          summary: "Daily loss limit approaching"
+          description: "Bot has reached 80% of configured daily loss limit"
+          
+      - alert: LLMModelNotLoaded
+        expr: llm_model_loaded == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM model not loaded"
+          description: "The local LLM model failed to load and bot is running in fallback mode"
+          
+  - name: system_alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} down"
+          description: "{{ $labels.instance }} has been down for more than 1 minute"
+          
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 85% on {{ $labels.mountpoint }}" 

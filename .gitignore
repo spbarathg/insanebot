@@ -16,6 +16,7 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -40,11 +41,8 @@ keys/
 wallets/
 
 # Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+logs/*
+!logs/.gitkeep
 
 # IDE specific files
 .idea/
@@ -56,7 +54,8 @@ yarn-error.log*
 *.sublime-project
 
 # Trading data
-data/
+data/*
+!data/.gitkeep
 historical_data/
 backtest_results/
 
@@ -75,14 +74,42 @@ dmypy.json
 
 # OS specific
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # Project specific
 config.prod.json
 *.cache
-simulation_results/ 
+simulation_results/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env*
+!env.example
+
+# Models
+models/*
+!models/.gitkeep
+
+# Monitoring data
+prometheus/data/
+grafana/data/
+loki/data/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+temp/
+
+# Notebooks
+*.ipynb
+pytest-report.xml 
