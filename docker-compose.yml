@@ -3,6 +3,7 @@ version: '3.8'
 services:
   trading-bot:
     build:
+      context: .
       dockerfile: compatible.Dockerfile
     container_name: solana-trading-bot
     restart: unless-stopped
