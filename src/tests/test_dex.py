@@ -3,7 +3,7 @@ Test suite for DEX interaction functionality.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from solana.transaction import Transaction
+from solders.transaction import Transaction
 from src.core.dex import RaydiumDEX
 
 @pytest.fixture

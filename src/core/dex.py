@@ -5,8 +5,8 @@ import asyncio
 from typing import Dict, Optional, List, Any
 from functools import lru_cache
 from solana.rpc.async_api import AsyncClient
-from solana.transaction import Transaction
-from solana.keypair import Keypair
+from solders.transaction import Transaction
+from solders.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.instruction import Instruction, AccountMeta
 from loguru import logger
