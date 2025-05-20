@@ -8,7 +8,7 @@ import json
 import time
 import asyncio
 from typing import Dict, List, Optional, Any
-from solana.keypair import Keypair
+from solders.keypair import Keypair
 from solana.publickey import PublicKey
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed

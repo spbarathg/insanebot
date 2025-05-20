@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from loguru import logger
 from solana.rpc.async_api import AsyncClient
 from solders.transaction import Transaction
-from solana.keypair import Keypair
+from solders.keypair import Keypair
 from solana.rpc.commitment import Confirmed
 from core.config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG
 from core.error_handler import ErrorHandler
