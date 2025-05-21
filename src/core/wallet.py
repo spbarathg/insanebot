@@ -186,8 +186,12 @@ class WalletManager:
         try:
             if not self._balance_cache:
                 pubkey = self.keypair.pubkey()
-                response = await self.rpc_client.get_balance(str(pubkey))
-                self._balance_cache = response["result"]["value"] / 1e9  # Convert lamports to SOL
+                response = await self.rpc_client.get_balance(pubkey)
+                if response and "result" in response and "value" in response["result"]:
+                    self._balance_cache = response["result"]["value"] / 1e9  # Convert lamports to SOL
+                else:
+                    logger.error("Failed to get balance: Invalid response format")
+                    return None
             return self._balance_cache
             
         except Exception as e:

@@ -20,6 +20,7 @@ from core.error_handler import ErrorHandler
 from core.dex import RaydiumDEX
 from core.wallet import WalletManager
 from core.simulator import TradingSimulator
+from solana.publickey import PublicKey
 
 @dataclass
 class TradeInfo:
@@ -45,7 +46,7 @@ class SimpleTradingBot:
     """
     
     def __init__(self, wallet_address: str, simulation_mode: bool = False):
-        self.wallet_address = wallet_address
+        self.wallet_address = PublicKey(wallet_address)  # Convert string to Pubkey
         self.error_handler = ErrorHandler()
         self.is_running = False
         self.last_trade_time = 0
