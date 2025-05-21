@@ -17,10 +17,12 @@ from loguru import logger
 from dotenv import load_dotenv
 import asyncio
 import logging
+import base58
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # Changed to INFO to reduce logging overhead
 
-async def await_confirmation(rpc_client, signature, timeout=30, poll_interval=1):
+async def await_confirmation(rpc_client, signature, timeout=15, poll_interval=0.5):  # Reduced timeout and poll interval
     """Poll Solana RPC for transaction confirmation."""
     start = time.time()
     while time.time() - start < timeout:
@@ -46,6 +48,8 @@ class WalletManager:
         self.keypair: Optional[Keypair] = None
         self._fernet = None
         self._balance_cache = None
+        self._last_balance_update = 0
+        self._balance_cache_ttl = 30  # Cache balance for 30 seconds
         self._load_wallet()
         
     def _initialize_encryption(self) -> None:
@@ -75,30 +79,57 @@ class WalletManager:
     def _load_wallet(self) -> None:
         """Load wallet from private key."""
         try:
-            # Load environment variables
-            load_dotenv()
-            
             # Get private key from environment
-            private_key = os.getenv("WALLET_PRIVATE_KEY")
+            private_key = os.getenv("WALLET_PRIVATE_KEY") or os.getenv("SOLANA_PRIVATE_KEY")
             
-            # For tests, use a dummy keypair if no private key found
             if not private_key:
-                logger.info("No wallet private key found, using mock keypair for testing")
-                self.keypair = Keypair()
-                return
-                
-            # Convert private key to bytes
-            private_key_bytes = bytes.fromhex(private_key)
+                if os.getenv("SIMULATION_MODE", "False").lower() == "true":
+                    # Use a random keypair for simulation
+                    self.keypair = Keypair()
+                    return
+                raise ValueError("No wallet private key found and not in simulation mode")
             
-            # Create keypair
-            self.keypair = Keypair.from_secret_key(private_key_bytes)
-            logger.info(f"Loaded wallet: {self.keypair.public_key}")
+            # Try base58 first, then hex
+            try:
+                # For base58 encoded keys
+                private_key_bytes = base58.b58decode(private_key)
+            except Exception:
+                try:
+                    # For hex encoded keys, ensure we have valid hex
+                    if private_key.startswith('0x'):
+                        private_key = private_key[2:]
+                    private_key_bytes = bytes.fromhex(private_key)
+                except Exception as e:
+                    logger.error(f"Invalid private key format: {str(e)}")
+                    # Use a random keypair as fallback in any case
+                    if os.getenv("SIMULATION_MODE", "False").lower() == "true":
+                        self.keypair = Keypair()
+                        return
+                    raise ValueError(f"Invalid private key format. Must be base58 or hex: {str(e)}")
+            
+            # Create keypair from secret key bytes
+            # Note: in newer solders versions, use create_from_bytes instead
+            try:
+                self.keypair = Keypair.from_bytes(private_key_bytes)
+            except AttributeError:
+                # Try alternative method if from_secret_key doesn't exist
+                try:
+                    self.keypair = Keypair.from_bytes(private_key_bytes)
+                except Exception:
+                    # Last resort, create a random keypair for simulation
+                    if os.getenv("SIMULATION_MODE", "False").lower() == "true":
+                        self.keypair = Keypair()
+                    else:
+                        raise ValueError("Could not create keypair from provided private key")
+            
+            logger.info(f"Loaded wallet: {self.keypair.pubkey()}")
             
         except Exception as e:
-            logger.error(f"Error loading wallet: {str(e)}")
-            # Use a dummy keypair for testing
-            self.keypair = Keypair()
-            
+            if os.getenv("SIMULATION_MODE", "False").lower() == "true":
+                self.keypair = Keypair()
+            else:
+                raise ValueError(f"Failed to load wallet: {str(e)}")
+    
     def load_wallet(self, encrypted_key_path: str) -> None:
         """
         Load encrypted wallet from file.
@@ -171,29 +202,23 @@ class WalletManager:
         return self.keypair
     
     async def get_balance(self) -> Optional[float]:
-        """
-        Get wallet balance in SOL.
-        
-        Returns:
-            float: Wallet balance in SOL
-            
-        Raises:
-            ValueError: If wallet is not loaded
-        """
+        """Get wallet balance in SOL with caching."""
         if not self.keypair:
             raise ValueError("Wallet not loaded")
             
-        try:
-            if not self._balance_cache:
-                pubkey = self.keypair.pubkey()
-                response = await self.rpc_client.get_balance(pubkey)
-                if response and "result" in response and "value" in response["result"]:
-                    self._balance_cache = response["result"]["value"] / 1e9  # Convert lamports to SOL
-                else:
-                    logger.error("Failed to get balance: Invalid response format")
-                    return None
+        current_time = time.time()
+        if (self._balance_cache is not None and 
+            current_time - self._last_balance_update < self._balance_cache_ttl):
             return self._balance_cache
             
+        try:
+            pubkey = self.keypair.pubkey()
+            response = await self.rpc_client.get_balance(pubkey)
+            if response and "result" in response and "value" in response["result"]:
+                self._balance_cache = response["result"]["value"] / 1e9
+                self._last_balance_update = current_time
+                return self._balance_cache
+            return None
         except Exception as e:
             logger.error(f"Failed to get balance: {e}")
             return None
@@ -207,10 +232,20 @@ class WalletManager:
             if not token_address:
                 raise ValueError("Invalid token address")
                 
+            # Ensure owner is a Pubkey object
+            owner_pubkey = self.keypair.pubkey()
+            
+            # Ensure token_address is a Pubkey object
+            try:
+                mint_pubkey = Pubkey.from_string(token_address)
+            except Exception as e:
+                logger.error(f"Could not convert token address to Pubkey: {str(e)}")
+                return 0.0
+                
             # Get token account
             token_account = await self.rpc_client.get_token_accounts_by_owner(
-                self.keypair.public_key,
-                {"mint": Pubkey(token_address)}
+                owner_pubkey,
+                {"mint": mint_pubkey}
             )
             
             if not token_account or not token_account.get("result", {}).get("value"):
@@ -240,43 +275,26 @@ class WalletManager:
         return self.keypair.pubkey()
         
     async def send_transaction(self, transaction: Transaction) -> bool:
-        """
-        Send a transaction with retry logic, error handling, and confirmation monitoring.
-        
-        Args:
-            transaction: Transaction to send
-            
-        Returns:
-            bool: True if transaction was successful
-            
-        Raises:
-            ValueError: If wallet is not loaded
-        """
+        """Send a transaction with optimized retry logic."""
         if not self.keypair:
             raise ValueError("Wallet not loaded")
-        max_retries = 3
-        retry_delay = 1
+            
+        max_retries = 2  # Reduced retries
+        retry_delay = 0.5  # Reduced delay
+        
         for attempt in range(max_retries):
             try:
                 transaction.sign([self.keypair])
                 response = await self.rpc_client.send_transaction(transaction)
                 if "result" in response:
                     signature = response["result"]
-                    logger.info(f"Transaction sent: {signature}")
-                    # Wait for confirmation
                     confirmed = await await_confirmation(self.rpc_client, signature)
                     if confirmed:
-                        logger.info(f"Transaction {signature} confirmed.")
                         return True
-                    else:
-                        logger.error(f"Transaction {signature} not confirmed in time.")
-                        return False
             except Exception as e:
-                logger.warning(f"Transaction attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (attempt + 1))
+                    await asyncio.sleep(retry_delay)
                 continue
-        logger.error("All transaction attempts failed")
         return False
 
     async def initialize(self) -> bool:

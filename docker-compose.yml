@@ -9,9 +9,9 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./config:/app/config
+      - ./data:/app/data:rw
+      - ./logs:/app/logs:rw
+      - ./config:/app/config:rw
     depends_on:
       - prometheus
       - grafana
@@ -34,6 +34,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    user: "1000:1000"
+    environment:
+      - SIMULATION_MODE=True
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      - LOG_LEVEL=INFO
 
   prometheus:
     image: prom/prometheus:latest

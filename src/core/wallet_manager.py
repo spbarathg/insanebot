@@ -36,42 +36,49 @@ logger = logging.getLogger(__name__)
 
 class WalletManager:
     """
-    Manages a wallet for Solana trading bot.
-    
-    Handles key management, balance checks, and transaction monitoring.
+    Manages wallet operations including key storage, balance checking,
+    and transaction signing.
     """
     
     def __init__(self):
+        """Initialize wallet manager with Solana client."""
+        self.solana_client = None
         self.keypair = None
         self.public_key = None
-        self.solana_client = None
         self.balance = 0.0
-        self.transactions = []
-        self.pending_transactions = {}
-        self.token_accounts = {}
-        self.balance_cache = 0.0
+        self.balance_cache = None
         self.last_balance_update = 0
-        wallet_logger.info("WalletManager instance initialized")
-
-    async def initialize(self) -> bool:
-        """Initialize wallet manager."""
+        self.initialize()
+        
+    def initialize(self):
+        """Initialize wallet manager with RPC connection and keypair."""
         try:
-            logger.info("Initializing wallet manager...")
+            # Initialize Solana client
+            rpc_url = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+            self.solana_client = AsyncClient(rpc_url)
             
-            # Load keypair from private key
+            # Load keypair
             self._load_keypair()
             
-            # Initialize Solana client
-            self.solana_client = AsyncClient(settings.RPC_ENDPOINTS[0], commitment=Confirmed)
+            # Check balance
+            asyncio.run(self.check_balance())
             
-            # Check wallet balance
-            await self.check_balance()
+            # Check if balance is sufficient
+            min_balance = float(os.getenv("MIN_BALANCE", "0.05"))
             
-            logger.info(f"Wallet manager initialized for {self.public_key}")
-            return True
+            # Handle null balance by defaulting to 0
+            if self.balance is None:
+                logger.warning("Balance is None, defaulting to 0")
+                self.balance = 0.0
+                
+            # Now we can safely compare with a float
+            if self.balance < min_balance:
+                logger.warning(f"Wallet balance {self.balance} SOL is below minimum {min_balance} SOL")
+                
+            logger.info("Wallet manager initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize wallet manager: {str(e)}")
-            return False
+            logger.error(f"Failed to initialize bot: {str(e)}")
+            raise
             
     def _load_keypair(self):
         """Load keypair from private key or create a new one in simulation mode."""
@@ -82,15 +89,38 @@ class WalletManager:
                 logger.info("Created simulation keypair")
             else:
                 # In real mode, load from environment variable
-                if not settings.SOLANA_PRIVATE_KEY:
-                    raise ValueError("SOLANA_PRIVATE_KEY not set in environment")
+                if not settings.WALLET_PRIVATE_KEY and not settings.SOLANA_PRIVATE_KEY:
+                    raise ValueError("WALLET_PRIVATE_KEY or SOLANA_PRIVATE_KEY not set in environment")
                     
-                # Convert private key to bytes and create keypair
-                private_key_bytes = bytes.fromhex(settings.SOLANA_PRIVATE_KEY)
-                self.keypair = Keypair.from_secret_key(private_key_bytes)
+                # Get private key from either environment variable
+                private_key = settings.WALLET_PRIVATE_KEY or settings.SOLANA_PRIVATE_KEY
+                
+                try:
+                    # Try base58 first
+                    private_key_bytes = base58.b58decode(private_key)
+                except Exception:
+                    try:
+                        # Then try hex
+                        if private_key.startswith('0x'):
+                            private_key = private_key[2:]
+                        private_key_bytes = bytes.fromhex(private_key)
+                    except Exception as e:
+                        raise ValueError(f"Invalid private key format: {str(e)}")
+                
+                # Handle different Solana SDK versions
+                try:
+                    # Newer versions
+                    self.keypair = Keypair.from_bytes(private_key_bytes)
+                except AttributeError:
+                    try:
+                        # Alternative API
+                        self.keypair = Keypair.from_secret_key(private_key_bytes)
+                    except AttributeError:
+                        # Last resort
+                        raise ValueError("Could not create keypair - incompatible Solana SDK version")
                 
             # Set public key
-            self.public_key = self.keypair.public_key
+            self.public_key = self.keypair.pubkey()
             
         except Exception as e:
             logger.error(f"Error loading keypair: {str(e)}")
@@ -116,10 +146,10 @@ class WalletManager:
                 return self.balance
             else:
                 logger.warning("Could not retrieve wallet balance")
-                return 0
+                return 0.0
         except Exception as e:
             logger.error(f"Error checking balance: {str(e)}")
-            return 0
+            return 0.0
             
     def get_keypair(self) -> Keypair:
         """Get wallet keypair."""
@@ -128,100 +158,19 @@ class WalletManager:
     def get_public_key(self) -> PublicKey:
         """Get wallet public key."""
         return self.public_key
-        
-    async def get_token_accounts(self) -> List[Dict]:
-        """Get token accounts for wallet."""
-        try:
-            response = await self.solana_client.get_token_accounts_by_owner(
-                self.public_key,
-                {"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"}
-            )
-            
-            token_accounts = []
-            if response and "result" in response and "value" in response["result"]:
-                for account in response["result"]["value"]:
-                    token_accounts.append({
-                        "pubkey": account["pubkey"],
-                        "mint": account["account"]["data"]["parsed"]["info"]["mint"],
-                        "amount": int(account["account"]["data"]["parsed"]["info"]["tokenAmount"]["amount"]) / 10**account["account"]["data"]["parsed"]["info"]["tokenAmount"]["decimals"],
-                        "decimals": account["account"]["data"]["parsed"]["info"]["tokenAmount"]["decimals"]
-                    })
-            
-            self.token_accounts = {account["mint"]: account["pubkey"] for account in token_accounts}
-            wallet_logger.info(f"Retrieved {len(token_accounts)} token accounts")
-            return token_accounts
-        except Exception as e:
-            logger.error(f"Error getting token accounts: {str(e)}")
-            return []
-            
-    async def monitor_transaction(self, signature: str, max_retries: int = 30) -> bool:
-        """Monitor transaction until confirmed or failed."""
-        try:
-            self.pending_transactions[signature] = {
-                "status": "pending",
-                "start_time": time.time()
-            }
-            
-            retry_count = 0
-            while retry_count < max_retries:
-                # Check signature status
-                response = await self.solana_client.get_signature_statuses([signature])
-                
-                if response and "result" in response and "value" in response["result"] and response["result"]["value"][0]:
-                    status = response["result"]["value"][0]
-                    
-                    if status.get("confirmationStatus") == "confirmed" or status.get("confirmationStatus") == "finalized":
-                        # Transaction confirmed
-                        self.pending_transactions[signature]["status"] = "confirmed"
-                        self.pending_transactions[signature]["confirmed_time"] = time.time()
-                        
-                        # Add to transactions history
-                        self.transactions.append({
-                            "signature": signature,
-                            "status": "confirmed",
-                            "timestamp": time.time()
-                        })
-                        
-                        logger.info(f"Transaction confirmed: {signature}")
-                        return True
-                    elif status.get("err"):
-                        # Transaction failed
-                        self.pending_transactions[signature]["status"] = "failed"
-                        self.pending_transactions[signature]["error"] = status.get("err")
-                        
-                        # Add to transactions history
-                        self.transactions.append({
-                            "signature": signature,
-                            "status": "failed",
-                            "error": status.get("err"),
-                            "timestamp": time.time()
-                        })
-                        
-                        logger.warning(f"Transaction failed: {signature} - {status.get('err')}")
-                        return False
-                
-                # Sleep before retrying
-                await asyncio.sleep(1)
-                retry_count += 1
-                
-            # Max retries reached, consider transaction failed
-            self.pending_transactions[signature]["status"] = "timeout"
-            logger.warning(f"Transaction timeout: {signature}")
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error monitoring transaction: {str(e)}")
-            return False
-            
+    
     async def close(self):
-        """Close wallet manager."""
+        """Close connections."""
+        if self.solana_client:
+            await self.solana_client.close()
+            
+    def __del__(self):
+        """Ensure connections are closed on deletion."""
         try:
-            if self.solana_client:
-                await self.solana_client.close()
-                logger.info("Wallet manager closed")
-        except Exception as e:
-            logger.error(f"Error closing wallet manager: {str(e)}")
-            raise WalletError(f"Error closing wallet manager: {str(e)}")
+            if hasattr(self, 'solana_client') and self.solana_client:
+                asyncio.create_task(self.solana_client.close())
+        except Exception:
+            pass
 
     @handle_errors(wallet_logger)
     @log_performance(wallet_logger)

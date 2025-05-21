@@ -5,6 +5,7 @@ pydantic==2.1.1
 loguru==0.7.0
 flask>=2.0.0
 flask-cors>=3.0.0
+aiofiles>=0.8.0
 
 # Security dependencies
 cryptography==41.0.3
@@ -15,6 +16,7 @@ python-jose>=3.3.0
 # Solana dependencies
 solana>=0.26.0
 anchorpy>=0.18.0
+solders>=0.20.0
 
 # Monitoring and logging
 prometheus-client>=0.12.0
