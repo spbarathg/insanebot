@@ -249,9 +249,9 @@ class MarketScanner:
         self.token_watchlist = []
         self.new_token_candidates = []
         self.last_scan = 0
-        self.scan_interval = 600  # 10 minutes between scans for more frequent discovery
-        self.max_watchlist_size = 15  # Allow more tokens on watchlist
-        self.max_candidates = 25  # Track more candidates
+        self.scan_interval = 300  # 5 minutes between scans for more frequent discovery (was 600)
+        self.max_watchlist_size = 25  # Allow many more tokens on watchlist (was 15)
+        self.max_candidates = 50  # Track many more candidates (was 25)
     
     async def initialize(self) -> bool:
         """Initialize the market scanner"""
@@ -339,25 +339,25 @@ class MarketScanner:
             # Debug logging for discovered tokens
             logger.debug(f"Evaluating {metadata.get('symbol', 'UNKNOWN')}: Liquidity=${liquidity:.0f}, Holders={holders_count}, Volume=${volume:.0f}")
             
-            # Check minimum criteria - Lower thresholds for better token discovery
-            if liquidity < 10000:  # $10K minimum liquidity (was $50K)
+            # Check minimum criteria - Much lower thresholds for better token discovery
+            if liquidity < 1000:  # $1K minimum liquidity (was $10K)
                 return {"score": 0.1, "reason": "Insufficient liquidity"}
                 
-            if holders_count < 50:  # Minimum holder count (was 100)
+            if holders_count < 10:  # Much lower holder count (was 50)
                 return {"score": 0.2, "reason": "Too few holders"}
                 
-            if volume < 1000:  # $1K minimum daily volume (was $10K)
+            if volume < 100:  # $100 minimum daily volume (was $1K)
                 return {"score": 0.3, "reason": "Low trading volume"}
                 
             # Calculate concentration score (lower is better)
             top_holder_percentage = holders_data[0]["percentage"] if holders_data else 0.5
             concentration_score = 1 - top_holder_percentage
             
-            # Calculate final score (0 to 1)
+            # Calculate final score (0 to 1) - More generous scoring
             score = (
-                min(liquidity / 1000000, 1) * 0.4 +  # Liquidity score
-                min(volume / 100000, 1) * 0.3 +  # Volume score
-                min(holders_count / 1000, 1) * 0.2 +  # Holders score
+                min(liquidity / 100000, 1) * 0.4 +  # Liquidity score (reduced from 1M to 100K)
+                min(volume / 10000, 1) * 0.3 +  # Volume score (reduced from 100K to 10K)
+                min(holders_count / 100, 1) * 0.2 +  # Holders score (reduced from 1000 to 100)
                 concentration_score * 0.1  # Concentration score
             )
             
@@ -386,8 +386,8 @@ class MarketScanner:
         for token_address in list(self.new_token_candidates):
             evaluation = await self.evaluate_token(token_address)
             
-            # Lower the score threshold to add more tokens (from 0.4 to 0.25)
-            if evaluation.get("score", 0) > 0.25:
+            # Much lower score threshold to add more tokens (from 0.25 to 0.15)
+            if evaluation.get("score", 0) > 0.15:
                 if token_address not in self.token_watchlist:
                     # Add to watchlist if there's room
                     if len(self.token_watchlist) < self.max_watchlist_size:
@@ -403,11 +403,11 @@ class MarketScanner:
                 # Remove from candidates
                 if token_address in self.new_token_candidates:
                     self.new_token_candidates.remove(token_address)
-            elif evaluation.get("score", 0) < 0.2:
-                # Remove tokens with very low scores immediately
+            elif evaluation.get("score", 0) < 0.05:
+                # Remove tokens with extremely low scores immediately (reduced from 0.2 to 0.05)
                 if token_address in self.new_token_candidates:
                     self.new_token_candidates.remove(token_address)
-                    logger.debug(f"❌ Removed low-scoring token {token_address[:8]}... (score: {evaluation.get('score', 0):.2f})")
+                    logger.debug(f"❌ Removed extremely low-scoring token {token_address[:8]}... (score: {evaluation.get('score', 0):.2f})")
             elif time.time() - evaluation.get("evaluation_time", 0) > 86400:
                 # Remove old candidates after 24 hours
                 if token_address in self.new_token_candidates:
