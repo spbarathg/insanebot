@@ -5,13 +5,19 @@ import os
 import sys
 from pathlib import Path
 
-# Add config directory to path
-sys.path.append(str(Path(__file__).parent.parent.parent / "config"))
+# Add config directory to path - ensure absolute path is used
+config_dir = str(Path(__file__).resolve().parent.parent.parent / "config")
+if config_dir not in sys.path:
+    sys.path.insert(0, config_dir)
 
 try:
     from core_config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG
     from ant_princess_config import ANT_PRINCESS_CONFIG, QUEEN_CONFIG as ANT_QUEEN_CONFIG
-except ImportError:
+except ImportError as e:
+    print(f"Warning: Could not import configuration from config directory: {e}")
+    print(f"Searched in: {config_dir}")
+    print("Using fallback configuration...")
+    
     # Fallback configuration for tests
     CORE_CONFIG = {
         "trading": {

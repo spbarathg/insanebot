@@ -32,7 +32,7 @@ async def main():
             
     except asyncio.CancelledError:
         logger.info("Bot execution cancelled")
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Error in bot: {str(e)}")
     finally:
         logger.info("Bot shutdown complete")
@@ -60,9 +60,9 @@ def setup():
             except Exception as e:
                 logger.warning(f"Could not set permissions for {directory}: {str(e)}")
                 
-    # Set up signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+        # Set up signal handlers
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
     
         logger.info("Setup complete")
         return True
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # Perform setup
     if setup():
         # Run the bot
-    asyncio.run(main()) 
+        asyncio.run(main())
     else:
         logger.error("Failed to set up the bot environment")
         sys.exit(1) 
