@@ -13,6 +13,7 @@ import os
 import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
+from loguru import logger
 
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -24,15 +25,12 @@ from src.core.helius_service import HeliusService
 from src.core.jupiter_service import JupiterService
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/memecoin_bot.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+logger.add("logs/portfolio.log", rotation="5 MB", level="INFO", 
+          filter=lambda record: "PORTFOLIO" in record.get("extra", {}))
+logger.add("logs/scanner.log", rotation="5 MB", level="DEBUG", 
+          filter=lambda record: "SCANNER" in record.get("extra", {}))
+logger.add("logs/trades.log", rotation="5 MB", level="INFO", 
+          filter=lambda record: "TRADE" in record.get("extra", {}))
 
 # Ensure required directories exist
 for directory in ['logs', 'data', 'models']:
@@ -464,55 +462,77 @@ class MemeCoinBot:
             return False
             
     async def start(self):
-        """Start the bot with proper initialization check."""
-        logger.debug("MemeCoinBot.start() called")
+        """Start the bot trading loop."""
+        logger.bind(ACTIVITY="BOT_START").debug("🚀 MemeCoinBot.start() called")
         
         if not self.initialized:
-            logger.error("Bot not initialized. Call initialize() first.")
+            logger.bind(ACTIVITY="BOT_START").error("❌ Bot not initialized. Call initialize() first.")
             return
             
         if self.running:
-            logger.warning("Bot already running")
+            logger.bind(ACTIVITY="BOT_START").warning("⚠️ Bot already running")
             return
             
         self.running = True
-        logger.info("MemeCoinBot started")
+        logger.bind(ACTIVITY="BOT_START").success("✅ MemeCoinBot started - Entering main trading loop")
         
         try:
+            loop_count = 0
             while self.running:
                 try:
+                    loop_count += 1
+                    logger.bind(ACTIVITY="MAIN_LOOP").info(f"🔄 Starting trading cycle #{loop_count}")
+                    
                     # Update market scanner watchlist
+                    logger.bind(SCANNER=True).debug("📡 Updating market scanner watchlist...")
                     await self.market_scanner.update_watchlist()
+                    watchlist_size = len(self.market_scanner.token_watchlist)
+                    logger.bind(SCANNER=True).info(f"👁️ Monitoring {watchlist_size} tokens on watchlist")
                     
                     # Check all monitored tokens
+                    tokens_checked = 0
                     for token in self.market_scanner.token_watchlist:
+                        logger.bind(SCANNER=True).debug(f"🔍 Checking token: {token[:8]}...")
                         await self.check_token(token)
+                        tokens_checked += 1
+                    
+                    logger.bind(SCANNER=True).info(f"✅ Completed analysis of {tokens_checked} tokens")
                     
                     # Get portfolio summary
                     summary = self.portfolio.get_portfolio_summary()
                     holdings = self.portfolio.get_holdings()
                     
                     # Log portfolio status every few iterations
-                    if random.random() < 0.2:  # ~20% chance each cycle
-                        logger.info(f"Portfolio value: {summary['current_value']:.4f} SOL (Profit: {summary['total_return']:.4f} SOL, {summary['percent_return']:.2f}%)")
-                        logger.info(f"Win rate: {summary['win_rate']:.1f}% ({summary['successful_trades']} of {summary['total_trades']} trades)")
+                    if loop_count % 5 == 0 or random.random() < 0.2:  # Every 5 cycles or ~20% chance
+                        logger.bind(PORTFOLIO=True).info(f"💰 Portfolio value: {summary['current_value']:.4f} SOL")
+                        logger.bind(PORTFOLIO=True).info(f"📈 Profit: {summary['total_return']:.4f} SOL ({summary['percent_return']:.2f}%)")
+                        logger.bind(PORTFOLIO=True).info(f"🎯 Win rate: {summary['win_rate']:.1f}% ({summary['successful_trades']} of {summary['total_trades']} trades)")
+                        logger.bind(PORTFOLIO=True).info(f"🏃 Active trades: {self.active_trades}/{self.max_concurrent_trades}")
                         
                         if holdings:
+                            logger.bind(PORTFOLIO=True).info(f"🏷️ Holding {len(holdings)} different tokens")
                             top_holdings = holdings[:3] if len(holdings) > 3 else holdings
-                            logger.info("Top holdings:")
                             for holding in top_holdings:
-                                logger.info(f"  {holding['amount']:.2f} @ ${holding['current_price_usd']:.6f} = {holding['current_value_sol']:.4f} SOL ({holding['percent_change']:+.2f}%)")
+                                profit_emoji = "📈" if holding['percent_change'] > 0 else "📉" if holding['percent_change'] < 0 else "➡️"
+                                logger.bind(PORTFOLIO=True).info(f"{profit_emoji} {holding['symbol']}: {holding['amount']:.2f} @ ${holding['current_price_usd']:.6f} = {holding['current_value_sol']:.4f} SOL ({holding['percent_change']:+.2f}%)")
+                        else:
+                            logger.bind(PORTFOLIO=True).info("📭 No current holdings")
+                    
+                    # Log cycle completion
+                    logger.bind(ACTIVITY="MAIN_LOOP").debug(f"⏰ Trading cycle #{loop_count} completed, waiting 30s...")
                     
                     # Sleep between cycles
                     await asyncio.sleep(30)
                 except asyncio.CancelledError:
-                    logger.info("Bot operation was cancelled")
+                    logger.bind(ACTIVITY="SHUTDOWN").info("⏹️ Bot operation was cancelled")
                     break
                 except Exception as e:
-                    logger.error(f"Error in main loop: {str(e)}")
+                    logger.bind(ACTIVITY="ERROR").error(f"💥 Error in main loop: {str(e)}")
+                    logger.bind(ACTIVITY="ERROR").exception("Full error traceback:")
                     await asyncio.sleep(10)
         finally:
             self.running = False
+            logger.bind(ACTIVITY="SHUTDOWN").info("🛑 Main trading loop ended")
             
     async def check_token(self, token_address: str):
         """Check a token for trading opportunities."""
@@ -520,28 +540,35 @@ class MemeCoinBot:
             # Skip if in cooldown period
             now = time.time()
             if token_address in self.trade_cooldowns and now - self.trade_cooldowns[token_address] < self.min_trade_interval:
+                logger.bind(SCANNER=True).debug(f"⏳ Token {token_address[:8]}... in cooldown")
                 return
                 
             # Skip if checked very recently
             if token_address in self.last_check and now - self.last_check[token_address] < 30:
+                logger.bind(SCANNER=True).debug(f"🕐 Token {token_address[:8]}... checked recently")
                 return
                 
             # Update last check time
             self.last_check[token_address] = now
             
+            logger.bind(SCANNER=True).debug(f"📊 Fetching data for token {token_address[:8]}...")
+            
             # Get token metadata
             metadata = await self.helius_service.get_token_metadata(token_address)
             if not metadata:
+                logger.bind(SCANNER=True).warning(f"❌ No metadata for token {token_address[:8]}...")
                 return
                 
             # Get token price
             price_info = await self.helius_service.get_token_price(token_address)
             if not price_info:
+                logger.bind(SCANNER=True).warning(f"❌ No price data for token {token_address[:8]}...")
                 return
                 
             # Get liquidity data
             liquidity_data = await self.helius_service.get_token_liquidity(token_address)
             if not liquidity_data:
+                logger.bind(SCANNER=True).warning(f"❌ No liquidity data for token {token_address[:8]}...")
                 return
                 
             # Combine data for analysis
@@ -560,6 +587,8 @@ class MemeCoinBot:
                 "timestamp": now
             }
             
+            logger.bind(SCANNER=True).debug(f"✅ Data collected for {metadata.get('symbol', 'UNKNOWN')} ({token_address[:8]}...)")
+            
             # Cache the market data
             self.market_data_cache[token_address] = token_data
             
@@ -568,37 +597,47 @@ class MemeCoinBot:
             self.portfolio.update_prices(token_prices)
             
             # Get trading recommendation from LLM
+            logger.bind(SCANNER=True).debug(f"🤖 Getting LLM analysis for {metadata.get('symbol', 'UNKNOWN')}...")
             recommendation = await self.local_llm.analyze_market(token_data)
             if not recommendation:
+                logger.bind(SCANNER=True).warning(f"❌ No LLM recommendation for {metadata.get('symbol', 'UNKNOWN')}")
                 return
                 
             # Get sentiment if we're considering a buy
             sentiment = None
             if recommendation.get("action", "hold") == "buy" and recommendation.get("confidence", 0) > 0.6:
+                logger.bind(SCANNER=True).debug(f"😊 Getting sentiment analysis for {metadata.get('symbol', 'UNKNOWN')}...")
                 sentiment = await self.local_llm.get_market_sentiment(token_address)
             
             # Get risk assessment
+            logger.bind(SCANNER=True).debug(f"⚖️ Getting risk assessment for {metadata.get('symbol', 'UNKNOWN')}...")
             risk = await self.local_llm.get_risk_assessment(token_data)
             
             # Log the analysis
             action = recommendation.get("action", "hold")
             confidence = recommendation.get("confidence", 0)
             
-            logger.info(f"Token: {metadata.get('symbol', 'UNKNOWN')} ({token_address[:8]}...)")
-            logger.info(f"Price: ${token_data['price_usd']:.6f} | Liquidity: ${token_data['liquidity_usd']:.2f}")
-            logger.info(f"Action: {action.upper()} | Confidence: {confidence:.2f}")
+            action_emoji = "🟢" if action == "buy" else "🔴" if action == "sell" else "🟡"
+            confidence_emoji = "🔥" if confidence > 0.8 else "👍" if confidence > 0.6 else "😐" if confidence > 0.4 else "👎"
+            
+            logger.bind(SCANNER=True).info(f"📊 Analysis: {metadata.get('symbol', 'UNKNOWN')} ({token_address[:8]}...)")
+            logger.bind(SCANNER=True).info(f"💰 Price: ${token_data['price_usd']:.6f} | 💧 Liquidity: ${token_data['liquidity_usd']:.2f}")
+            logger.bind(SCANNER=True).info(f"{action_emoji} Action: {action.upper()} | {confidence_emoji} Confidence: {confidence:.2f}")
             
             if risk:
                 risk_level = risk.get("risk_category", "unknown")
-                logger.info(f"Risk: {risk_level.upper()} ({risk.get('overall_risk', 0):.2f})")
+                risk_emoji = "🔴" if risk_level.lower() == "high" else "🟡" if risk_level.lower() == "medium" else "🟢"
+                logger.bind(SCANNER=True).info(f"{risk_emoji} Risk: {risk_level.upper()} ({risk.get('overall_risk', 0):.2f})")
             
             if sentiment:
                 sentiment_score = sentiment.get("score", 0)
                 sentiment_direction = "positive" if sentiment_score > 0.2 else "negative" if sentiment_score < -0.2 else "neutral"
-                logger.info(f"Sentiment: {sentiment_direction.upper()} ({sentiment_score:.2f})")
+                sentiment_emoji = "😊" if sentiment_direction == "positive" else "😞" if sentiment_direction == "negative" else "😐"
+                logger.bind(SCANNER=True).info(f"{sentiment_emoji} Sentiment: {sentiment_direction.upper()} ({sentiment_score:.2f})")
             
             # Determine if we should execute the trade
             should_trade = False
+            trade_reason = ""
             
             if action == "buy":
                 # Check if we should buy
@@ -613,6 +652,18 @@ class MemeCoinBot:
                     
                     if position_percent <= self.risk_limit:
                         should_trade = True
+                        trade_reason = f"High confidence ({confidence:.2f}), within risk limits ({position_percent:.2%})"
+                    else:
+                        trade_reason = f"Position too large ({position_percent:.2%} > {self.risk_limit:.2%})"
+                else:
+                    reasons = []
+                    if confidence <= 0.7:
+                        reasons.append(f"low confidence ({confidence:.2f})")
+                    if self.active_trades >= self.max_concurrent_trades:
+                        reasons.append(f"max trades reached ({self.active_trades}/{self.max_concurrent_trades})")
+                    if sentiment and sentiment.get("score", 0) <= -self.sentiment_threshold:
+                        reasons.append(f"negative sentiment ({sentiment.get('score', 0):.2f})")
+                    trade_reason = f"Buy criteria not met: {', '.join(reasons)}"
             
             elif action == "sell":
                 # Check if we should sell
@@ -622,16 +673,28 @@ class MemeCoinBot:
                     for holding in holdings:
                         if holding["token_address"] == token_address:
                             should_trade = True
+                            trade_reason = f"Sell signal with high confidence ({confidence:.2f}), currently holding {holding['amount']:.2f}"
                             break
+                    if not should_trade:
+                        trade_reason = f"Sell signal but no holdings in {metadata.get('symbol', 'UNKNOWN')}"
+                else:
+                    trade_reason = f"Sell confidence too low ({confidence:.2f})"
+            else:
+                trade_reason = f"Hold recommendation ({confidence:.2f})"
+            
+            logger.bind(SCANNER=True).info(f"🎯 Decision: {trade_reason}")
             
             # Execute trade if conditions are met
             if should_trade:
+                logger.bind(TRADE=True).info(f"🚀 Executing {action.upper()} trade for {metadata.get('symbol', 'UNKNOWN')}")
                 await self.execute_trade(token_data, action, recommendation.get("position_size", 0.01), recommendation.get("reasoning", ""))
                 # Set cooldown for this token
                 self.trade_cooldowns[token_address] = now
+                logger.bind(SCANNER=True).info(f"⏰ Set cooldown for {metadata.get('symbol', 'UNKNOWN')} until {datetime.fromtimestamp(now + self.min_trade_interval).strftime('%H:%M:%S')}")
                 
         except Exception as e:
-            logger.error(f"Error checking token {token_address}: {str(e)}")
+            logger.bind(SCANNER=True).error(f"💥 Error checking token {token_address[:8]}...: {str(e)}")
+            logger.bind(SCANNER=True).exception("Full error traceback:")
             
     async def execute_trade(self, token_data: Dict, action: str, position_size: float, reasoning: str):
         """Execute a trade (simulated)."""
