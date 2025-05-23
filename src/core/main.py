@@ -204,6 +204,7 @@ class PortfolioManager:
             "realized_profit": self.realized_profit,
             "unrealized_profit": total_return - self.realized_profit,
             "total_trades": self.total_trades,
+            "successful_trades": self.successful_trades,
             "win_rate": win_rate,
             "holdings_count": len(self.holdings),
             "last_updated": self.last_updated,
