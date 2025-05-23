@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 import asyncio
 import logging
 from datetime import datetime
-from ..config import ANT_PRINCESS_CONFIG
+from config.ant_princess_config import ANT_PRINCESS_CONFIG
 from .grok_engine import GrokEngine
 from ..trading.trade_execution import TradeExecution
 
