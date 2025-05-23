@@ -237,7 +237,7 @@ class WalletManager:
             
             # Ensure token_address is a Pubkey object
             try:
-                mint_pubkey = Pubkey.from_string(token_address)
+            mint_pubkey = Pubkey.from_string(token_address)
             except Exception as e:
                 logger.error(f"Could not convert token address to Pubkey: {str(e)}")
                 return 0.0

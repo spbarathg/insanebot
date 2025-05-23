@@ -1,30 +1,25 @@
 """
-Jupiter API service for swap execution on Solana.
+Jupiter API service for swap execution on Solana (simulated).
 """
-import aiohttp
-import asyncio
 import logging
-from typing import Dict, List, Optional, Any
-import base58
-from solana.transaction import Transaction
-from solana.keypair import Keypair
-from solana.publickey import PublicKey
-from solana.instruction import Instruction
-from ..utils.config import settings
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 class JupiterService:
+    """
+    Simplified Jupiter service for simulating token swaps.
+    """
+    
     def __init__(self):
-        self.base_url = settings.JUPITER_API_URL
-        self.session: Optional[aiohttp.ClientSession] = None
-        self._cache = {}
+        """Initialize the Jupiter service."""
+        self.base_url = "https://quote-api.jup.ag/v6"
+        self.session = None
 
     async def initialize(self) -> bool:
         """Initialize the Jupiter service."""
         try:
-            self.session = aiohttp.ClientSession()
-            logger.info("Jupiter service initialized successfully")
+            logger.info("Jupiter service initialized successfully (simulation mode)")
             return True
         except Exception as e:
             logger.error(f"Failed to initialize Jupiter service: {str(e)}")
@@ -32,78 +27,49 @@ class JupiterService:
 
     async def close(self) -> None:
         """Close the Jupiter service."""
-        if self.session:
-            await self.session.close()
+        logger.info("Jupiter service closed")
 
     async def get_swap_quote(
         self, 
         input_token: str, 
         output_token: str, 
         amount: float,
-        slippage_bps: int = None
+        slippage_bps: int = 50
     ) -> Optional[Dict]:
-        """Get swap quote from Jupiter."""
+        """Get swap quote from Jupiter (simulated)."""
         try:
-            if not self.session:
-                await self.initialize()
+            # Simulate a response
+            logger.info(f"Simulating swap quote for {input_token} -> {output_token}")
+            
+            # Simple price simulation
+            price = 1.0
+            if input_token == "So11111111111111111111111111111111111111112":  # SOL
+                price = 100.0  # 1 SOL = 100 USDC
+            elif output_token == "So11111111111111111111111111111111111111112":  # SOL
+                price = 0.01  # 1 USDC = 0.01 SOL
                 
-            if slippage_bps is None:
-                slippage_bps = int(settings.MIN_SLIPPAGE * 10000)  # Convert percentage to basis points
-                
-            url = f"{self.base_url}/quote"
-            params = {
-                "inputMint": input_token,
-                "outputMint": output_token,
-                "amount": str(int(amount * 1e9)),  # Convert to lamports
+            in_amount = int(amount * 1e9)  # Convert to lamports
+            out_amount = int(in_amount * price)
+            
+            return {
+                "inAmount": str(in_amount),
+                "outAmount": str(out_amount),
+                "price": price,
                 "slippageBps": slippage_bps
             }
             
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    quote_data = await response.json()
-                    logger.info(f"Got swap quote for {input_token} -> {output_token}")
-                    return quote_data
-                else:
-                    logger.error(f"Failed to get swap quote: {response.status}")
-                    return None
         except Exception as e:
             logger.error(f"Error getting swap quote: {str(e)}")
             return None
 
-    async def get_swap_instructions(self, quote: Dict, wallet_public_key: str) -> Optional[Dict]:
-        """Get swap instructions from Jupiter."""
-        try:
-            if not self.session:
-                await self.initialize()
-                
-            url = f"{self.base_url}/swap"
-            data = {
-                "quoteResponse": quote,
-                "userPublicKey": wallet_public_key,
-                "wrapUnwrapSOL": True  # Handle wrapped SOL conversion
-            }
-            
-            async with self.session.post(url, json=data) as response:
-                if response.status == 200:
-                    swap_data = await response.json()
-                    logger.info(f"Got swap instructions")
-                    return swap_data
-                else:
-                    logger.error(f"Failed to get swap instructions: {response.status}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error getting swap instructions: {str(e)}")
-            return None
-            
     async def create_swap_transaction(self, quote: Dict, wallet_public_key: str) -> Optional[Dict]:
-        """Create a swap transaction from quote."""
+        """Create a swap transaction from quote (simulated)."""
         try:
-            swap_data = await self.get_swap_instructions(quote, wallet_public_key)
-            if not swap_data:
+            if not quote:
                 return None
                 
             return {
-                'swapTransaction': swap_data.get('swapTransaction'),
+                'swapTransaction': "simulated_transaction_data",
                 'expectedOutputAmount': quote.get('outAmount'),
                 'inputAmount': quote.get('inAmount'),
                 'price': float(quote.get('outAmount')) / float(quote.get('inAmount'))
@@ -113,76 +79,39 @@ class JupiterService:
             return None
             
     async def get_tokens(self) -> Optional[List[Dict]]:
-        """Get list of tokens supported by Jupiter."""
+        """Get list of tokens supported by Jupiter (simulated)."""
         try:
-            if not self.session:
-                await self.initialize()
-                
-            url = f"{self.base_url}/tokens"
-            
-            async with self.session.get(url) as response:
-                if response.status == 200:
-                    tokens_data = await response.json()
-                    logger.info(f"Got {len(tokens_data)} tokens from Jupiter")
-                    return tokens_data
-                else:
-                    logger.error(f"Failed to get tokens: {response.status}")
-                    return None
+            # Return a small list of common tokens
+            return [
+                {
+                    "address": "So11111111111111111111111111111111111111112",
+                    "symbol": "SOL",
+                    "name": "Wrapped SOL",
+                    "decimals": 9
+                },
+                {
+                    "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                    "symbol": "USDC",
+                    "name": "USD Coin",
+                    "decimals": 6
+                }
+            ]
         except Exception as e:
             logger.error(f"Error getting tokens: {str(e)}")
             return None
             
-    async def get_routes(self, input_token: str, output_token: str) -> Optional[List[Dict]]:
-        """Get available routes between input and output tokens."""
-        try:
-            if not self.session:
-                await self.initialize()
-                
-            url = f"{self.base_url}/routes"
-            params = {
-                "inputMint": input_token,
-                "outputMint": output_token
-            }
-            
-            async with self.session.get(url, params=params) as response:
-                if response.status == 200:
-                    routes_data = await response.json()
-                    logger.info(f"Got routes for {input_token} -> {output_token}")
-                    return routes_data.get('data', [])
-                else:
-                    logger.error(f"Failed to get routes: {response.status}")
-                    return None
-        except Exception as e:
-            logger.error(f"Error getting routes: {str(e)}")
-            return None
-            
     async def get_price(self, token_mint: str, vs_token: str = "USDC") -> Optional[float]:
-        """Get token price in terms of vs_token."""
+        """Get token price in terms of vs_token (simulated)."""
         try:
-            # First get the vs_token mint if it's not a mint address already
-            vs_token_mint = vs_token
-            if not vs_token.startswith(""):  # Check if it's not already a mint address
-                tokens = await self.get_tokens()
-                if tokens:
-                    for token in tokens:
-                        if token.get('symbol') == vs_token:
-                            vs_token_mint = token.get('address')
-                            break
-            
-            # Then get a quote for a small amount to determine price
-            quote = await self.get_swap_quote(
-                token_mint,
-                vs_token_mint,
-                0.001  # Small amount for price check
-            )
-            
-            if quote:
-                in_amount = float(quote.get('inAmount', 0))
-                out_amount = float(quote.get('outAmount', 0))
-                if in_amount > 0:
-                    return out_amount / in_amount
-            
-            return None
+            # Simulate prices for common tokens
+            if token_mint == "So11111111111111111111111111111111111111112":  # SOL
+                return 100.0  # 1 SOL = 100 USDC
+            elif token_mint == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":  # USDC
+                return 1.0  # 1 USDC = 1 USDC
+            else:
+                # Random memecoin price between 0.00001 and 0.1 USDC
+                import random
+                return random.uniform(0.00001, 0.1)
         except Exception as e:
             logger.error(f"Error getting price: {str(e)}")
             return None 

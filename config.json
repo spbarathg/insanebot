@@ -1,0 +1,36 @@
+{
+    "risk_limit": 0.1,
+    "max_concurrent_trades": 5,
+    "min_trade_interval": 600,
+    "sentiment_threshold": 0.3,
+    "trading_parameters": {
+        "default_position_size": 0.01,
+        "min_position_size": 0.005,
+        "max_position_size": 0.2,
+        "target_profit": 10.0,
+        "stop_loss": 5.0
+    },
+    "market_parameters": {
+        "min_liquidity": 50000,
+        "min_holders": 100,
+        "min_volume": 10000
+    },
+    "risk_management": {
+        "daily_loss_limit": 0.2,
+        "portfolio_risk_limit": 0.3,
+        "max_token_risk": {
+            "low": 0.1,
+            "medium": 0.05,
+            "high": 0.02,
+            "extreme": 0.01
+        }
+    },
+    "technical_analysis": {
+        "rsi_overbought": 70,
+        "rsi_oversold": 30,
+        "momentum_weight": 0.4,
+        "trend_weight": 0.6,
+        "fundamentals_weight": 0.3,
+        "technicals_weight": 0.7
+    }
+} 

@@ -1,65 +1,205 @@
 """
-Local LLM service for market analysis.
+Local LLM interface for trading bot.
 """
 import logging
 import json
 import time
-import os
-from typing import Dict, List, Optional, Any
-from pathlib import Path
-from ..utils.config import settings
-from .ai.ai_metrics import ai_metrics
+import math
+import random
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any, Tuple
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
+class TechnicalIndicators:
+    """Technical analysis indicators for trading"""
+    
+    @staticmethod
+    def calculate_rsi(prices: List[float], period: int = 14) -> float:
+        """
+        Calculate Relative Strength Index
+        
+        RSI = 100 - (100 / (1 + RS))
+        RS = Average Gain / Average Loss
+        """
+        if len(prices) < period + 1:
+            return 50  # Default value if not enough data
+            
+        # Calculate price changes
+        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
+        
+        # Split gains and losses
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+        
+        # Calculate average gain and loss
+        avg_gain = sum(gains[-period:]) / period
+        avg_loss = sum(losses[-period:]) / period
+        
+        if avg_loss == 0:
+            return 100  # Prevent division by zero
+            
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        return rsi
+    
+    @staticmethod
+    def calculate_macd(prices: List[float], fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> Tuple[float, float, float]:
+        """
+        Calculate MACD (Moving Average Convergence Divergence)
+        
+        MACD Line = Fast EMA - Slow EMA
+        Signal Line = EMA of MACD Line
+        Histogram = MACD Line - Signal Line
+        """
+        if len(prices) < slow_period + signal_period:
+            return 0, 0, 0  # Default values if not enough data
+            
+        # Calculate EMAs
+        fast_ema = TechnicalIndicators.calculate_ema(prices, fast_period)
+        slow_ema = TechnicalIndicators.calculate_ema(prices, slow_period)
+        
+        # Calculate MACD line
+        macd_line = fast_ema - slow_ema
+        
+        # Calculate signal line (EMA of MACD line)
+        # For simplicity, we'll use a simple moving average
+        signal_line = sum(prices[-signal_period:]) / signal_period
+        
+        # Calculate histogram
+        histogram = macd_line - signal_line
+        
+        return macd_line, signal_line, histogram
+    
+    @staticmethod
+    def calculate_ema(prices: List[float], period: int) -> float:
+        """Calculate Exponential Moving Average"""
+        if len(prices) < period:
+            return prices[-1] if prices else 0  # Default to last price if not enough data
+            
+        # Simple moving average for initial EMA
+        sma = sum(prices[-period:]) / period
+        
+        # Smoothing factor
+        multiplier = 2 / (period + 1)
+        
+        # Calculate EMA
+        ema = sma
+        for price in prices[-period:]:
+            ema = (price - ema) * multiplier + ema
+            
+        return ema
+    
+    @staticmethod
+    def calculate_bollinger_bands(prices: List[float], period: int = 20, num_std: float = 2.0) -> Tuple[float, float, float]:
+        """
+        Calculate Bollinger Bands
+        
+        Middle Band = SMA
+        Upper Band = SMA + (num_std * std_dev)
+        Lower Band = SMA - (num_std * std_dev)
+        """
+        if len(prices) < period:
+            price = prices[-1] if prices else 0
+            return price, price, price  # Default values if not enough data
+            
+        # Calculate middle band (SMA)
+        middle_band = sum(prices[-period:]) / period
+        
+        # Calculate standard deviation
+        std_dev = math.sqrt(sum((price - middle_band) ** 2 for price in prices[-period:]) / period)
+        
+        # Calculate upper and lower bands
+        upper_band = middle_band + (num_std * std_dev)
+        lower_band = middle_band - (num_std * std_dev)
+        
+        return upper_band, middle_band, lower_band
+    
+    @staticmethod
+    def detect_momentum(prices: List[float], volume: List[float] = None, period: int = 14) -> float:
+        """
+        Detect momentum using multiple indicators
+        Returns a score between -1 and 1
+        """
+        if len(prices) < period:
+            return 0  # Neutral if not enough data
+            
+        # Calculate price change percentage
+        price_change = (prices[-1] / prices[-period] - 1) * 100
+        
+        # Calculate RSI
+        rsi = TechnicalIndicators.calculate_rsi(prices, period)
+        
+        # Calculate MACD
+        macd_line, signal_line, histogram = TechnicalIndicators.calculate_macd(prices)
+        
+        # Combine indicators to create momentum score
+        # Normalize values to -1 to 1 range
+        rsi_score = (rsi - 50) / 50  # -1 to 1
+        macd_score = 1 if histogram > 0 else -1
+        price_change_score = min(max(price_change / 10, -1), 1)  # Cap at -1 to 1
+        
+        # Weight the different indicators
+        momentum_score = (rsi_score * 0.4) + (macd_score * 0.3) + (price_change_score * 0.3)
+        
+        return momentum_score
+    
+    @staticmethod
+    def detect_trend(prices: List[float], short_period: int = 10, long_period: int = 50) -> float:
+        """
+        Detect trend direction and strength
+        Returns a score between -1 (strong downtrend) and 1 (strong uptrend)
+        """
+        if len(prices) < long_period:
+            return 0  # Neutral if not enough data
+            
+        # Calculate short and long term moving averages
+        short_ma = sum(prices[-short_period:]) / short_period
+        long_ma = sum(prices[-long_period:]) / long_period
+        
+        # Calculate MA crossover
+        ma_diff = short_ma - long_ma
+        ma_ratio = ma_diff / long_ma
+        
+        # Calculate price direction over multiple timeframes
+        short_direction = prices[-1] - prices[-short_period]
+        medium_direction = prices[-1] - prices[-long_period//2] if len(prices) >= long_period//2 else 0
+        long_direction = prices[-1] - prices[-long_period] if len(prices) >= long_period else 0
+        
+        # Normalize and combine
+        short_score = min(max(short_direction / (prices[-short_period] * 0.1), -1), 1)
+        medium_score = min(max(medium_direction / (prices[-long_period//2] * 0.2), -1), 1) if len(prices) >= long_period//2 else 0
+        long_score = min(max(long_direction / (prices[-long_period] * 0.3), -1), 1) if len(prices) >= long_period else 0
+        ma_score = min(max(ma_ratio * 10, -1), 1)
+        
+        # Weight the different timeframes
+        trend_score = (short_score * 0.2) + (medium_score * 0.3) + (long_score * 0.3) + (ma_score * 0.2)
+        
+        return trend_score
+
 class LocalLLM:
     """
-    Local LLM service for market analysis using a quantized model.
-    
-    This implementation uses a quantized LLM (GGUF format) for reduced
-    memory requirements while maintaining reasonable performance.
+    Local LLM interface for trading decision-making.
+    This uses technical analysis and trading algorithms.
     """
     
     def __init__(self):
+        """Initialize the Local LLM service."""
+        self.ready = False
+        self.model_loaded = False
         self.model = None
         self.training_data = []
-        self.training_file = settings.DATA_DIR / "training_data.json"
-        self.ready = False
-        self.model_path = settings.MODEL_DIR / "mistral-7b-v0.1.Q4_K_M.gguf"
-        self.last_training_time = 0
-        self.batch_predictions = []
-        self.model_loaded = False
+        self.technical_indicators = TechnicalIndicators()
+        self.trade_history = []
+        self.token_data_history = {}
+        self.risk_appetite = 0.7  # 0 to 1, higher means more risk-tolerant
         
-    @ai_metrics.track_training()
     async def initialize(self) -> bool:
         """Initialize the Local LLM service."""
         try:
-            logger.info("Initializing Local LLM service...")
-            
-            # Load training data if available
-            await self._load_training_data()
-            
-            # Check if model file exists
-            if not self.model_path.exists():
-                logger.warning(f"Model file not found: {self.model_path}")
-                logger.warning("Using simplified rule-based analysis instead of LLM")
-            self.ready = True
-                return True
-                
-            try:
-                logger.info("Attempting to initialize quantized LLM...")
-                # In production, we would load the model using ctransformers or llama-cpp-python
-                # For this example, we'll simulate that the model is loaded
-                self.model_loaded = True
-                logger.info("Model loaded successfully")
-            except Exception as e:
-                logger.error(f"Failed to load LLM model: {str(e)}")
-                logger.warning("Using simplified rule-based analysis instead of LLM")
-            
-            # Update metrics
-            ai_metrics.update_training_samples(len(self.training_data))
-            ai_metrics.update_accuracy(0.7)  # Initial accuracy
-            
+            logger.info("Initializing Local LLM service")
             self.ready = True
             logger.info("Local LLM service initialized successfully")
             return True
@@ -69,248 +209,324 @@ class LocalLLM:
             
     async def close(self) -> None:
         """Close the Local LLM service."""
-        try:
-            # Save training data
-            await self._save_training_data()
-            
-            # Close model if loaded
-            if self.model_loaded and self.model:
-                # In a real implementation, this would unload the model
-                self.model = None
-                self.model_loaded = False
-                
-            logger.info("Local LLM service closed")
-        except Exception as e:
-            logger.error(f"Error closing Local LLM service: {str(e)}")
-            
-    async def _load_training_data(self) -> None:
-        """Load training data from file."""
-        try:
-            if self.training_file.exists():
-                with open(self.training_file, "r") as f:
-                    self.training_data = json.load(f)
-                logger.info(f"Loaded {len(self.training_data)} training samples")
-            else:
-                logger.info("No training data found, starting fresh")
-                self.training_data = []
-        except Exception as e:
-            logger.error(f"Error loading training data: {str(e)}")
-            self.training_data = []
-            
-    async def _save_training_data(self) -> None:
-        """Save training data to file."""
-        try:
-            if not settings.DATA_DIR.exists():
-                settings.DATA_DIR.mkdir(parents=True)
-                
-            with open(self.training_file, "w") as f:
-                json.dump(self.training_data, f, indent=2)
-            logger.info(f"Saved {len(self.training_data)} training samples")
-        except Exception as e:
-            logger.error(f"Error saving training data: {str(e)}")
+        logger.info("Local LLM service closed")
     
-    def _format_prompt(self, token_data: Dict) -> str:
-        """Format the prompt for the LLM."""
-        # Extract key data
-        token_name = token_data.get('name', 'Unknown')
-        token_symbol = token_data.get('symbol', 'UNKNOWN')
-        liquidity = token_data.get('liquidity_usd', 0)
-        volume_24h = token_data.get('volumeUsd24h', 0)
-        price_usd = token_data.get('price_usd', 0)
+    def _update_token_history(self, token_address: str, token_data: Dict) -> None:
+        """Update token history for technical analysis"""
+        if token_address not in self.token_data_history:
+            self.token_data_history[token_address] = []
         
-        # Format the prompt
-        prompt = f"""Analyze this Solana token and recommend a trading action:
-Token: {token_name} ({token_symbol})
-Current Price: ${price_usd}
-Liquidity: ${liquidity}
-24h Volume: ${volume_24h}
-
-Based on this data, would you recommend to buy, sell, or hold? 
-Provide confidence level (0.0-1.0) and reasoning.
-"""
-        return prompt
-            
-    @ai_metrics.track_prediction(prediction_type="market_analysis")
+        # Add new data point
+        self.token_data_history[token_address].append({
+            "timestamp": token_data.get("timestamp", time.time()),
+            "price": token_data.get("price_usd", 0),
+            "volume": token_data.get("volumeUsd24h", 0),
+            "liquidity": token_data.get("liquidity_usd", 0)
+        })
+        
+        # Keep only last 100 data points
+        if len(self.token_data_history[token_address]) > 100:
+            self.token_data_history[token_address] = self.token_data_history[token_address][-100:]
+    
+    def _get_token_price_history(self, token_address: str) -> List[float]:
+        """Get price history for technical analysis"""
+        if token_address not in self.token_data_history:
+            return []
+        
+        return [point["price"] for point in self.token_data_history[token_address]]
+    
+    def _get_token_volume_history(self, token_address: str) -> List[float]:
+        """Get volume history for technical analysis"""
+        if token_address not in self.token_data_history:
+            return []
+        
+        return [point["volume"] for point in self.token_data_history[token_address]]
+    
+    def _analyze_token_fundamentals(self, token_data: Dict) -> Dict:
+        """Analyze token fundamentals and market data"""
+        # Extract key metrics
+        liquidity = token_data.get("liquidity_usd", 0)
+        market_cap = token_data.get("market_cap", 0)
+        volume_24h = token_data.get("volumeUsd24h", 0)
+        holders = token_data.get("holders", 0)
+        
+        # Calculate key ratios
+        volume_to_mcap = volume_24h / market_cap if market_cap > 0 else 0
+        liquidity_to_mcap = liquidity / market_cap if market_cap > 0 else 0
+        
+        # Score different aspects (0 to 1)
+        liquidity_score = min(liquidity / 1000000, 1) * 0.5 + min(liquidity_to_mcap * 10, 1) * 0.5
+        volume_score = min(volume_24h / 1000000, 1) * 0.5 + min(volume_to_mcap * 5, 1) * 0.5
+        holders_score = min(holders / 10000, 1)
+        
+        # Combine scores
+        fundamental_score = (liquidity_score * 0.4) + (volume_score * 0.4) + (holders_score * 0.2)
+        
+        # Risk assessment
+        risk_level = 1 - fundamental_score
+        
+        return {
+            "fundamental_score": fundamental_score,
+            "liquidity_score": liquidity_score,
+            "volume_score": volume_score,
+            "holders_score": holders_score,
+            "risk_level": risk_level
+        }
+    
+    def _determine_position_size(self, token_data: Dict, risk_level: float, confidence: float) -> float:
+        """Determine position size based on risk and confidence"""
+        # Base position size (0.01 to 0.1 SOL)
+        base_position = 0.01
+        
+        # Scale based on token value (invest less in smaller cap tokens)
+        market_cap = token_data.get("market_cap", 0)
+        market_cap_factor = min(math.log10(max(market_cap, 10000)) / 9, 1)
+        
+        # Scale based on confidence and risk
+        confidence_factor = confidence
+        risk_factor = 1 - risk_level  # Higher risk = smaller position
+        
+        # Calculate position size
+        position_size = base_position * (1 + 5 * self.risk_appetite * confidence_factor * risk_factor * market_cap_factor)
+        
+        # Cap position size
+        return min(max(position_size, 0.005), 0.2)
+    
     async def analyze_market(self, token_data: Dict) -> Optional[Dict]:
         """
         Analyze market data and provide trading recommendations.
         
-        Uses the local LLM if available, falls back to rule-based approach.
+        Uses technical analysis and market indicators.
         """
         try:
-            if not self.ready:
-                logger.warning("Local LLM not ready for analysis")
-                return None
-                
-            # Extract relevant metrics from token data
-            liquidity = token_data.get("liquidity_usd", 0)
-            price_usd = token_data.get("price_usd", 0)
-            volume_24h = token_data.get("volumeUsd24h", 0)
+            # Update token history
+            token_address = token_data.get("address", "unknown")
+            self._update_token_history(token_address, token_data)
             
-            # If model is loaded, use it for prediction
-            if self.model_loaded and self.model:
-                try:
-                    # Format prompt for LLM
-                    prompt = self._format_prompt(token_data)
-                    
-                    # In a real implementation, get prediction from model
-                    # For now, simulate a response
-                    # result = self.model.generate(prompt, max_tokens=100)
-                    
-                    # Simulate different responses based on data
-                    if liquidity > 10000 and volume_24h > 50000:
-                        action = "buy"
-                        confidence = 0.85
-                        reasoning = "High liquidity and volume indicate strong market presence"
-                    elif liquidity < 1000 or volume_24h < 5000:
-                        action = "sell"
-                        confidence = 0.78
-                        reasoning = "Low liquidity and volume suggest limited market interest"
-                    else:
-                        action = "hold"
-                        confidence = 0.65
-                        reasoning = "Moderate market indicators suggest waiting for clearer signals"
-                    
-                    # Add prediction to batch for later training
-                    self.batch_predictions.append({
-                        "token_data": token_data,
-                        "prediction": {
-                            "action": action,
-                            "confidence": confidence,
-                            "reasoning": reasoning,
-                            "timestamp": time.time()
-                        }
-                    })
-                    
-                    ai_metrics.record_confidence(confidence)
-                    
-                    return {
-                        "action": action,
-                        "confidence": confidence,
-                        "position_size": min(
-                            settings.MAX_POSITION_SIZE,
-                            max(settings.MIN_POSITION_SIZE, settings.DEFAULT_POSITION_SIZE * (confidence / 0.7))
-                        ),
-                        "reasoning": reasoning,
-                        "timestamp": time.time(),
-                        "method": "llm"
-                    }
-                except Exception as e:
-                    logger.error(f"Error getting LLM prediction: {str(e)}")
-                    logger.warning("Falling back to rule-based analysis")
-                    # Fall through to rule-based approach
+            # Get price history
+            price_history = self._get_token_price_history(token_address)
             
-            # Simple rule-based analysis (fallback)
-            action = "hold"
-            confidence = 0.5
-            position_size = settings.DEFAULT_POSITION_SIZE
+            # Default values if not enough history
+            if len(price_history) < 5:
+                action = "hold"
+                confidence = 0.5
+                position_size = 0.01
+                reasoning = "Insufficient price history for analysis"
+                return {
+                    "action": action,
+                    "confidence": confidence,
+                    "position_size": position_size,
+                    "reasoning": reasoning,
+                    "timestamp": time.time(),
+                    "method": "fundamental-only"
+                }
             
-            # Buy if high liquidity and volume
-            if liquidity > settings.MIN_LIQUIDITY * 2 and volume_24h > 10000:
+            # Analyze token fundamentals
+            fundamentals = self._analyze_token_fundamentals(token_data)
+            fundamental_score = fundamentals["fundamental_score"]
+            risk_level = fundamentals["risk_level"]
+            
+            # Technical analysis
+            momentum_score = TechnicalIndicators.detect_momentum(price_history)
+            trend_score = TechnicalIndicators.detect_trend(price_history)
+            
+            # RSI analysis
+            rsi = TechnicalIndicators.calculate_rsi(price_history)
+            rsi_signal = "oversold" if rsi < 30 else "overbought" if rsi > 70 else "neutral"
+            
+            # Bollinger Bands
+            upper, middle, lower = TechnicalIndicators.calculate_bollinger_bands(price_history)
+            price = price_history[-1]
+            bb_signal = "oversold" if price < lower else "overbought" if price > upper else "neutral"
+            
+            # Combined technical signal (-1 to 1)
+            technical_score = (momentum_score * 0.4) + (trend_score * 0.6)
+            
+            # Combined overall score (-1 to 1, negative = sell, positive = buy)
+            overall_score = (technical_score * 0.7) + ((fundamental_score * 2 - 1) * 0.3)
+            
+            # Determine action
+            if overall_score > 0.3:
                 action = "buy"
-                confidence = 0.7
-                # Scale position size with liquidity
-                position_size = min(
-                    settings.MAX_POSITION_SIZE,
-                    max(settings.MIN_POSITION_SIZE, settings.DEFAULT_POSITION_SIZE * (liquidity / 1000))
-                )
-            
-            # Sell if low liquidity or volume
-            elif liquidity < settings.MIN_LIQUIDITY or volume_24h < 1000:
+                confidence = min(abs(overall_score) + 0.3, 1)
+            elif overall_score < -0.3:
                 action = "sell"
-                confidence = 0.7
+                confidence = min(abs(overall_score) + 0.3, 1)
+            else:
+                action = "hold"
+                confidence = 0.5
             
-            # Record confidence in metrics
-            ai_metrics.record_confidence(confidence)
-                
+            # Determine position size
+            position_size = self._determine_position_size(token_data, risk_level, confidence)
+            
+            # Generate reasoning
+            technical_direction = "bullish" if technical_score > 0.2 else "bearish" if technical_score < -0.2 else "neutral"
+            fundamental_quality = "strong" if fundamental_score > 0.7 else "weak" if fundamental_score < 0.3 else "average"
+            
+            reasoning = (
+                f"Technical: {technical_direction} (momentum: {momentum_score:.2f}, trend: {trend_score:.2f}, RSI: {rsi:.1f}), "
+                f"Fundamentals: {fundamental_quality} (score: {fundamental_score:.2f}, risk: {risk_level:.2f})"
+            )
+            
             return {
                 "action": action,
                 "confidence": confidence,
                 "position_size": position_size,
-                "reasoning": f"Based on liquidity (${liquidity}) and volume (${volume_24h})",
+                "reasoning": reasoning,
                 "timestamp": time.time(),
-                "method": "rule-based"
+                "method": "technical-fundamental",
+                "metrics": {
+                    "technical_score": technical_score,
+                    "fundamental_score": fundamental_score,
+                    "overall_score": overall_score,
+                    "rsi": rsi,
+                    "trend": trend_score,
+                    "momentum": momentum_score
+                }
             }
             
         except Exception as e:
             logger.error(f"Error analyzing market: {str(e)}")
-            return None
+            # Fallback to simple analysis
+            return {
+                "action": "hold",
+                "confidence": 0.5,
+                "position_size": 0.01,
+                "reasoning": f"Analysis error: {str(e)}",
+                "timestamp": time.time(),
+                "method": "fallback"
+            }
             
-    @ai_metrics.track_training()
-    async def learn_from_trade(self, trade_data: Dict) -> None:
-        """
-        Learn from trade outcomes to improve future predictions.
-        
-        Handles batch training at appropriate intervals to reduce resource usage.
-        """
-        try:
-            # Add to training data
-            self.training_data.append(trade_data)
-            
-            # Update metrics
-            ai_metrics.update_training_samples(len(self.training_data))
-            
-            # Determine if we should trigger a training run
-            current_time = time.time()
-            should_train = (
-                len(self.batch_predictions) >= 10 or
-                (current_time - self.last_training_time > 3600 and len(self.batch_predictions) > 0)
-            )
-            
-            if should_train and self.model_loaded and len(self.training_data) >= settings.MIN_TRAINING_SAMPLES:
-                logger.info(f"Training model with {len(self.training_data)} samples")
-                
-                # In a real implementation, we would fine-tune the model here
-                # For now, just simulate accuracy improvement
-            current_accuracy = min(0.95, 0.7 + (len(self.training_data) * 0.001))
-            ai_metrics.update_accuracy(current_accuracy)
-            
-                # Update last training time
-                self.last_training_time = current_time
-                self.batch_predictions = []
-                
-                # Save updated training data
-                await self._save_training_data()
-                
-            # Update accuracy by action type
-            if "action" in trade_data:
-                action_type = trade_data["action"]
-                type_accuracy = 0.7 * (0.9 + 0.1 * (trade_data.get("profit", 0) > 0))
-                ai_metrics.update_accuracy_by_type(action_type, type_accuracy)
-            
-            if len(self.training_data) % 10 == 0:
-                logger.info(f"Added trade to training data (total: {len(self.training_data)})")
-                
-        except Exception as e:
-            logger.error(f"Error learning from trade: {str(e)}")
-            
-    @ai_metrics.track_prediction(prediction_type="sentiment_analysis")
     async def get_market_sentiment(self, token_address: str) -> Optional[Dict]:
         """
         Get market sentiment for a token.
         
-        In a real implementation, this would analyze social media, news, etc.
-        For now, we return a simulated sentiment.
+        Simulates social media and news sentiment analysis.
         """
         try:
-            import random
+            # In a real implementation, we would analyze social media, news, etc.
+            # Here we generate simulated sentiment based on token address
+            random.seed(token_address + str(int(time.time() / 3600)))  # Change hourly
             
-            sentiments = ["bullish", "bearish", "neutral"]
-            sentiment_weights = [0.4, 0.3, 0.3]  # Slightly bias toward bullish
-            sentiment = random.choices(sentiments, weights=sentiment_weights)[0]
-            confidence = round(random.uniform(0.5, 0.9), 2)
+            # Generate base sentiment (-1 to 1)
+            base_sentiment = random.uniform(-0.7, 0.7)
             
-            # Record confidence in metrics
-            ai_metrics.record_confidence(confidence)
+            # Generate magnitude (0 to 1)
+            magnitude = random.uniform(0.3, 1.0)
+            
+            # More popular tokens (like SOL) have more sources
+            num_sources = 5
+            if token_address == "So11111111111111111111111111111111111111112":  # SOL
+                num_sources = 20
+                # Bias sentiment positively for SOL
+                base_sentiment = (base_sentiment + 0.5) / 1.5
+            elif token_address == "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v":  # USDC
+                num_sources = 15
+                # Neutral sentiment for stablecoins
+                base_sentiment = base_sentiment * 0.3
+            
+            # Generate sources
+            sources = []
+            source_types = ["twitter", "telegram", "discord", "reddit", "news"]
+            for i in range(num_sources):
+                source_sentiment = base_sentiment + random.uniform(-0.3, 0.3)
+                source_sentiment = max(min(source_sentiment, 1.0), -1.0)  # Clamp to -1 to 1
+                
+                sources.append({
+                    "type": random.choice(source_types),
+                    "sentiment": source_sentiment,
+                    "timestamp": time.time() - random.uniform(0, 86400)  # Last 24 hours
+                })
+            
+            # Calculate overall sentiment
+            overall_sentiment = sum(s["sentiment"] for s in sources) / len(sources)
             
             return {
-                "token": token_address,
-                "sentiment": sentiment,
-                "confidence": confidence,
-                "source": "simulated",
+                "score": overall_sentiment,
+                "magnitude": magnitude,
+                "sources": [s["type"] for s in sources],
+                "positive_sources": len([s for s in sources if s["sentiment"] > 0.2]),
+                "negative_sources": len([s for s in sources if s["sentiment"] < -0.2]),
+                "neutral_sources": len([s for s in sources if -0.2 <= s["sentiment"] <= 0.2]),
                 "timestamp": time.time()
             }
-            
         except Exception as e:
             logger.error(f"Error getting market sentiment: {str(e)}")
+            return None
+            
+    async def get_risk_assessment(self, token_data: Dict) -> Optional[Dict]:
+        """
+        Assess the risk level of a token.
+        """
+        try:
+            # Extract key metrics
+            token_address = token_data.get("address", "unknown")
+            market_cap = token_data.get("market_cap", 0)
+            liquidity = token_data.get("liquidity_usd", 0)
+            volume = token_data.get("volumeUsd24h", 0)
+            holders = token_data.get("holders", 0)
+            price = token_data.get("price_usd", 0)
+            
+            # Calculate risk factors (0 to 1, higher is riskier)
+            
+            # Market cap risk (lower market cap = higher risk)
+            mcap_risk = 1.0 - min(market_cap / 1e9, 1.0)
+            
+            # Liquidity risk (lower liquidity = higher risk)
+            liquidity_risk = 1.0 - min(liquidity / 1e6, 1.0)
+            
+            # Liquidity/Market Cap ratio risk
+            liq_mcap_ratio = liquidity / market_cap if market_cap > 0 else 0
+            liq_mcap_risk = 1.0 - min(liq_mcap_ratio * 10, 1.0)
+            
+            # Volume risk (lower volume = higher risk)
+            volume_risk = 1.0 - min(volume / 1e6, 1.0)
+            
+            # Holder concentration risk
+            holder_risk = 1.0 - min(holders / 10000, 1.0)
+            
+            # Price history volatility risk
+            price_history = self._get_token_price_history(token_address)
+            if len(price_history) > 5:
+                # Calculate price volatility
+                returns = [price_history[i] / price_history[i-1] - 1 for i in range(1, len(price_history))]
+                volatility = np.std(returns) if len(returns) > 0 else 0
+                volatility_risk = min(volatility * 10, 1.0)
+            else:
+                volatility_risk = 0.5  # Default if not enough history
+            
+            # Token age risk (not implemented in simulation, default to medium)
+            age_risk = 0.5
+            
+            # Overall risk score (weighted average)
+            overall_risk = (
+                mcap_risk * 0.2 +
+                liquidity_risk * 0.2 +
+                liq_mcap_risk * 0.15 +
+                volume_risk * 0.15 +
+                holder_risk * 0.1 +
+                volatility_risk * 0.1 +
+                age_risk * 0.1
+            )
+            
+            # Risk categorization
+            risk_category = "extreme" if overall_risk > 0.8 else "high" if overall_risk > 0.6 else "medium" if overall_risk > 0.4 else "low"
+            
+            return {
+                "overall_risk": overall_risk,
+                "risk_category": risk_category,
+                "risk_factors": {
+                    "market_cap_risk": mcap_risk,
+                    "liquidity_risk": liquidity_risk,
+                    "liquidity_mcap_ratio_risk": liq_mcap_risk,
+                    "volume_risk": volume_risk,
+                    "holder_risk": holder_risk,
+                    "volatility_risk": volatility_risk,
+                    "age_risk": age_risk
+                },
+                "max_recommended_position": 0.05 * (1 - overall_risk) + 0.01,
+                "timestamp": time.time()
+            }
+        except Exception as e:
+            logger.error(f"Error in risk assessment: {str(e)}")
             return None 
