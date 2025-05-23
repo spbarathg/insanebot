@@ -9,6 +9,11 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+# Add the app directory to Python path for Docker compatibility
+app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if app_root not in sys.path:
+    sys.path.insert(0, app_root)
+
 # Configure detailed logging
 from loguru import logger
 
