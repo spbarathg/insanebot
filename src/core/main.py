@@ -249,7 +249,9 @@ class MarketScanner:
         self.token_watchlist = []
         self.new_token_candidates = []
         self.last_scan = 0
-        self.scan_interval = 3600  # 1 hour between scans
+        self.scan_interval = 600  # 10 minutes between scans for more frequent discovery
+        self.max_watchlist_size = 15  # Allow more tokens on watchlist
+        self.max_candidates = 25  # Track more candidates
     
     async def initialize(self) -> bool:
         """Initialize the market scanner"""
@@ -275,25 +277,41 @@ class MarketScanner:
         self.last_scan = now
         logger.info("Scanning for new trading opportunities...")
         
-        # In a real implementation, this would use Helius API to find new tokens
-        # For simulation, we'll generate some random new tokens
-        
-        new_tokens = []
-        for _ in range(random.randint(1, 3)):
-            # Generate random token address
-            token_address = f"NEW{random.randint(10000, 99999)}111111111111111111111111111"
+        # Get real tokens from Jupiter API
+        try:
+            # Get random tokens from Jupiter
+            random_tokens = await self.jupiter_service.get_random_tokens(count=5)
             
-            # Skip if already in watchlist
-            if token_address in self.token_watchlist or token_address in self.new_token_candidates:
-                continue
+            new_tokens = []
+            for token_data in random_tokens:
+                token_address = token_data.get('address')
+                if not token_address:
+                    continue
+                    
+                # Skip if already in watchlist or candidates
+                if token_address in self.token_watchlist or token_address in self.new_token_candidates:
+                    continue
                 
-            new_tokens.append(token_address)
-            self.new_token_candidates.append(token_address)
+                # Skip common stable coins and major tokens
+                symbol = token_data.get('symbol', '').upper()
+                if symbol in {'USDC', 'USDT', 'SOL', 'BTC', 'ETH', 'WBTC', 'WETH'}:
+                    continue
+                    
+                new_tokens.append(token_address)
+                self.new_token_candidates.append(token_address)
+                
+                logger.info(f"Found new token candidate: {symbol} ({token_address[:8]}...)")
+                
+            if new_tokens:
+                logger.info(f"Found {len(new_tokens)} new potential tokens")
+            else:
+                logger.info("No new tokens found in this scan")
+                
+            return new_tokens
             
-        if new_tokens:
-            logger.info(f"Found {len(new_tokens)} new potential tokens")
-            
-        return new_tokens
+        except Exception as e:
+            logger.error(f"Error scanning for new tokens: {str(e)}")
+            return []
     
     async def evaluate_token(self, token_address: str) -> Dict:
         """Evaluate if a token is worth adding to the main watchlist"""
@@ -365,18 +383,37 @@ class MarketScanner:
         for token_address in list(self.new_token_candidates):
             evaluation = await self.evaluate_token(token_address)
             
-            # If score is high enough, add to main watchlist
-            if evaluation.get("score", 0) > 0.6:
+            # Lower the score threshold to add more tokens (from 0.6 to 0.4)
+            if evaluation.get("score", 0) > 0.4:
                 if token_address not in self.token_watchlist:
-                    self.token_watchlist.append(token_address)
-                    logger.info(f"Added {evaluation.get('symbol', 'Unknown')} to watchlist with score {evaluation.get('score', 0):.2f}")
+                    # Add to watchlist if there's room
+                    if len(self.token_watchlist) < self.max_watchlist_size:
+                        self.token_watchlist.append(token_address)
+                        logger.info(f"✅ Added {evaluation.get('symbol', 'Unknown')} to watchlist with score {evaluation.get('score', 0):.2f}")
+                    else:
+                        # Remove a less promising token if watchlist is full
+                        # For now, remove the last token (oldest)
+                        removed_token = self.token_watchlist.pop()
+                        self.token_watchlist.append(token_address)
+                        logger.info(f"✅ Added {evaluation.get('symbol', 'Unknown')} to watchlist (replaced older token)")
                 
                 # Remove from candidates
-                self.new_token_candidates.remove(token_address)
+                if token_address in self.new_token_candidates:
+                    self.new_token_candidates.remove(token_address)
+            elif evaluation.get("score", 0) < 0.2:
+                # Remove tokens with very low scores immediately
+                if token_address in self.new_token_candidates:
+                    self.new_token_candidates.remove(token_address)
+                    logger.debug(f"❌ Removed low-scoring token {token_address[:8]}... (score: {evaluation.get('score', 0):.2f})")
             elif time.time() - evaluation.get("evaluation_time", 0) > 86400:
                 # Remove old candidates after 24 hours
                 if token_address in self.new_token_candidates:
                     self.new_token_candidates.remove(token_address)
+                    
+        # Limit the number of candidates we track
+        if len(self.new_token_candidates) > self.max_candidates:
+            # Remove oldest candidates
+            self.new_token_candidates = self.new_token_candidates[-self.max_candidates:]
 
 class MemeCoinBot:
     """

@@ -252,7 +252,10 @@ class HeliusService:
                 
                 # Holders (typically correlated with market cap)
                 holders_base = int(math.sqrt(market_cap) / 10)
-                holders = random.randint(max(100, holders_base // 2), holders_base * 2)
+                holders_base = max(holders_base, 100)  # Ensure minimum base
+                min_holders = max(100, holders_base // 2)
+                max_holders = max(holders_base * 2, min_holders + 1)  # Ensure max > min
+                holders = random.randint(min_holders, max_holders)
                 
                 return {
                     "name": token_name,
