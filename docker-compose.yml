@@ -12,6 +12,7 @@ services:
       - ./data:/app/data:rw
       - ./logs:/app/logs:rw
       - ./config:/app/config:rw
+      - ./models:/app/models
     depends_on:
       - prometheus
       - grafana
@@ -41,6 +42,10 @@ services:
       - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
       - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
       - LOG_LEVEL=INFO
+      - JUPITER_API_KEY=demo_key_for_testing
+      - HELIUS_API_KEY=demo_key_for_testing
+      - PRIVATE_KEY=demo_private_key_for_testing
+      - PYTHONUNBUFFERED=1
 
   prometheus:
     image: prom/prometheus:latest
