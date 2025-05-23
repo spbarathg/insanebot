@@ -336,14 +336,17 @@ class MarketScanner:
             holders_count = metadata.get("holders", 0)
             volume = metadata.get("volumeUsd24h", 0)
             
-            # Check minimum criteria
-            if liquidity < 50000:  # $50K minimum liquidity
+            # Debug logging for discovered tokens
+            logger.debug(f"Evaluating {metadata.get('symbol', 'UNKNOWN')}: Liquidity=${liquidity:.0f}, Holders={holders_count}, Volume=${volume:.0f}")
+            
+            # Check minimum criteria - Lower thresholds for better token discovery
+            if liquidity < 10000:  # $10K minimum liquidity (was $50K)
                 return {"score": 0.1, "reason": "Insufficient liquidity"}
                 
-            if holders_count < 100:  # Minimum holder count
+            if holders_count < 50:  # Minimum holder count (was 100)
                 return {"score": 0.2, "reason": "Too few holders"}
                 
-            if volume < 10000:  # $10K minimum daily volume
+            if volume < 1000:  # $1K minimum daily volume (was $10K)
                 return {"score": 0.3, "reason": "Low trading volume"}
                 
             # Calculate concentration score (lower is better)
@@ -383,8 +386,8 @@ class MarketScanner:
         for token_address in list(self.new_token_candidates):
             evaluation = await self.evaluate_token(token_address)
             
-            # Lower the score threshold to add more tokens (from 0.6 to 0.4)
-            if evaluation.get("score", 0) > 0.4:
+            # Lower the score threshold to add more tokens (from 0.4 to 0.25)
+            if evaluation.get("score", 0) > 0.25:
                 if token_address not in self.token_watchlist:
                     # Add to watchlist if there's room
                     if len(self.token_watchlist) < self.max_watchlist_size:
