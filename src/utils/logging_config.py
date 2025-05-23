@@ -1,206 +1,200 @@
 """
-Logging configuration for Solana trading bot.
+Logging configuration for the Solana trading bot.
 """
 import logging
-import sys
-from logging.handlers import RotatingFileHandler
 import os
-from datetime import datetime
-import traceback
-import functools
-import time
-from typing import Callable, Any
+import sys
 from pathlib import Path
-from .config import settings
+from typing import Optional, Dict, Any
+from loguru import logger
+import json
+from datetime import datetime
 
-# Create logs directory if it doesn't exist
-os.makedirs('logs', exist_ok=True)
+# Default logging configuration
+DEFAULT_LOG_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        },
+        "detailed": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(module)s - %(funcName)s - %(message)s"
+        }
+    },
+    "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "stream": "ext://sys.stdout"
+        },
+        "file": {
+            "level": "DEBUG",
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "detailed",
+            "filename": "logs/trading_bot.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5
+        },
+        "error_file": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "detailed",
+            "filename": "logs/errors.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 3
+        }
+    },
+    "loggers": {
+        "": {  # root logger
+            "handlers": ["console", "file", "error_file"],
+            "level": "DEBUG",
+            "propagate": False
+        }
+    }
+}
 
-# Configure logging format
-LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
-DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
-
-# Create formatters
-formatter = logging.Formatter(LOG_FORMAT, datefmt=DATE_FORMAT)
-
-# Create handlers
-def setup_logger(name, log_file, level=logging.INFO):
-    """Set up a logger with file and console handlers"""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+class LoggingConfig:
+    """Manage logging configuration for the trading bot."""
     
-    # File handler with rotation
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10*1024*1024,  # 10MB
-        backupCount=5
-    )
-    file_handler.setFormatter(formatter)
-    
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    
-    # Add handlers
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    
-    return logger
-
-# Create loggers for different components
-trade_logger = setup_logger('trade', 'logs/trade.log')
-error_logger = setup_logger('error', 'logs/error.log', level=logging.ERROR)
-system_logger = setup_logger('system', 'logs/system.log')
-market_logger = setup_logger('market', 'logs/market.log')
-wallet_logger = setup_logger('wallet', 'logs/wallet.log')
-llm_logger = setup_logger('llm', 'logs/llm.log')
-monitoring_logger = setup_logger('monitoring', 'logs/monitoring.log')
-alert_logger = setup_logger('alert', 'logs/alert.log')
-whale_logger = setup_logger('whale_tracker', 'logs/whale_tracker.log')
-debug_logger = setup_logger('debug', 'logs/debug.log', level=logging.DEBUG)
-
-# Custom exception classes
-class TradingError(Exception):
-    """Base exception for trading-related errors"""
-    def __init__(self, message, details=None):
-        super().__init__(message)
-        self.details = details
-        error_logger.error(f"Trading Error: {message}", extra={
-            'details': details,
-            'traceback': traceback.format_exc()
-        })
-
-class MarketDataError(Exception):
-    """Exception for market data related errors"""
-    def __init__(self, message, details=None):
-        super().__init__(message)
-        self.details = details
-        error_logger.error(f"Market Data Error: {message}", extra={
-            'details': details,
-            'traceback': traceback.format_exc()
-        })
-
-class WalletError(Exception):
-    """Exception for wallet-related errors"""
-    def __init__(self, message, details=None):
-        super().__init__(message)
-        self.details = details
-        error_logger.error(f"Wallet Error: {message}", extra={
-            'details': details,
-            'traceback': traceback.format_exc()
-        })
-
-class LLMError(Exception):
-    """Exception for LLM-related errors"""
-    def __init__(self, message, details=None):
-        super().__init__(message)
-        self.details = details
-        error_logger.error(f"LLM Error: {message}", extra={
-            'details': details,
-            'traceback': traceback.format_exc()
-        })
-
-class NetworkError(Exception):
-    """Custom exception for network-related errors"""
-    pass
-
-class MonitoringError(Exception):
-    """Exception for monitoring-related errors"""
-    def __init__(self, message, details=None):
-        super().__init__(message)
-        self.details = details
-        error_logger.error(f"Monitoring Error: {message}", extra={
-            'details': details,
-            'traceback': traceback.format_exc()
-        })
-
-# Error handling decorator
-def handle_errors(logger: logging.Logger) -> Callable:
-    """Decorator to handle errors and log them"""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                logger.error(f"Error in {func.__name__}: {str(e)}", exc_info=True)
-                raise
-        return wrapper
-    return decorator
-
-# Logging decorator for performance monitoring
-def log_performance(logger: logging.Logger) -> Callable:
-    """Decorator to log function performance"""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            start_time = time.time()
-            result = func(*args, **kwargs)
-            end_time = time.time()
-            
-            logger.debug(
-                f"Function {func.__name__} took {end_time - start_time:.2f} seconds",
-                extra={
-                    'function': func.__name__,
-                    'execution_time': end_time - start_time,
-                    'timestamp': datetime.now().isoformat()
-                }
+    def __init__(self, log_dir: Optional[Path] = None):
+        """Initialize logging configuration."""
+        self.log_dir = log_dir or Path("logs")
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+    def setup_logging(self, level: str = "INFO", enable_json: bool = False) -> None:
+        """
+        Setup logging configuration.
+        
+        Args:
+            level: Logging level (DEBUG, INFO, WARNING, ERROR)
+            enable_json: Whether to enable JSON logging format
+        """
+        # Remove default loguru handler
+        logger.remove()
+        
+        # Setup console logging
+        console_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+            "<level>{message}</level>"
+        )
+        
+        logger.add(
+            sys.stderr,
+            format=console_format,
+            level=level.upper(),
+            colorize=True
+        )
+        
+        # Setup file logging
+        if enable_json:
+            file_format = self._json_formatter
+        else:
+            file_format = (
+                "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
             )
-            return result
-        return wrapper
-    return decorator
-
-# Logging decorator for async functions
-def log_async_performance(logger: logging.Logger) -> Callable:
-    """Decorator to log async function performance"""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs) -> Any:
-            start_time = time.time()
-            result = await func(*args, **kwargs)
-            end_time = time.time()
+        
+        # Main log file
+        logger.add(
+            self.log_dir / "trading_bot.log",
+            format=file_format,
+            level="DEBUG",
+            rotation="10 MB",
+            retention="7 days",
+            compression="zip"
+        )
+        
+        # Error log file
+        logger.add(
+            self.log_dir / "errors.log",
+            format=file_format,
+            level="ERROR",
+            rotation="10 MB",
+            retention="30 days",
+            compression="zip"
+        )
+        
+        # Trade log file
+        logger.add(
+            self.log_dir / "trades.log",
+            format=file_format,
+            level="INFO",
+            rotation="10 MB",
+            retention="30 days",
+            compression="zip",
+            filter=lambda record: "TRADE" in record["extra"]
+        )
+        
+    def _json_formatter(self, record):
+        """Custom JSON formatter for structured logging."""
+        log_entry = {
+            "timestamp": record["time"].isoformat(),
+            "level": record["level"].name,
+            "logger": record["name"],
+            "module": record["module"],
+            "function": record["function"],
+            "line": record["line"],
+            "message": record["message"],
+            "extra": record["extra"]
+        }
+        
+        if record["exception"]:
+            log_entry["exception"] = {
+                "type": record["exception"].type.__name__,
+                "value": str(record["exception"].value),
+                "traceback": record["exception"].traceback
+            }
             
-            logger.debug(
-                f"Async function {func.__name__} took {end_time - start_time:.2f} seconds",
-                extra={
-                    'function': func.__name__,
-                    'execution_time': end_time - start_time,
-                    'timestamp': datetime.now().isoformat()
-                }
-            )
-            return result
-        return wrapper
-    return decorator
+        return json.dumps(log_entry)
+    
+    def configure_external_loggers(self, level: str = "WARNING") -> None:
+        """Configure external library loggers to reduce noise."""
+        # Reduce noise from external libraries
+        external_loggers = [
+            "aiohttp",
+            "urllib3",
+            "asyncio",
+            "solana",
+            "websockets",
+            "httpx"
+        ]
+        
+        for logger_name in external_loggers:
+            logging.getLogger(logger_name).setLevel(getattr(logging, level.upper()))
+    
+    def get_trade_logger(self):
+        """Get a specialized logger for trade events."""
+        trade_logger = logger.bind(TRADE=True)
+        return trade_logger
 
-# Initialize log directories
-def initialize_logging():
-    """Initialize logging directories and files."""
-    try:
-        # Create log directory if it doesn't exist
-        if not settings.LOG_DIR.exists():
-            settings.LOG_DIR.mkdir(parents=True)
-            
-        # Create an empty log file if it doesn't exist
-        if not settings.LOG_FILE.exists():
-            with open(settings.LOG_FILE, "w") as f:
-                f.write("")
-                
-        if not settings.ERROR_LOG_FILE.exists():
-            with open(settings.ERROR_LOG_FILE, "w") as f:
-                f.write("")
-                
-        # Create other log files
-        for log_file in ["wallet.log", "trades.log", "api.log"]:
-            log_path = settings.LOG_DIR / log_file
-            if not log_path.exists():
-                with open(log_path, "w") as f:
-                    f.write("")
-                    
-        logging.info("Logging initialized successfully")
-        return True
-    except Exception as e:
-        print(f"Error initializing logging: {str(e)}")
-        return False
+# Global logging setup function
+def setup_logging(
+    level: str = "INFO", 
+    log_dir: Optional[Path] = None,
+    enable_json: bool = False
+) -> LoggingConfig:
+    """
+    Setup global logging configuration.
+    
+    Args:
+        level: Logging level
+        log_dir: Directory for log files
+        enable_json: Enable JSON logging format
+        
+    Returns:
+        LoggingConfig instance
+    """
+    config = LoggingConfig(log_dir)
+    config.setup_logging(level, enable_json)
+    config.configure_external_loggers()
+    
+    logger.info(f"Logging initialized with level: {level}")
+    return config
 
-# Initialize logging when module is imported
-initialize_logging() 
+# For backwards compatibility
+def init_logging(level: str = "INFO") -> None:
+    """Initialize logging with basic configuration."""
+    setup_logging(level) 

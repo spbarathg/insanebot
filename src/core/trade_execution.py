@@ -1,16 +1,19 @@
 """
-Trade execution service for Solana trading bot.
+Trade execution module for Solana trading bot.
 """
 import asyncio
 import logging
 import time
+import os
+import json
 from typing import Dict, List, Optional, Any
 from solders.keypair import Keypair
-from solana.publickey import PublicKey
+from solders.pubkey import Pubkey
+from solders.transaction import Transaction
 from solana.rpc.async_api import AsyncClient
 from solana.rpc.commitment import Confirmed
-from solders.transaction import Transaction
-import base58
+
+# Import settings
 from ..utils.config import settings
 from .jupiter_service import JupiterService
 from .helius_service import HeliusService
@@ -64,16 +67,24 @@ class TradeExecution:
     def _load_trade_history(self):
         """Load trade history from file."""
         try:
-            # Implementation of loading trade history
-            pass
+            if os.path.exists(settings.TRADE_HISTORY_FILE):
+                with open(settings.TRADE_HISTORY_FILE, 'r') as f:
+                    self.trade_history = json.load(f)
+                logger.info(f"Loaded {len(self.trade_history)} trades from history")
+            else:
+                self.trade_history = []
+                logger.info("No trade history file found, starting fresh")
         except Exception as e:
             logger.error(f"Error loading trade history: {e}")
+            self.trade_history = []
             
     def _save_trade_history(self):
         """Save trade history to file."""
         try:
-            # Implementation of saving trade history
-            pass
+            os.makedirs(os.path.dirname(settings.TRADE_HISTORY_FILE), exist_ok=True)
+            with open(settings.TRADE_HISTORY_FILE, 'w') as f:
+                json.dump(self.trade_history, f, indent=2, default=str)
+            logger.debug(f"Saved {len(self.trade_history)} trades to history")
         except Exception as e:
             logger.error(f"Error saving trade history: {e}")
             
