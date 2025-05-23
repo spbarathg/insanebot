@@ -1,0 +1,75 @@
+{
+  "risk_management": {
+    "position_sizing": {
+      "max_position_size_sol": 0.1,
+      "max_position_percentage": 10,
+      "min_trade_size_sol": 0.001,
+      "max_trades_per_token": 3
+    },
+    "stop_loss": {
+      "default_stop_loss_percentage": 10,
+      "trailing_stop_enabled": true,
+      "trailing_stop_percentage": 5,
+      "max_loss_per_trade": 0.02
+    },
+    "take_profit": {
+      "default_take_profit_percentage": 50,
+      "partial_profit_levels": [25, 50, 100],
+      "partial_profit_percentages": [30, 50, 20]
+    },
+    "daily_limits": {
+      "max_daily_loss_sol": 0.05,
+      "max_daily_trades": 50,
+      "max_trades_per_hour": 10,
+      "cooldown_after_loss_minutes": 30
+    },
+    "token_filtering": {
+      "min_liquidity_usd": 10000,
+      "min_volume_24h_usd": 50000,
+      "max_price_impact_percentage": 3,
+      "blacklisted_tokens": [],
+      "min_holder_count": 100
+    },
+    "emergency_stops": {
+      "emergency_stop_loss_percentage": 20,
+      "portfolio_stop_loss_percentage": 15,
+      "suspicious_activity_pause": true,
+      "network_congestion_pause": true
+    }
+  },
+  "trading_parameters": {
+    "analysis_thresholds": {
+      "min_confidence_to_buy": 0.7,
+      "min_confidence_to_sell": 0.6,
+      "max_risk_score": 0.5,
+      "sentiment_weight": 0.3
+    },
+    "timing": {
+      "scan_interval_seconds": 30,
+      "price_check_interval_seconds": 10,
+      "order_timeout_seconds": 30,
+      "retry_failed_orders": 3
+    },
+    "slippage": {
+      "max_slippage_percentage": 2,
+      "dynamic_slippage": true,
+      "priority_fee_lamports": 10000
+    }
+  },
+  "monitoring": {
+    "alerts": {
+      "telegram_enabled": false,
+      "email_enabled": false,
+      "discord_enabled": false,
+      "alert_on_trades": true,
+      "alert_on_errors": true,
+      "alert_on_profits": true
+    },
+    "performance": {
+      "track_pnl": true,
+      "track_win_rate": true,
+      "benchmark_against_sol": true,
+      "daily_reports": true
+    }
+  }
+} 
