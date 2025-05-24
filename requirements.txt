@@ -14,18 +14,19 @@ jsonschema==4.17.3
 urllib3==2.0.4
 certifi==2023.7.22
 
-# Optional dependencies (comment out if causing issues)
-# solana==0.30.2  # Solana Python SDK
-# anchorpy==0.18.0  # Anchor Python SDK
+# Solana dependencies - REQUIRED for production
+solana>=0.30.2
+anchorpy>=0.18.0
+solders>=0.20.0
+base58==2.1.1
+construct-typing==0.5.5
+construct>=2.10.0,<3.0.0
 
 # Security dependencies
 cryptography==41.0.3
 pyjwt>=2.8.0
 bcrypt>=4.0.1
 python-jose>=3.3.0
-
-# Solana dependencies
-solders>=0.20.0
 
 # Monitoring and logging
 prometheus-client>=0.12.0
@@ -45,8 +46,22 @@ mypy>=0.910
 pandas>=1.3.0
 
 # Additional dependencies
-base58==2.1.1
-pyserum>=0.5.0a0
-construct-typing==0.5.5
-construct>=2.10.0,<3.0.0
-typing_extensions>=4.3.0 
+typing_extensions>=4.3.0
+
+# Input validation
+pydantic>=2.0.0
+marshmallow>=3.20.0
+
+# API rate limiting
+aiolimiter>=1.1.0
+
+# Enhanced HTTP client
+httpx>=0.25.0
+
+# Database for production (optional but recommended)
+SQLAlchemy>=2.0.0
+alembic>=1.12.0
+
+# Redis for caching (optional)
+redis>=5.0.0
+aioredis>=2.0.0 

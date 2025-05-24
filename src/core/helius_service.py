@@ -1,445 +1,415 @@
 """
-Helius API service for Solana token data and transactions (simulated).
+Helius service for Solana blockchain data with real API integration.
 """
+import asyncio
+import aiohttp
+import json
 import logging
-from typing import Dict, List, Optional
 import time
-import random
-import math
-from datetime import datetime
+import os
+from typing import Dict, List, Optional, Any, Union
+from datetime import datetime, timedelta
+from loguru import logger
 
-logger = logging.getLogger(__name__)
+class HeliusAPIError(Exception):
+    """Raised when Helius API calls fail"""
+    pass
 
 class HeliusService:
     """
-    Simplified Helius service for simulating Solana token data.
+    Real Helius service for Solana blockchain data.
+    Supports both live API calls and simulation mode.
     """
     
     def __init__(self):
-        """Initialize the Helius service."""
-        self.api_key = "simulated_api_key"
-        self.api_url = "https://api.helius.xyz/v0"
-        # Storage for price history to create continuous price movements
-        self._price_history = {}
-        # Real token data for popular tokens
-        self.real_tokens = {
-            # SOL
-            "So11111111111111111111111111111111111111112": {
-                "name": "Wrapped SOL",
-                "symbol": "SOL",
-                "price_usd": 144.75,
-                "market_cap": 65000000000,
-                "volatility": 0.04,  # 4% daily volatility
-                "holders": 312000,
-                "trend": 0.3  # Slight upward trend
-            },
-            # USDC
-            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": {
-                "name": "USD Coin",
-                "symbol": "USDC",
-                "price_usd": 1.0,
-                "market_cap": 35000000000,
-                "volatility": 0.001,  # Very stable
-                "holders": 560000,
-                "trend": 0.0
-            },
-            # BONK
-            "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": {
-                "name": "Bonk",
-                "symbol": "BONK",
-                "price_usd": 0.00002823,
-                "market_cap": 1800000000,
-                "volatility": 0.12,  # High volatility
-                "holders": 150000,
-                "trend": 0.1
-            },
-            # JTO
-            "JTO9c5fHf2xHjdJwEiXBXJ4DFXm7nDY7ix6Esw4qGAiA": {
-                "name": "Jito",
-                "symbol": "JTO",
-                "price_usd": 4.23,
-                "market_cap": 487000000,
-                "volatility": 0.09,
-                "holders": 42000,
-                "trend": -0.15
-            },
-            # PYTH
-            "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3": {
-                "name": "Pyth Network",
-                "symbol": "PYTH",
-                "price_usd": 0.58,
-                "market_cap": 1150000000,
-                "volatility": 0.06,
-                "holders": 88000,
-                "trend": 0.05
-            },
-        }
-        # Initialize price history with starting prices
-        for token_address, data in self.real_tokens.items():
-            self._price_history[token_address] = {
-                "last_price": data["price_usd"],
-                "last_update": time.time(),
-                "data_points": [(time.time(), data["price_usd"])]
-            }
+        """Initialize Helius service with real API configuration."""
+        self.simulation_mode = os.getenv("SIMULATION_MODE", "true").lower() == "true"
+        self.api_key = os.getenv("HELIUS_API_KEY", "")
+        self.base_url = "https://api.helius.xyz/v0"
+        self.rpc_url = f"https://mainnet.helius-rpc.com/?api-key={self.api_key}"
+        self.websocket_url = f"wss://mainnet.helius-rpc.com/?api-key={self.api_key}"
         
-    async def initialize(self) -> bool:
-        """Initialize the Helius service."""
+        # Rate limiting
+        self.max_requests_per_second = 10
+        self.request_interval = 1.0 / self.max_requests_per_second
+        self.last_request_time = 0
+        
+        # Session management
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.timeout = aiohttp.ClientTimeout(total=30)
+        
+        # Validation
+        self._validate_configuration()
+        
+        logger.info(f"Helius service initialized in {'simulation' if self.simulation_mode else 'live'} mode")
+    
+    def _validate_configuration(self) -> None:
+        """Validate Helius service configuration."""
+        if not self.simulation_mode:
+            if not self.api_key or self.api_key in ["", "abc123example_replace_with_real_api_key", "demo_key_for_testing"]:
+                logger.error("Invalid or missing HELIUS_API_KEY for live mode")
+                raise HeliusAPIError("HELIUS_API_KEY must be set for live mode")
+            
+            logger.info(f"Using Helius API key: {self.api_key[:8]}...")
+        else:
+            logger.info("Running in simulation mode - using mock data")
+    
+    async def _ensure_session(self) -> None:
+        """Ensure HTTP session is created."""
+        if not self.session or self.session.closed:
+            self.session = aiohttp.ClientSession(
+                timeout=self.timeout,
+                headers={"User-Agent": "Solana-Trading-Bot/1.0"}
+            )
+    
+    async def _rate_limit(self) -> None:
+        """Implement rate limiting for API calls."""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        
+        if time_since_last_request < self.request_interval:
+            sleep_time = self.request_interval - time_since_last_request
+            await asyncio.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
+    
+    async def _make_api_request(self, endpoint: str, method: str = "GET", params: Dict = None, data: Dict = None) -> Dict:
+        """Make authenticated API request to Helius."""
+        if self.simulation_mode:
+            # Return simulated data
+            return self._get_simulation_data(endpoint)
+        
+        await self._ensure_session()
+        await self._rate_limit()
+        
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        
         try:
-            logger.info("Helius service initialized successfully (simulation mode)")
-            logger.info(f"Loaded data for {len(self.real_tokens)} real tokens")
-            return True
+            async with self.session.request(
+                method=method,
+                url=url,
+                headers=headers,
+                params=params,
+                json=data
+            ) as response:
+                
+                if response.status == 429:
+                    # Rate limited, wait and retry
+                    await asyncio.sleep(1)
+                    return await self._make_api_request(endpoint, method, params, data)
+                
+                if response.status >= 400:
+                    error_text = await response.text()
+                    raise HeliusAPIError(f"API request failed: {response.status} - {error_text}")
+                
+                return await response.json()
+                
+        except aiohttp.ClientError as e:
+            raise HeliusAPIError(f"Network error: {str(e)}")
         except Exception as e:
-            logger.error(f"Failed to initialize Helius service: {str(e)}")
-            return False
-            
-    async def close(self) -> None:
-        """Close the Helius service."""
-        logger.info("Helius service closed")
-            
-    async def get_token_price(self, token_address: str) -> Optional[Dict]:
-        """Get token price from Helius (simulated with realistic price movements)."""
-        try:
-            price = 0
-            price_sol = 0
-            
-            # Use realistic data for known tokens with price movement simulation
-            if token_address in self.real_tokens:
-                token_data = self.real_tokens[token_address]
-                price_history = self._price_history[token_address]
-                
-                # Calculate time since last update
-                now = time.time()
-                time_diff = now - price_history["last_update"]
-                
-                # Only update price if some time has passed (avoid repeated calls giving different prices)
-                if time_diff > 5:  # Update price every 5 seconds of simulation time
-                    # Use random walk with drift for price movement
-                    volatility = token_data["volatility"] * math.sqrt(time_diff / 86400)  # Scale volatility by time
-                    trend_factor = token_data["trend"] * (time_diff / 86400)  # Scale trend by time
-                    
-                    # Generate random component with normal distribution
-                    random_component = random.normalvariate(0, 1) * volatility
-                    
-                    # Calculate new price with trend and random component
-                    price = price_history["last_price"] * (1 + trend_factor + random_component)
-                    
-                    # Update price history
-                    price_history["last_price"] = price
-                    price_history["last_update"] = now
-                    price_history["data_points"].append((now, price))
-                    
-                    # Keep only last 100 data points
-                    if len(price_history["data_points"]) > 100:
-                        price_history["data_points"] = price_history["data_points"][-100:]
-                else:
-                    # Use last price if not enough time has passed
-                    price = price_history["last_price"]
-                
-                # Calculate SOL price
-                sol_price = self._price_history["So11111111111111111111111111111111111111112"]["last_price"]
-                price_sol = price / sol_price if sol_price > 0 else 0
-            else:
-                # For unknown tokens, generate random memecoin prices
-                # Use consistent prices for the same token address
-                random.seed(token_address)
-                base_price = random.uniform(0.00000001, 0.01)
-                
-                # If we have price history, use that with some random movement
-                if token_address in self._price_history:
-                    price_history = self._price_history[token_address]
-                    
-                    # Calculate time since last update
-                    now = time.time()
-                    time_diff = now - price_history["last_update"]
-                    
-                    # Only update price if some time has passed
-                    if time_diff > 5:
-                        # High volatility for unknown tokens
-                        volatility = 0.15 * math.sqrt(time_diff / 86400)
-                        
-                        # Random trend based on token address but changes over time
-                        hash_value = sum(ord(c) for c in token_address)
-                        day_of_year = datetime.now().timetuple().tm_yday
-                        trend_seed = (hash_value + day_of_year) % 100
-                        trend_factor = (trend_seed / 100 - 0.5) * 0.1 * (time_diff / 86400)
-                        
-                        # Generate random component
-                        random_component = random.normalvariate(0, 1) * volatility
-                        
-                        # Calculate new price
-                        price = price_history["last_price"] * (1 + trend_factor + random_component)
-                        
-                        # Update price history
-                        price_history["last_price"] = price
-                        price_history["last_update"] = now
-                        price_history["data_points"].append((now, price))
-                        
-                        # Keep only last 100 data points
-                        if len(price_history["data_points"]) > 100:
-                            price_history["data_points"] = price_history["data_points"][-100:]
-                    else:
-                        # Use last price if not enough time has passed
-                        price = price_history["last_price"]
-                else:
-                    # Initialize price history for new token
-                    price = base_price
-                    self._price_history[token_address] = {
-                        "last_price": price,
-                        "last_update": time.time(),
-                        "data_points": [(time.time(), price)]
-                    }
-                
-                # Calculate SOL price
-                sol_price = self._price_history["So11111111111111111111111111111111111111112"]["last_price"]
-                price_sol = price / sol_price if sol_price > 0 else 0
-            
+            raise HeliusAPIError(f"Unexpected error: {str(e)}")
+    
+    def _get_simulation_data(self, endpoint: str) -> Dict:
+        """Generate realistic simulation data based on endpoint."""
+        if "tokens" in endpoint or "token" in endpoint:
             return {
-                "price": price,
-                "pricePerSol": price_sol,
-                "last_updated": int(time.time()),
-                "price_history": self._price_history[token_address]["data_points"][-10:]  # Last 10 data points
-            }
-        except Exception as e:
-            logger.error(f"Error getting token price: {str(e)}")
-            return None
-            
-    async def get_token_metadata(self, token_address: str) -> Optional[Dict]:
-        """Get token metadata from Helius (simulated with realistic data)."""
-        try:
-            # Use realistic data for known tokens
-            if token_address in self.real_tokens:
-                token_data = self.real_tokens[token_address]
-                price = self._price_history[token_address]["last_price"]
-                
-                # Calculate volume based on market cap and price volatility
-                daily_volume = token_data["market_cap"] * (0.05 + token_data["volatility"] * 2)
-                
-                return {
-                    "name": token_data["name"],
-                    "symbol": token_data["symbol"],
-                    "address": token_address,
-                    "decimals": 9 if token_data["symbol"] != "USDC" else 6,
-                    "price_usd": price,
-                    "market_cap": token_data["market_cap"],
-                    "volumeUsd24h": daily_volume,
-                    "holders": token_data["holders"],
-                    "lastUpdatedAt": int(time.time())
-                }
-            else:
-                # For unknown tokens, generate plausible memecoin data
-                # Use consistent data for the same token address
-                random.seed(token_address)
-                
-                # Generate random name for memecoins
-                prefixes = ["Moon", "Doge", "Shib", "Pepe", "Ape", "Baby", "Safe", "Elon", "Based", "Chad", 
-                           "Floki", "Degen", "Frog", "Magic", "Pixel", "Cyber", "Meta", "Space", "Pump"]
-                suffixes = ["Inu", "Moon", "Rocket", "Elon", "Coin", "Cash", "Swap", "Finance", "Token", "AI", 
-                           "DAO", "Verse", "Doge", "Chain", "Labs", "Games", "Protocol", "Network"]
-                token_name = f"{random.choice(prefixes)}{random.choice(suffixes)}"
-                token_symbol = "".join([c for c in token_name if c.isupper()])
-                if not token_symbol:
-                    token_symbol = token_name[:4].upper()
-                
-                # Get price from price history
-                price = self._price_history[token_address]["last_price"] if token_address in self._price_history else 0.0001
-                
-                # Generate plausible market cap (smaller for random tokens)
-                market_cap = price * random.randint(10000000, 1000000000)
-                
-                # Realistic volume (typically 1-20% of market cap for small tokens)
-                volume_percentage = random.uniform(0.01, 0.2)
-                volume = market_cap * volume_percentage
-                
-                # Holders (typically correlated with market cap)
-                holders_base = int(math.sqrt(market_cap) / 10)
-                holders_base = max(holders_base, 100)  # Ensure minimum base
-                min_holders = max(100, holders_base // 2)
-                max_holders = max(holders_base * 2, min_holders + 1)  # Ensure max > min
-                holders = random.randint(min_holders, max_holders)
-                
-                return {
-                    "name": token_name,
-                    "symbol": token_symbol,
-                    "address": token_address,
-                    "decimals": 9,
-                    "price_usd": price,
-                    "market_cap": market_cap,
-                    "volumeUsd24h": volume,
-                    "holders": holders,
-                    "lastUpdatedAt": int(time.time())
-                }
-        except Exception as e:
-            logger.error(f"Error getting token metadata: {str(e)}")
-            return None
-            
-    async def get_token_balances(self, wallet_address: str) -> Optional[Dict]:
-        """Get token balances for a wallet (simulated with realistic holdings)."""
-        try:
-            # Generate consistent balances for the same wallet
-            random.seed(wallet_address)
-            
-            # Base SOL balance (between 0.1 and 50 SOL)
-            sol_balance = random.uniform(0.1, 50)
-            sol_balance_lamports = int(sol_balance * 1e9)
-            
-            # Generate list of tokens
-            tokens = []
-            
-            # Add SOL
-            tokens.append({
-                "mint": "So11111111111111111111111111111111111111112",
-                "amount": sol_balance_lamports,
-                "decimals": 9,
-                "uiAmount": sol_balance
-            })
-            
-            # Add USDC (correlated with SOL balance)
-            usdc_balance = sol_balance * random.uniform(10, 1000)
-            tokens.append({
-                "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                "amount": int(usdc_balance * 1e6),
-                "decimals": 6,
-                "uiAmount": usdc_balance
-            })
-            
-            # Add some popular tokens
-            popular_tokens = list(self.real_tokens.keys())[2:]  # Skip SOL and USDC
-            for token in random.sample(popular_tokens, min(2, len(popular_tokens))):
-                if random.random() < 0.7:  # 70% chance to have each token
-                    token_data = self.real_tokens[token]
-                    # Token amount inversely related to price
-                    amount = random.uniform(10, 10000) / token_data["price_usd"]
-                    tokens.append({
-                        "mint": token,
-                        "amount": int(amount * 1e9),
+                "tokens": [
+                    {
+                        "address": f"SIM{i:010d}TokenAddress{int(time.time())}",
+                        "symbol": f"SIM{i}",
+                        "name": f"Simulation Token {i}",
                         "decimals": 9,
-                        "uiAmount": amount
-                    })
-            
-            # Add some random memecoins
-            for _ in range(random.randint(1, 5)):
-                # Generate random token address
-                random_token = f"RAND{random.randint(10000, 99999)}111111111111111111111111111"
-                # Get a random amount (higher for low-value tokens)
-                token_price = 0.0001 * random.random()
-                amount = random.uniform(100, 1000000) * (0.0001 / max(token_price, 0.0000001))
-                tokens.append({
-                    "mint": random_token,
-                    "amount": int(amount * 1e9),
+                        "supply": 1000000,
+                        "price_usd": round(0.001 + (i * 0.01), 6),
+                        "market_cap": 1000 + (i * 100),
+                        "volume_24h": 500 + (i * 50),
+                        "holders": 100 + (i * 10),
+                        "created_at": int(time.time()) - (i * 3600)
+                    }
+                    for i in range(1, 6)
+                ]
+            }
+        elif "price" in endpoint:
+            return {
+                "price_usd": round(0.01 + (time.time() % 100) * 0.001, 6),
+                "price_change_24h": round((time.time() % 20) - 10, 2),
+                "volume_24h": 1000 + (time.time() % 5000),
+                "market_cap": 50000 + (time.time() % 100000)
+            }
+        elif "holders" in endpoint:
+            return {
+                "holders": [
+                    {
+                        "address": f"SIMHolder{i:010d}Address{int(time.time())}",
+                        "balance": 1000 + (i * 100),
+                        "percentage": round(5.0 / (i + 1), 2)
+                    }
+                    for i in range(10)
+                ]
+            }
+        else:
+            return {"simulated": True, "endpoint": endpoint, "timestamp": time.time()}
+    
+    async def get_token_metadata(self, token_address: str) -> Dict[str, Any]:
+        """Get comprehensive token metadata."""
+        try:
+            if self.simulation_mode:
+                return {
+                    "address": token_address,
+                    "symbol": "SIMTOKEN",
+                    "name": "Simulation Token",
                     "decimals": 9,
-                    "uiAmount": amount
-                })
+                    "supply": 1000000,
+                    "mint_authority": None,
+                    "freeze_authority": None,
+                    "is_initialized": True,
+                    "created_at": int(time.time()) - 3600
+                }
             
-            return {
-                "tokens": tokens,
-                "nativeBalance": sol_balance_lamports
+            response = await self._make_api_request(f"tokens/{token_address}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to get token metadata for {token_address}: {str(e)}")
+            raise
+    
+    async def get_token_price(self, token_address: str) -> Dict[str, Any]:
+        """Get current token price data."""
+        try:
+            if self.simulation_mode:
+                return {
+                    "address": token_address,
+                    "price_usd": round(0.01 + (time.time() % 100) * 0.001, 6),
+                    "price_change_1h": round((time.time() % 10) - 5, 2),
+                    "price_change_24h": round((time.time() % 20) - 10, 2),
+                    "volume_24h": 1000 + (time.time() % 5000),
+                    "market_cap": 50000 + (time.time() % 100000),
+                    "liquidity": 10000 + (time.time() % 20000)
+                }
+            
+            response = await self._make_api_request(f"tokens/{token_address}/price")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to get token price for {token_address}: {str(e)}")
+            raise
+    
+    async def get_new_tokens(self, limit: int = 10, min_age_minutes: int = 5) -> List[Dict]:
+        """Get recently created tokens."""
+        try:
+            if self.simulation_mode:
+                return [
+                    {
+                        "address": f"SIM{i:010d}NewToken{int(time.time())}",
+                        "symbol": f"NEW{i}",
+                        "name": f"New Token {i}",
+                        "decimals": 9,
+                        "supply": 1000000,
+                        "created_at": int(time.time()) - (i * 300),
+                        "creator": f"Creator{i}Address",
+                        "initial_liquidity": 1000 + (i * 100)
+                    }
+                    for i in range(1, limit + 1)
+                ]
+            
+            params = {
+                "limit": limit,
+                "min_age_minutes": min_age_minutes
             }
+            response = await self._make_api_request("tokens/new", params=params)
+            return response.get("tokens", [])
+            
         except Exception as e:
-            logger.error(f"Error getting token balances: {str(e)}")
-            return None
-            
-    async def get_token_holders(self, token_address: str, limit: int = 100) -> Optional[List[Dict]]:
-        """Get token holders data (simulated with realistic distribution)."""
+            logger.error(f"Failed to get new tokens: {str(e)}")
+            return []
+    
+    async def get_token_holders(self, token_address: str, limit: int = 100) -> List[Dict]:
+        """Get token holders information."""
         try:
-            holders = []
+            if self.simulation_mode:
+                return [
+                    {
+                        "address": f"SIMHolder{i:010d}Address",
+                        "balance": 1000000 - (i * 10000),
+                        "percentage": round(10.0 / (i + 1), 2),
+                        "rank": i + 1
+                    }
+                    for i in range(min(limit, 50))
+                ]
             
-            # Total supply simulation
-            if token_address in self.real_tokens:
-                token_data = self.real_tokens[token_address]
-                price = token_data["price_usd"]
-                market_cap = token_data["market_cap"]
-                total_supply = market_cap / price if price > 0 else 1000000000000
-                total_holders = token_data["holders"]
-            else:
-                # For unknown tokens
-                random.seed(token_address)
-                price = self._price_history[token_address]["last_price"] if token_address in self._price_history else 0.0001
-                market_cap = price * random.randint(10000000, 1000000000)
-                total_supply = market_cap / price if price > 0 else 1000000000000
-                total_holders = random.randint(100, 50000)
+            params = {"limit": limit}
+            response = await self._make_api_request(f"tokens/{token_address}/holders", params=params)
+            return response.get("holders", [])
             
-            # Number of holders to generate (min of limit and total holders)
-            num_holders = min(limit, total_holders)
-            
-            # Generate whale addresses (top holders)
-            num_whales = max(1, int(num_holders * 0.05))  # Top 5% are whales
-            
-            # Whale distribution follows power law
-            whale_supply_percentage = 0.6  # Whales hold 60% of supply
-            whale_supply = total_supply * whale_supply_percentage
-            
-            for i in range(num_whales):
-                # Power law distribution for whales
-                percentage = (whale_supply_percentage / num_whales) * (1 + random.paretovariate(1.5) / 5)
-                amount = total_supply * percentage
-                
-                holders.append({
-                    "address": f"WHALE{i}111111111111111111111111111111111",
-                    "amount": int(amount),
-                    "percentage": percentage
-                })
-            
-            # Regular holders
-            regular_supply = total_supply * (1 - whale_supply_percentage)
-            for i in range(num_whales, num_holders):
-                # Exponential distribution for regular holders
-                percentage = (1 - whale_supply_percentage) * (random.expovariate(10) / 5) / (num_holders - num_whales)
-                amount = total_supply * percentage
-                
-                holders.append({
-                    "address": f"HOLDER{i}111111111111111111111111111111111",
-                    "amount": int(amount),
-                    "percentage": percentage
-                })
-            
-            # Sort by amount
-            holders.sort(key=lambda x: x["amount"], reverse=True)
-            
-            # Normalize percentages
-            total_percentage = sum(h["percentage"] for h in holders)
-            for holder in holders:
-                holder["percentage"] = holder["percentage"] / total_percentage
-            
-            return holders
         except Exception as e:
-            logger.error(f"Error getting token holders: {str(e)}")
-            return None
-            
-    async def get_token_liquidity(self, token_address: str) -> Optional[Dict]:
-        """Get token liquidity data (simulated with realistic values)."""
+            logger.error(f"Failed to get token holders for {token_address}: {str(e)}")
+            return []
+    
+    async def get_token_transactions(self, token_address: str, limit: int = 50) -> List[Dict]:
+        """Get recent token transactions."""
         try:
-            # Get token metadata for market cap and volume
+            if self.simulation_mode:
+                return [
+                    {
+                        "signature": f"SIMTransaction{i:010d}Signature",
+                        "timestamp": int(time.time()) - (i * 60),
+                        "type": "swap" if i % 2 == 0 else "transfer",
+                        "amount": 1000 + (i * 100),
+                        "price_usd": 0.01 + (i * 0.001),
+                        "from_address": f"FromAddress{i}",
+                        "to_address": f"ToAddress{i}"
+                    }
+                    for i in range(1, limit + 1)
+                ]
+            
+            params = {"limit": limit}
+            response = await self._make_api_request(f"tokens/{token_address}/transactions", params=params)
+            return response.get("transactions", [])
+            
+        except Exception as e:
+            logger.error(f"Failed to get token transactions for {token_address}: {str(e)}")
+            return []
+    
+    async def analyze_token_security(self, token_address: str) -> Dict[str, Any]:
+        """Analyze token for security risks."""
+        try:
+            if self.simulation_mode:
+                return {
+                    "address": token_address,
+                    "is_mintable": False,
+                    "is_freezable": False,
+                    "has_mint_authority": False,
+                    "has_freeze_authority": False,
+                    "top_holder_percentage": 5.5,
+                    "is_rug_risk": False,
+                    "liquidity_locked": True,
+                    "security_score": 85,
+                    "risk_level": "low"
+                }
+            
+            # Get token metadata and holders
             metadata = await self.get_token_metadata(token_address)
+            holders = await self.get_token_holders(token_address, 10)
             
-            if not metadata:
-                return None
+            # Analyze security factors
+            has_mint_authority = metadata.get("mint_authority") is not None
+            has_freeze_authority = metadata.get("freeze_authority") is not None
+            top_holder_percentage = holders[0]["percentage"] if holders else 100
             
-            market_cap = metadata.get("market_cap", 0)
-            volume = metadata.get("volumeUsd24h", 0)
+            # Calculate security score
+            security_score = 100
+            if has_mint_authority:
+                security_score -= 20
+            if has_freeze_authority:
+                security_score -= 15
+            if top_holder_percentage > 50:
+                security_score -= 30
+            elif top_holder_percentage > 20:
+                security_score -= 15
             
-            # Liquidity is typically 2-20% of market cap depending on the token
-            if token_address in self.real_tokens:
-                # Known tokens have higher liquidity as a percentage of market cap
-                liquidity_percentage = random.uniform(0.05, 0.2)
+            # Determine risk level
+            if security_score >= 80:
+                risk_level = "low"
+            elif security_score >= 60:
+                risk_level = "medium"
+            elif security_score >= 40:
+                risk_level = "high"
             else:
-                # Unknown tokens have lower liquidity
-                liquidity_percentage = random.uniform(0.01, 0.1)
-            
-            # Calculate liquidity
-            liquidity = market_cap * liquidity_percentage
-            
-            # Add some randomness to liquidity (±10%)
-            liquidity = liquidity * random.uniform(0.9, 1.1)
-            
-            # Calculate liquidity/volume ratio (health indicator)
-            lv_ratio = liquidity / volume if volume > 0 else 0
+                risk_level = "extreme"
             
             return {
-                "liquidity": liquidity,
-                "liquidity_sol": liquidity / self._price_history["So11111111111111111111111111111111111111112"]["last_price"],
-                "liquidity_volume_ratio": lv_ratio,
-                "timestamp": int(time.time())
+                "address": token_address,
+                "is_mintable": has_mint_authority,
+                "is_freezable": has_freeze_authority,
+                "has_mint_authority": has_mint_authority,
+                "has_freeze_authority": has_freeze_authority,
+                "top_holder_percentage": top_holder_percentage,
+                "is_rug_risk": security_score < 40,
+                "security_score": security_score,
+                "risk_level": risk_level
             }
+            
         except Exception as e:
-            logger.error(f"Error getting token liquidity: {str(e)}")
-            return None 
+            logger.error(f"Failed to analyze token security for {token_address}: {str(e)}")
+            return {
+                "address": token_address,
+                "security_score": 0,
+                "risk_level": "unknown",
+                "error": str(e)
+            }
+    
+    async def search_tokens(self, query: str, limit: int = 20) -> List[Dict]:
+        """Search for tokens by name or symbol."""
+        try:
+            if self.simulation_mode:
+                return [
+                    {
+                        "address": f"SIMSearch{i:010d}Token",
+                        "symbol": f"{query.upper()}{i}",
+                        "name": f"{query} Token {i}",
+                        "decimals": 9,
+                        "price_usd": 0.01 + (i * 0.01),
+                        "market_cap": 10000 + (i * 1000),
+                        "volume_24h": 500 + (i * 50)
+                    }
+                    for i in range(1, min(limit, 5) + 1)
+                ]
+            
+            params = {"q": query, "limit": limit}
+            response = await self._make_api_request("tokens/search", params=params)
+            return response.get("tokens", [])
+            
+        except Exception as e:
+            logger.error(f"Failed to search tokens for query '{query}': {str(e)}")
+            return []
+    
+    async def get_trending_tokens(self, time_range: str = "1h", limit: int = 20) -> List[Dict]:
+        """Get trending tokens by volume or price change."""
+        try:
+            if self.simulation_mode:
+                return [
+                    {
+                        "address": f"SIMTrending{i:010d}Token",
+                        "symbol": f"TREND{i}",
+                        "name": f"Trending Token {i}",
+                        "price_usd": 0.1 + (i * 0.05),
+                        "price_change": 50 - (i * 5),  # Decreasing trend
+                        "volume_24h": 10000 - (i * 500),
+                        "market_cap": 100000 - (i * 5000),
+                        "rank": i
+                    }
+                    for i in range(1, min(limit, 10) + 1)
+                ]
+            
+            params = {"time_range": time_range, "limit": limit}
+            response = await self._make_api_request("tokens/trending", params=params)
+            return response.get("tokens", [])
+            
+        except Exception as e:
+            logger.error(f"Failed to get trending tokens: {str(e)}")
+            return []
+    
+    async def close(self) -> None:
+        """Close HTTP session and cleanup."""
+        try:
+            if self.session and not self.session.closed:
+                await self.session.close()
+            
+            logger.info("Helius service closed successfully")
+            
+        except Exception as e:
+            logger.error(f"Error closing Helius service: {str(e)}")
+    
+    def __del__(self):
+        """Ensure session is closed on object destruction."""
+        if hasattr(self, 'session') and self.session and not self.session.closed:
+            # Create new event loop if necessary for cleanup
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.session.close())
+                else:
+                    loop.run_until_complete(self.session.close())
+            except Exception:
+                pass  # Ignore cleanup errors 
