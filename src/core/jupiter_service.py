@@ -389,6 +389,10 @@ class JupiterService:
         """Alias for get_supported_tokens - used by cross-dex scanner."""
         return await self.get_supported_tokens()
     
+    async def get_swap_quote(self, input_mint: str, output_mint: str, amount: int, slippage_bps: Optional[int] = None) -> Optional[SwapQuote]:
+        """Alias for get_quote - used by cross-dex scanner."""
+        return await self.get_quote(input_mint, output_mint, amount, slippage_bps)
+    
     async def get_token_price(self, token_mint: str, vs_token_mint: str = "So11111111111111111111111111111111111111112") -> Optional[float]:
         """Get token price in terms of another token (default: SOL)."""
         try:
