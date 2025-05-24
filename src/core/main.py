@@ -420,6 +420,10 @@ class MarketScanner:
         if len(self.new_token_candidates) > self.max_candidates:
             # Remove oldest candidates
             self.new_token_candidates = self.new_token_candidates[-self.max_candidates:]
+    
+    def get_current_watchlist(self) -> List[str]:
+        """Get the current token watchlist."""
+        return self.token_watchlist.copy()
 
 class MemeCoinBot:
     """
