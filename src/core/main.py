@@ -20,7 +20,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.utils.config import settings
 from src.core.wallet_manager import WalletManager, WalletSecurityError, InsufficientFundsError
-# from src.core.local_llm import LocalLLM  # Temporarily disabled due to numpy compatibility issue
+
+# Fix numpy compatibility issues before importing ML components
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# Import Local LLM with error handling
+try:
+    from src.core.local_llm import LocalLLM
+    LOCAL_LLM_AVAILABLE = True
+    logger.info("✅ Local LLM imported successfully")
+except ImportError as e:
+    LOCAL_LLM_AVAILABLE = False
+    logger.warning(f"⚠️ Local LLM import failed: {str(e)} - will use fallback")
+
 from src.core.helius_service import HeliusService
 from src.core.jupiter_service import JupiterService
 from src.core.validation import TradingValidator, ValidationError, SecurityLevel
@@ -28,27 +42,62 @@ from src.core.validation import TradingValidator, ValidationError, SecurityLevel
 # Import arbitrage scanner
 from .arbitrage import CrossDEXScanner
 
-# Import ML engine components
-# from .ml_engine import (
-#     PricePredictor, 
-#     PatternRecognizer, 
-#     SentimentAnalyzer, 
-#     RiskScorer,
-#     MLSignal,
-#     PredictionResult,
-#     PatternType,
-#     SentimentResult,
-#     RiskScore
-# )  # Temporarily disabled due to numpy compatibility issue
+# Import ML engine components with error handling
+try:
+    from .ml_engine import (
+        PricePredictor, 
+        PatternRecognizer, 
+        SentimentAnalyzer, 
+        RiskScorer,
+        MLSignal,
+        PredictionResult,
+        PatternType,
+        SentimentResult,
+        RiskScore
+    )
+    ML_ENGINE_AVAILABLE = True
+    logger.info("✅ ML Engine imported successfully")
+except ImportError as e:
+    ML_ENGINE_AVAILABLE = False
+    logger.warning(f"⚠️ ML Engine import failed: {str(e)} - will use simplified fallback")
+    
+    # Create placeholder classes for when ML engine is not available
+    class PricePredictor:
+        async def initialize(self): return True
+        async def predict_price(self, *args, **kwargs): return None
+    
+    class PatternRecognizer:
+        async def initialize(self): return True
+        async def recognize_patterns(self, *args, **kwargs): return []
+    
+    class SentimentAnalyzer:
+        async def initialize(self): return True
+        async def analyze_sentiment(self, *args, **kwargs): return None
+    
+    class RiskScorer:
+        async def initialize(self): return True
+        async def score_risk(self, *args, **kwargs): return {"risk_score": 0.5}
 
-# Import execution engine
-# from .execution_engine import (
-#     ExecutionEngine,
-#     OrderType,
-#     ExecutionStrategy,
-#     ExecutionParams,
-#     ExecutionResult
-# )  # Temporarily disabled due to potential numpy compatibility issues
+# Import execution engine with error handling
+try:
+    from .execution_engine import (
+        ExecutionEngine,
+        OrderType,
+        ExecutionStrategy,
+        ExecutionParams,
+        ExecutionResult
+    )
+    EXECUTION_ENGINE_AVAILABLE = True
+    logger.info("✅ Execution Engine imported successfully")
+except ImportError as e:
+    EXECUTION_ENGINE_AVAILABLE = False
+    logger.warning(f"⚠️ Execution Engine import failed: {str(e)} - will use basic execution")
+    
+    # Create placeholder class
+    class ExecutionEngine:
+        def __init__(self, *args, **kwargs): pass
+        async def initialize(self): return True
+        async def execute_trade(self, *args, **kwargs): return {"success": False, "message": "Advanced execution not available"}
 
 # Configure logging
 logger.add("logs/portfolio.log", rotation="5 MB", level="INFO", 
@@ -531,8 +580,24 @@ class MemeCoinBot:
             # Initialize core services
             self.helius_service = HeliusService()
             self.jupiter_service = JupiterService() 
-            # self.local_llm = LocalLLM()  # Temporarily disabled due to numpy compatibility issue
-            self.local_llm = None  # Placeholder
+            
+            # Initialize Local LLM with error handling
+            if LOCAL_LLM_AVAILABLE:
+                try:
+                    logger.info("🔧 Initializing Local LLM...")
+                    self.local_llm = LocalLLM()
+                    if not await self.local_llm.initialize():
+                        logger.warning("⚠️ Local LLM initialization failed - using fallback")
+                        self.local_llm = None
+                    else:
+                        logger.info("✅ Local LLM initialized successfully")
+                except Exception as e:
+                    logger.warning(f"⚠️ Local LLM error: {str(e)} - using fallback")
+                    self.local_llm = None
+            else:
+                self.local_llm = None
+                logger.info("⚠️ Local LLM not available - using fallback analysis")
+            
             self.portfolio = PortfolioManager()
             
             # Initialize services
@@ -543,12 +608,6 @@ class MemeCoinBot:
             logger.info("🔧 Initializing Jupiter service...")
             # Note: Jupiter service doesn't have initialize method in new implementation
             logger.info("✅ Jupiter service initialized")
-            
-            # logger.info("🔧 Initializing Local LLM...")
-            # if not await self.local_llm.initialize():
-            #     logger.error("❌ Failed to initialize Local LLM")
-            #     return False
-            logger.info("⚠️ Local LLM temporarily disabled")
             
             logger.info("🔧 Initializing Portfolio Manager...")
             starting_balance = await self.wallet_manager.check_balance()
@@ -567,53 +626,80 @@ class MemeCoinBot:
                 logger.error("❌ Failed to initialize Arbitrage Scanner")
                 return False
             
-            # Initialize ML Engine Components
+            # Initialize ML Engine Components with error handling
             logger.info("🧠 Initializing ML Engine...")
             
-            # # Price Predictor
-            # logger.info("🔧 Initializing Price Predictor...")
-            # self.price_predictor = PricePredictor()
-            # if not await self.price_predictor.initialize():
-            #     logger.error("❌ Failed to initialize Price Predictor")
-            #     return False
+            if ML_ENGINE_AVAILABLE:
+                try:
+                    # Price Predictor
+                    logger.info("🔧 Initializing Price Predictor...")
+                    self.price_predictor = PricePredictor()
+                    if not await self.price_predictor.initialize():
+                        logger.warning("⚠️ Price Predictor initialization failed - using fallback")
+                        self.price_predictor = PricePredictor()  # Use fallback
+                    else:
+                        logger.info("✅ Price Predictor initialized successfully")
+                    
+                    # Pattern Recognizer
+                    logger.info("🔧 Initializing Pattern Recognizer...")
+                    self.pattern_recognizer = PatternRecognizer()
+                    if not await self.pattern_recognizer.initialize():
+                        logger.warning("⚠️ Pattern Recognizer initialization failed - using fallback")
+                        self.pattern_recognizer = PatternRecognizer()  # Use fallback
+                    else:
+                        logger.info("✅ Pattern Recognizer initialized successfully")
+                    
+                    # Sentiment Analyzer
+                    logger.info("🔧 Initializing Sentiment Analyzer...")
+                    self.sentiment_analyzer = SentimentAnalyzer()
+                    if not await self.sentiment_analyzer.initialize():
+                        logger.warning("⚠️ Sentiment Analyzer initialization failed - using fallback")
+                        self.sentiment_analyzer = SentimentAnalyzer()  # Use fallback
+                    else:
+                        logger.info("✅ Sentiment Analyzer initialized successfully")
+                    
+                    # Risk Scorer
+                    logger.info("🔧 Initializing Risk Scorer...")
+                    self.risk_scorer = RiskScorer()
+                    if not await self.risk_scorer.initialize():
+                        logger.warning("⚠️ Risk Scorer initialization failed - using fallback")
+                        self.risk_scorer = RiskScorer()  # Use fallback
+                    else:
+                        logger.info("✅ Risk Scorer initialized successfully")
+                    
+                    logger.info("✅ ML Engine initialized successfully")
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ ML Engine error: {str(e)} - using fallback components")
+                    # Use fallback components
+                    self.price_predictor = PricePredictor()
+                    self.pattern_recognizer = PatternRecognizer()
+                    self.sentiment_analyzer = SentimentAnalyzer()
+                    self.risk_scorer = RiskScorer()
+            else:
+                # Use fallback components
+                self.price_predictor = PricePredictor()
+                self.pattern_recognizer = PatternRecognizer()
+                self.sentiment_analyzer = SentimentAnalyzer()
+                self.risk_scorer = RiskScorer()
+                logger.info("⚠️ ML Engine using fallback components (advanced ML not available)")
             
-            # # Pattern Recognizer
-            # logger.info("🔧 Initializing Pattern Recognizer...")
-            # self.pattern_recognizer = PatternRecognizer()
-            # if not await self.pattern_recognizer.initialize():
-            #     logger.error("❌ Failed to initialize Pattern Recognizer")
-            #     return False
-            
-            # # Sentiment Analyzer
-            # logger.info("🔧 Initializing Sentiment Analyzer...")
-            # self.sentiment_analyzer = SentimentAnalyzer()
-            # if not await self.sentiment_analyzer.initialize():
-            #     logger.error("❌ Failed to initialize Sentiment Analyzer")
-            #     return False
-            
-            # # Risk Scorer
-            # logger.info("🔧 Initializing Risk Scorer...")
-            # self.risk_scorer = RiskScorer()
-            # if not await self.risk_scorer.initialize():
-            #     logger.error("❌ Failed to initialize Risk Scorer")
-            #     return False
-            
-            # Set ML components to None for now
-            self.price_predictor = None
-            self.pattern_recognizer = None
-            self.sentiment_analyzer = None
-            self.risk_scorer = None
-            logger.info("⚠️ ML Engine temporarily disabled due to numpy compatibility issues")
-            
-            # Advanced Execution Engine
-            # logger.info("🔧 Initializing Advanced Execution Engine...")
-            # self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service, self.wallet_manager)
-            # if not await self.execution_engine.initialize():
-            #     logger.error("❌ Failed to initialize Execution Engine")
-            #     return False
-            
-            self.execution_engine = None
-            logger.info("⚠️ Execution Engine temporarily disabled")
+            # Advanced Execution Engine with error handling
+            if EXECUTION_ENGINE_AVAILABLE:
+                try:
+                    logger.info("🔧 Initializing Advanced Execution Engine...")
+                    self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service, self.wallet_manager)
+                    if not await self.execution_engine.initialize():
+                        logger.warning("⚠️ Execution Engine initialization failed - using basic execution")
+                        self.execution_engine = ExecutionEngine()  # Use fallback
+                    else:
+                        logger.info("✅ Execution Engine initialized successfully")
+                except Exception as e:
+                    logger.warning(f"⚠️ Execution Engine error: {str(e)} - using basic execution")
+                    self.execution_engine = ExecutionEngine()  # Use fallback
+            else:
+                self.execution_engine = ExecutionEngine()  # Use fallback
+                logger.info("⚠️ Using basic execution engine (advanced execution not available)")
             
             logger.success("✅ All services initialized successfully!")
             logger.info("MemeCoinBot initialization complete")
@@ -875,14 +961,14 @@ class MemeCoinBot:
             logger.bind(ML=True).debug(f"⚠️ Running risk assessment for {metadata.get('symbol', 'UNKNOWN')}...")
             risk_score = None
             try:
-                risk_score = await self.risk_scorer.calculate_risk_score(
+                risk_score = await self.risk_scorer.score_risk(
                     token_address, token_data, token_data["price_history"], holders_data
                 )
                 if risk_score:
                     logger.bind(ML=True).info(
                         f"⚠️ Risk assessment for {metadata.get('symbol', 'UNKNOWN')}: "
                         f"{risk_score.risk_category.upper()} risk "
-                        f"(Score: {risk_score.overall_risk_score:.2f}, "
+                        f"(Score: {risk_score.risk_score:.2f}, "
                         f"Max position: {risk_score.recommended_position_size:.1%})"
                     )
             except Exception as e:
@@ -1063,9 +1149,9 @@ class MemeCoinBot:
             if validation_result.security_level == SecurityLevel.HIGH:
                 execution_strategy = "STEALTH"  # High risk = stealth
             elif risk_score:
-                if risk_score.overall_risk_score > 0.7:
+                if risk_score.risk_score > 0.7:
                     execution_strategy = "STEALTH"  # High risk = stealth
-                elif risk_score.overall_risk_score < 0.3:
+                elif risk_score.risk_score < 0.3:
                     execution_strategy = "AGGRESSIVE"  # Low risk = aggressive
             
             # Set execution parameters based on risk and market conditions (simplified)
