@@ -35,7 +35,7 @@ from .ml_engine import (
     RiskScorer,
     MLSignal,
     PredictionResult,
-    PatternRecognition,
+    PatternType,
     SentimentResult,
     RiskScore
 )
@@ -920,7 +920,7 @@ class MemeCoinBot:
     
     def _generate_ml_signal(self, token_address: str, token_data: Dict, 
                            price_prediction: PredictionResult = None, 
-                           patterns: List[PatternRecognition] = None, 
+                           patterns: List[PatternType] = None, 
                            sentiment: SentimentResult = None, 
                            risk: RiskScore = None) -> MLSignal:
         """Generate ML trading signal from analysis components"""
