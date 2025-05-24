@@ -36,11 +36,16 @@ services:
       retries: 3
       start_period: 20s
     user: "1000:1000"
+    env_file:
+      - .env
     environment:
       - SIMULATION_MODE=True
       - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
       - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
       - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      - HELIUS_API_KEY=${HELIUS_API_KEY}
+      - JUPITER_API_KEY=${JUPITER_API_KEY}
+      - PRIVATE_KEY=${PRIVATE_KEY}
       - LOG_LEVEL=INFO
       - JUPITER_API_URL=https://quote-api.jup.ag/v6
       - PYTHONUNBUFFERED=1
