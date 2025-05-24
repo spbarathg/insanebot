@@ -22,207 +22,373 @@ class HeliusService:
     """
     
     def __init__(self):
-        """Initialize Helius service with real API configuration."""
-        self.simulation_mode = os.getenv("SIMULATION_MODE", "true").lower() == "true"
+        """Initialize Helius service with REAL API integration only."""
         self.api_key = os.getenv("HELIUS_API_KEY", "")
-        self.base_url = "https://api.helius.xyz/v0"
-        self.rpc_url = f"https://mainnet.helius-rpc.com/?api-key={self.api_key}"
-        self.websocket_url = f"wss://mainnet.helius-rpc.com/?api-key={self.api_key}"
+        self.base_url = f"https://api.helius.xyz/v0"
+        self.session = None
+        self.max_retries = 3
+        self.timeout = 30
         
-        # Rate limiting
-        self.max_requests_per_second = 10
-        self.request_interval = 1.0 / self.max_requests_per_second
-        self.last_request_time = 0
+        # Real-time cache for performance optimization
+        self._price_cache = {}
+        self._metadata_cache = {}
+        self._cache_ttl = 10  # 10 seconds cache for real-time data
         
-        # Session management
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.timeout = aiohttp.ClientTimeout(total=30)
+        if not self.api_key or self.api_key in ["", "demo_key_for_testing"]:
+            logger.warning("No valid Helius API key provided - some features may be limited")
         
-        # Validation
-        self._validate_configuration()
-        
-        logger.info(f"Helius service initialized in {'simulation' if self.simulation_mode else 'live'} mode")
+        logger.info("Helius Service initialized - REAL API MODE ONLY")
     
-    def _validate_configuration(self) -> None:
-        """Validate Helius service configuration."""
-        if not self.simulation_mode:
-            if not self.api_key or self.api_key in ["", "abc123example_replace_with_real_api_key", "demo_key_for_testing"]:
-                logger.error("Invalid or missing HELIUS_API_KEY for live mode")
-                raise HeliusAPIError("HELIUS_API_KEY must be set for live mode")
-            
-            logger.info(f"Using Helius API key: {self.api_key[:8]}...")
-        else:
-            logger.info("Running in simulation mode - using mock data")
-    
-    async def _ensure_session(self) -> None:
-        """Ensure HTTP session is created."""
-        if not self.session or self.session.closed:
-            self.session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                headers={"User-Agent": "Solana-Trading-Bot/1.0"}
-            )
-    
-    async def _rate_limit(self) -> None:
-        """Implement rate limiting for API calls."""
-        current_time = time.time()
-        time_since_last_request = current_time - self.last_request_time
-        
-        if time_since_last_request < self.request_interval:
-            sleep_time = self.request_interval - time_since_last_request
-            await asyncio.sleep(sleep_time)
-        
-        self.last_request_time = time.time()
-    
-    async def _make_api_request(self, endpoint: str, method: str = "GET", params: Dict = None, data: Dict = None) -> Dict:
-        """Make authenticated API request to Helius."""
-        if self.simulation_mode:
-            # Return simulated data
-            return self._get_simulation_data(endpoint)
-        
-        await self._ensure_session()
-        await self._rate_limit()
-        
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        
+    async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
+        """Make API request to Helius with real data only."""
         try:
-            async with self.session.request(
-                method=method,
-                url=url,
-                headers=headers,
-                params=params,
-                json=data
-            ) as response:
+            if not self.session:
+                import aiohttp
+                timeout = aiohttp.ClientTimeout(total=self.timeout)
+                headers = {"User-Agent": "Solana-Trading-Bot/1.0"}
+                if self.api_key and self.api_key not in ["", "demo_key_for_testing"]:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
                 
-                if response.status == 429:
-                    # Rate limited, wait and retry
-                    await asyncio.sleep(1)
-                    return await self._make_api_request(endpoint, method, params, data)
-                
-                if response.status >= 400:
-                    error_text = await response.text()
-                    raise HeliusAPIError(f"API request failed: {response.status} - {error_text}")
-                
-                return await response.json()
-                
-        except aiohttp.ClientError as e:
-            raise HeliusAPIError(f"Network error: {str(e)}")
+                self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
+            
+            # Add API key to params if available
+            if params is None:
+                params = {}
+            if self.api_key and self.api_key not in ["", "demo_key_for_testing"]:
+                params["api-key"] = self.api_key
+            
+            url = f"{self.base_url}/{endpoint}"
+            
+            for attempt in range(self.max_retries):
+                try:
+                    if method == "GET":
+                        async with self.session.get(url, params=params) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                logger.debug(f"Helius API success: {endpoint}")
+                                return data
+                            elif response.status == 429:  # Rate limited
+                                wait_time = 2 ** attempt
+                                logger.warning(f"Helius API rate limited, waiting {wait_time}s")
+                                await asyncio.sleep(wait_time)
+                                continue
+                            elif response.status == 401:
+                                logger.error("Helius API authentication failed - check API key")
+                                break
+                            else:
+                                logger.warning(f"Helius API error {response.status} for {endpoint}")
+                                break
+                    elif method == "POST":
+                        async with self.session.post(url, json=params) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                logger.debug(f"Helius API POST success: {endpoint}")
+                                return data
+                            elif response.status == 429:  # Rate limited
+                                wait_time = 2 ** attempt
+                                logger.warning(f"Helius API rate limited, waiting {wait_time}s")
+                                await asyncio.sleep(wait_time)
+                                continue
+                            else:
+                                logger.warning(f"Helius API POST error {response.status} for {endpoint}")
+                                break
+                except asyncio.TimeoutError:
+                    logger.warning(f"Helius API timeout on attempt {attempt + 1}")
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(1)
+                        continue
+                except Exception as e:
+                    logger.error(f"Helius API request error: {str(e)}")
+                    break
+            
+            logger.error(f"Helius API request failed after {self.max_retries} attempts: {endpoint}")
+            return None
+            
         except Exception as e:
-            raise HeliusAPIError(f"Unexpected error: {str(e)}")
-    
-    def _get_simulation_data(self, endpoint: str) -> Dict:
-        """Generate realistic simulation data based on endpoint."""
-        if "tokens" in endpoint or "token" in endpoint:
-            return {
-                "tokens": [
-                    {
-                        "address": f"SIM{i:010d}TokenAddress{int(time.time())}",
-                        "symbol": f"SIM{i}",
-                        "name": f"Simulation Token {i}",
-                        "decimals": 9,
-                        "supply": 1000000,
-                        "price_usd": round(0.001 + (i * 0.01), 6),
-                        "market_cap": 1000 + (i * 100),
-                        "volume_24h": 500 + (i * 50),
-                        "holders": 100 + (i * 10),
-                        "created_at": int(time.time()) - (i * 3600)
-                    }
-                    for i in range(1, 6)
-                ]
-            }
-        elif "price" in endpoint:
-            return {
-                "price_usd": round(0.01 + (time.time() % 100) * 0.001, 6),
-                "price_change_24h": round((time.time() % 20) - 10, 2),
-                "volume_24h": 1000 + (time.time() % 5000),
-                "market_cap": 50000 + (time.time() % 100000)
-            }
-        elif "holders" in endpoint:
-            return {
-                "holders": [
-                    {
-                        "address": f"SIMHolder{i:010d}Address{int(time.time())}",
-                        "balance": 1000 + (i * 100),
-                        "percentage": round(5.0 / (i + 1), 2)
-                    }
-                    for i in range(10)
-                ]
-            }
-        else:
-            return {"simulated": True, "endpoint": endpoint, "timestamp": time.time()}
+            logger.error(f"Failed to make Helius API request: {str(e)}")
+            return None
     
     async def get_token_metadata(self, token_address: str) -> Dict[str, Any]:
         """Get comprehensive token metadata."""
         try:
-            if self.simulation_mode:
-                return {
-                    "address": token_address,
-                    "symbol": "SIMTOKEN",
-                    "name": "Simulation Token",
-                    "decimals": 9,
-                    "supply": 1000000,
-                    "mint_authority": None,
-                    "freeze_authority": None,
-                    "is_initialized": True,
-                    "created_at": int(time.time()) - 3600
-                }
+            # Check cache first
+            cache_key = f"metadata_{token_address}"
+            current_time = time.time()
             
-            response = await self._make_api_request(f"tokens/{token_address}")
-            return response
+            if cache_key in self._metadata_cache:
+                cached_data = self._metadata_cache[cache_key]
+                if (current_time - cached_data['timestamp']) < self._cache_ttl * 6:  # Cache metadata longer
+                    return cached_data['data']
+            
+            # Method 1: Helius Metadata API
+            try:
+                response = await self._make_api_request(f"tokens/metadata", 
+                                                      params={"mint": token_address}, 
+                                                      method="GET")
+                if response and isinstance(response, list) and len(response) > 0:
+                    token_data = response[0]
+                    
+                    metadata = {
+                        "address": token_address,
+                        "name": token_data.get("account", {}).get("data", {}).get("name", "Unknown"),
+                        "symbol": token_data.get("account", {}).get("data", {}).get("symbol", "UNKNOWN"),
+                        "decimals": token_data.get("account", {}).get("data", {}).get("decimals", 9),
+                        "supply": token_data.get("account", {}).get("data", {}).get("supply", 0),
+                        "holders": 0,  # Helius doesn't provide this directly
+                        "verified": False,  # Need to check verification
+                        "timestamp": current_time
+                    }
+                    
+                    # Cache the result
+                    self._metadata_cache[cache_key] = {
+                        'data': metadata,
+                        'timestamp': current_time
+                    }
+                    
+                    return metadata
+            except Exception as e:
+                logger.debug(f"Helius metadata API failed: {str(e)}")
+            
+            # Method 2: Get metadata from Jupiter token list
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    url = f"https://quote-api.jup.ag/v6/tokens"
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
+                        if response.status == 200:
+                            tokens = await response.json()
+                            for token in tokens:
+                                if token.get("address") == token_address:
+                                    metadata = {
+                                        "address": token_address,
+                                        "name": token.get("name", "Unknown"),
+                                        "symbol": token.get("symbol", "UNKNOWN"),
+                                        "decimals": token.get("decimals", 9),
+                                        "supply": 0,  # Jupiter doesn't provide supply
+                                        "holders": 0,  # Jupiter doesn't provide holders
+                                        "verified": "verified" in token.get("tags", []),
+                                        "logo_uri": token.get("logoURI", ""),
+                                        "timestamp": current_time
+                                    }
+                                    
+                                    # Cache the result
+                                    self._metadata_cache[cache_key] = {
+                                        'data': metadata,
+                                        'timestamp': current_time
+                                    }
+                                    
+                                    return metadata
+            except Exception as e:
+                logger.debug(f"Jupiter token list failed: {str(e)}")
+            
+            # Fallback: minimal metadata
+            return {
+                "address": token_address,
+                "name": "Unknown Token",
+                "symbol": "UNKNOWN",
+                "decimals": 9,
+                "supply": 0,
+                "holders": 0,
+                "verified": False,
+                "timestamp": current_time
+            }
             
         except Exception as e:
             logger.error(f"Failed to get token metadata for {token_address}: {str(e)}")
-            raise
+            return {}
     
     async def get_token_price(self, token_address: str) -> Dict[str, Any]:
         """Get current token price data."""
         try:
-            if self.simulation_mode:
-                return {
-                    "address": token_address,
-                    "price_usd": round(0.01 + (time.time() % 100) * 0.001, 6),
-                    "price_change_1h": round((time.time() % 10) - 5, 2),
-                    "price_change_24h": round((time.time() % 20) - 10, 2),
-                    "volume_24h": 1000 + (time.time() % 5000),
-                    "market_cap": 50000 + (time.time() % 100000),
-                    "liquidity": 10000 + (time.time() % 20000)
-                }
+            # Check cache first for performance
+            cache_key = f"price_{token_address}"
+            current_time = time.time()
             
-            response = await self._make_api_request(f"tokens/{token_address}/price")
-            return response
+            if cache_key in self._price_cache:
+                cached_data = self._price_cache[cache_key]
+                if (current_time - cached_data['timestamp']) < self._cache_ttl:
+                    return cached_data['data']
+            
+            # Method 1: Helius Token API (if available)
+            try:
+                response = await self._make_api_request(f"tokens/{token_address}")
+                if response:
+                    price_data = {
+                        "address": token_address,
+                        "price_usd": response.get("price", {}).get("usd", 0),
+                        "price_change_1h": response.get("price_change_1h", 0),
+                        "price_change_24h": response.get("price_change_24h", 0),
+                        "volume_24h": response.get("volume_24h", 0),
+                        "market_cap": response.get("market_cap", 0),
+                        "liquidity": response.get("liquidity", 0),
+                        "timestamp": current_time
+                    }
+                    
+                    # Cache the result
+                    self._price_cache[cache_key] = {
+                        'data': price_data,
+                        'timestamp': current_time
+                    }
+                    
+                    return price_data
+            except Exception as e:
+                logger.debug(f"Helius token API failed: {str(e)}")
+            
+            # Method 2: Use Jupiter pricing as fallback
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    # Get token price via Jupiter API
+                    jupiter_url = f"https://price.jup.ag/v4/price"
+                    params = {"ids": token_address}
+                    
+                    async with session.get(jupiter_url, params=params, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            token_data = data.get("data", {}).get(token_address)
+                            if token_data:
+                                price_data = {
+                                    "address": token_address,
+                                    "price_usd": token_data.get("price", 0),
+                                    "price_change_1h": 0,  # Jupiter doesn't provide change data
+                                    "price_change_24h": 0,
+                                    "volume_24h": 0,
+                                    "market_cap": 0,
+                                    "liquidity": 0,
+                                    "timestamp": current_time
+                                }
+                                
+                                # Cache the result
+                                self._price_cache[cache_key] = {
+                                    'data': price_data,
+                                    'timestamp': current_time
+                                }
+                                
+                                return price_data
+            except Exception as e:
+                logger.debug(f"Jupiter price API failed: {str(e)}")
+            
+            # Method 3: CoinGecko API for major tokens
+            try:
+                # Map token addresses to CoinGecko IDs for major tokens
+                coingecko_mapping = {
+                    "So11111111111111111111111111111111111111112": "solana",
+                    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v": "usd-coin",
+                    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": "tether",
+                    "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263": "bonk"
+                }
+                
+                coingecko_id = coingecko_mapping.get(token_address)
+                if coingecko_id:
+                    import aiohttp
+                    async with aiohttp.ClientSession() as session:
+                        url = f"https://api.coingecko.com/api/v3/coins/{coingecko_id}"
+                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                market_data = data.get("market_data", {})
+                                
+                                price_data = {
+                                    "address": token_address,
+                                    "price_usd": market_data.get("current_price", {}).get("usd", 0),
+                                    "price_change_1h": market_data.get("price_change_percentage_1h_in_currency", {}).get("usd", 0),
+                                    "price_change_24h": market_data.get("price_change_percentage_24h_in_currency", {}).get("usd", 0),
+                                    "volume_24h": market_data.get("total_volume", {}).get("usd", 0),
+                                    "market_cap": market_data.get("market_cap", {}).get("usd", 0),
+                                    "liquidity": market_data.get("total_volume", {}).get("usd", 0),  # Use volume as liquidity proxy
+                                    "timestamp": current_time
+                                }
+                                
+                                # Cache the result
+                                self._price_cache[cache_key] = {
+                                    'data': price_data,
+                                    'timestamp': current_time
+                                }
+                                
+                                return price_data
+            except Exception as e:
+                logger.debug(f"CoinGecko API failed: {str(e)}")
+            
+            # If all methods fail, return empty data
+            logger.warning(f"Failed to get price data for token {token_address}")
+            return {
+                "address": token_address,
+                "price_usd": 0,
+                "price_change_1h": 0,
+                "price_change_24h": 0,
+                "volume_24h": 0,
+                "market_cap": 0,
+                "liquidity": 0,
+                "timestamp": current_time
+            }
             
         except Exception as e:
             logger.error(f"Failed to get token price for {token_address}: {str(e)}")
-            raise
+            return {}
     
     async def get_token_liquidity(self, token_address: str) -> Dict[str, Any]:
         """Get token liquidity information."""
         try:
-            if self.simulation_mode:
-                return {
-                    "address": token_address,
-                    "total_liquidity_usd": 10000 + (time.time() % 50000),
-                    "liquidity_pools": [
-                        {
-                            "dex": "Raydium",
-                            "liquidity_usd": 5000 + (time.time() % 25000),
-                            "volume_24h": 2000 + (time.time() % 10000)
-                        },
-                        {
-                            "dex": "Orca", 
-                            "liquidity_usd": 3000 + (time.time() % 15000),
-                            "volume_24h": 1500 + (time.time() % 7500)
-                        }
-                    ],
-                    "timestamp": time.time()
-                }
+            # Method 1: Helius DeFi APIs
+            try:
+                response = await self._make_api_request(f"tokens/{token_address}/liquidity")
+                if response:
+                    return {
+                        "address": token_address,
+                        "total_liquidity_usd": response.get("total_liquidity", 0),
+                        "liquidity_pools": response.get("pools", []),
+                        "timestamp": time.time()
+                    }
+            except Exception as e:
+                logger.debug(f"Helius liquidity API failed: {str(e)}")
             
-            response = await self._make_api_request(f"tokens/{token_address}/liquidity")
-            return response
+            # Method 2: Get liquidity from Jupiter pool data
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    # Get Jupiter pool info
+                    url = f"https://quote-api.jup.ag/v6/tokens"
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
+                        if response.status == 200:
+                            tokens = await response.json()
+                            for token in tokens:
+                                if token.get("address") == token_address:
+                                    # Estimate liquidity from Jupiter data
+                                    return {
+                                        "address": token_address,
+                                        "total_liquidity_usd": 0,  # Jupiter doesn't provide direct liquidity
+                                        "liquidity_pools": [
+                                            {
+                                                "dex": "Jupiter_Aggregated",
+                                                "liquidity_usd": 0,
+                                                "volume_24h": 0
+                                            }
+                                        ],
+                                        "timestamp": time.time()
+                                    }
+            except Exception as e:
+                logger.debug(f"Jupiter liquidity check failed: {str(e)}")
+            
+            # Method 3: Estimate from price data
+            price_data = await self.get_token_price(token_address)
+            estimated_liquidity = price_data.get("volume_24h", 0) * 2  # Rough estimate
+            
+            return {
+                "address": token_address,
+                "total_liquidity_usd": estimated_liquidity,
+                "liquidity_pools": [
+                    {
+                        "dex": "estimated",
+                        "liquidity_usd": estimated_liquidity,
+                        "volume_24h": price_data.get("volume_24h", 0)
+                    }
+                ],
+                "timestamp": time.time()
+            }
             
         except Exception as e:
             logger.error(f"Failed to get token liquidity for {token_address}: {str(e)}")
-            raise
+            return {}
     
     async def get_new_tokens(self, limit: int = 10, min_age_minutes: int = 5) -> List[Dict]:
         """Get recently created tokens."""

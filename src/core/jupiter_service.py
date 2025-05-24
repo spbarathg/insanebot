@@ -59,154 +59,74 @@ class JupiterService:
     """
     
     def __init__(self):
-        """Initialize Jupiter service with real API configuration."""
-        self.simulation_mode = os.getenv("SIMULATION_MODE", "true").lower() == "true"
-        self.api_key = os.getenv("JUPITER_API_KEY", "")
+        """Initialize Jupiter Service with real API integration only."""
         self.base_url = "https://quote-api.jup.ag/v6"
+        self.session = None
+        self.default_slippage_bps = 100  # 1% default slippage
+        self.max_retries = 3
+        self.timeout = 30
         
-        # Rate limiting
-        self.max_requests_per_second = 5
-        self.request_interval = 1.0 / self.max_requests_per_second
-        self.last_request_time = 0
+        # Real-time cache for performance optimization
+        self._quote_cache = {}
+        self._cache_ttl = 5  # 5 seconds cache for quotes (very short for real-time data)
         
-        # Session management
-        self.session: Optional[aiohttp.ClientSession] = None
-        self.timeout = aiohttp.ClientTimeout(total=30)
-        
-        # Trading settings
-        self.default_slippage_bps = 300  # 3%
-        self.max_slippage_bps = 1000     # 10%
-        self.min_output_amount_threshold = 0.95  # 95% of quoted amount
-        
-        # Performance tracking
-        self.successful_swaps = 0
-        self.failed_swaps = 0
-        self.total_volume_traded = 0
-        
-        # Validation
-        self._validate_configuration()
-        
-        logger.info(f"Jupiter service initialized in {'simulation' if self.simulation_mode else 'live'} mode")
+        logger.info("Jupiter Service initialized - REAL API MODE ONLY")
     
-    def _validate_configuration(self) -> None:
-        """Validate Jupiter service configuration."""
-        if not self.simulation_mode:
-            # For live mode, we don't strictly require API key as Jupiter quote API is public
-            # But if provided, it should be valid
-            if self.api_key and self.api_key in ["", "demo_key_for_testing"]:
-                logger.warning("Using demo Jupiter API key - consider getting real key for better rate limits")
-            
-            logger.info("Jupiter service configured for live trading")
-        else:
-            logger.info("Running in simulation mode - using mock data")
-    
-    async def _ensure_session(self) -> None:
-        """Ensure HTTP session is created."""
-        if not self.session or self.session.closed:
-            headers = {"User-Agent": "Solana-Trading-Bot/1.0"}
-            if self.api_key and self.api_key not in ["", "demo_key_for_testing"]:
-                headers["Authorization"] = f"Bearer {self.api_key}"
-            
-            self.session = aiohttp.ClientSession(
-                timeout=self.timeout,
-                headers=headers
-            )
-    
-    async def _rate_limit(self) -> None:
-        """Implement rate limiting for API calls."""
-        current_time = time.time()
-        time_since_last_request = current_time - self.last_request_time
-        
-        if time_since_last_request < self.request_interval:
-            sleep_time = self.request_interval - time_since_last_request
-            await asyncio.sleep(sleep_time)
-        
-        self.last_request_time = time.time()
-    
-    async def _make_api_request(self, endpoint: str, method: str = "GET", params: Dict = None, data: Dict = None) -> Dict:
-        """Make API request to Jupiter."""
-        if self.simulation_mode:
-            return self._get_simulation_data(endpoint, params)
-        
-        await self._ensure_session()
-        await self._rate_limit()
-        
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        
+    async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
+        """Make API request to Jupiter with real data only."""
         try:
-            async with self.session.request(
-                method=method,
-                url=url,
-                params=params,
-                json=data
-            ) as response:
-                
-                if response.status == 429:
-                    # Rate limited, wait and retry
-                    await asyncio.sleep(2)
-                    return await self._make_api_request(endpoint, method, params, data)
-                
-                if response.status >= 400:
-                    error_text = await response.text()
-                    raise JupiterAPIError(f"API request failed: {response.status} - {error_text}")
-                
-                return await response.json()
-                
-        except aiohttp.ClientError as e:
-            raise JupiterAPIError(f"Network error: {str(e)}")
-        except Exception as e:
-            raise JupiterAPIError(f"Unexpected error: {str(e)}")
-    
-    def _get_simulation_data(self, endpoint: str, params: Dict = None) -> Dict:
-        """Generate realistic simulation data for Jupiter API."""
-        if "quote" in endpoint:
-            input_amount = int(params.get("amount", 1000000)) if params else 1000000
-            # Simulate realistic price impact and routing
-            price_impact = min(0.05, input_amount / 10000000)  # Higher amount = more impact
-            output_amount = int(input_amount * 0.99 * (1 - price_impact))  # 1% base fee + impact
+            if not self.session:
+                import aiohttp
+                timeout = aiohttp.ClientTimeout(total=self.timeout)
+                self.session = aiohttp.ClientSession(timeout=timeout)
             
-            return {
-                "inputMint": params.get("inputMint", "So11111111111111111111111111111111111111112"),
-                "inAmount": str(input_amount),
-                "outputMint": params.get("outputMint", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-                "outAmount": str(output_amount),
-                "priceImpactPct": price_impact,
-                "platformFee": {"amount": str(input_amount // 1000), "feeBps": 100},
-                "routePlan": [
-                    {
-                        "swapInfo": {
-                            "ammKey": "SIM_AMM_KEY",
-                            "label": "Raydium",
-                            "inputMint": params.get("inputMint"),
-                            "outputMint": params.get("outputMint"),
-                            "inAmount": str(input_amount),
-                            "outAmount": str(output_amount),
-                            "feeAmount": str(input_amount // 1000),
-                            "feeMint": params.get("inputMint")
-                        }
-                    }
-                ],
-                "timeTaken": 150
-            }
-        elif "swap" in endpoint:
-            return {
-                "txid": f"SIM_SWAP_{int(time.time() * 1000000)}",
-                "success": True
-            }
-        elif "tokens" in endpoint:
-            return [
-                {
-                    "address": f"SIM{i:010d}TokenAddress",
-                    "symbol": f"SIM{i}",
-                    "name": f"Simulation Token {i}",
-                    "decimals": 9,
-                    "logoURI": f"https://example.com/sim{i}.png",
-                    "tags": ["simulation"]
-                }
-                for i in range(1, 11)
-            ]
-        else:
-            return {"simulated": True, "endpoint": endpoint, "timestamp": time.time()}
+            url = f"{self.base_url}/{endpoint}"
+            
+            for attempt in range(self.max_retries):
+                try:
+                    if method == "GET":
+                        async with self.session.get(url, params=params) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                logger.debug(f"Jupiter API success: {endpoint}")
+                                return data
+                            elif response.status == 429:  # Rate limited
+                                wait_time = 2 ** attempt
+                                logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
+                                await asyncio.sleep(wait_time)
+                                continue
+                            else:
+                                logger.warning(f"Jupiter API error {response.status} for {endpoint}")
+                                break
+                    elif method == "POST":
+                        async with self.session.post(url, json=params) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                logger.debug(f"Jupiter API POST success: {endpoint}")
+                                return data
+                            elif response.status == 429:  # Rate limited
+                                wait_time = 2 ** attempt
+                                logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
+                                await asyncio.sleep(wait_time)
+                                continue
+                            else:
+                                logger.warning(f"Jupiter API POST error {response.status} for {endpoint}")
+                                break
+                except asyncio.TimeoutError:
+                    logger.warning(f"Jupiter API timeout on attempt {attempt + 1}")
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(1)
+                        continue
+                except Exception as e:
+                    logger.error(f"Jupiter API request error: {str(e)}")
+                    break
+            
+            logger.error(f"Jupiter API request failed after {self.max_retries} attempts: {endpoint}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to make Jupiter API request: {str(e)}")
+            return None
     
     async def get_quote(
         self,
@@ -260,36 +180,6 @@ class JupiterService:
         start_time = time.time()
         
         try:
-            if self.simulation_mode:
-                # Simulate swap execution
-                await asyncio.sleep(0.2)  # Simulate network delay
-                
-                # Simulate occasional failures (5% chance)
-                if time.time() % 20 < 1:
-                    return SwapResult(
-                        success=False,
-                        error="Simulated network timeout",
-                        execution_time=time.time() - start_time
-                    )
-                
-                # Simulate successful swap with slight slippage
-                actual_slippage = quote.price_impact_pct * (0.8 + 0.4 * (time.time() % 1))
-                actual_output = int(quote.output_amount * (1 - actual_slippage / 100))
-                
-                self.successful_swaps += 1
-                self.total_volume_traded += quote.input_amount
-                
-                return SwapResult(
-                    success=True,
-                    transaction_id=f"SIM_SWAP_{int(time.time() * 1000000)}",
-                    input_amount=quote.input_amount,
-                    output_amount=actual_output,
-                    actual_price=actual_output / quote.input_amount,
-                    slippage=actual_slippage,
-                    gas_used=50000,  # Simulated gas
-                    execution_time=time.time() - start_time
-                )
-            
             # Real swap execution
             max_slippage_bps = max_slippage_bps or self.max_slippage_bps
             
@@ -346,9 +236,6 @@ class JupiterService:
             tx_status = await wallet_manager.get_transaction_status(tx_id)
             
             if tx_status.get("status") == "confirmed":
-                self.successful_swaps += 1
-                self.total_volume_traded += quote.input_amount
-                
                 return SwapResult(
                     success=True,
                     transaction_id=tx_id,
@@ -359,7 +246,6 @@ class JupiterService:
                     execution_time=time.time() - start_time
                 )
             else:
-                self.failed_swaps += 1
                 return SwapResult(
                     success=False,
                     error=f"Transaction failed: {tx_status.get('error', 'Unknown error')}",
@@ -367,7 +253,6 @@ class JupiterService:
                 )
                 
         except Exception as e:
-            self.failed_swaps += 1
             logger.error(f"Swap execution failed: {str(e)}")
             return SwapResult(
                 success=False,
@@ -413,72 +298,110 @@ class JupiterService:
             return None
     
     async def find_arbitrage_opportunities(self, token_mints: List[str], min_profit_pct: float = 1.0) -> List[Dict]:
-        """Find arbitrage opportunities between different DEXes."""
+        """Find REAL arbitrage opportunities using actual market data."""
         try:
-            if self.simulation_mode:
-                # Return simulated arbitrage opportunities
-                return [
-                    {
-                        "token_in": token_mints[0] if token_mints else "So11111111111111111111111111111111111111112",
-                        "token_out": token_mints[1] if len(token_mints) > 1 else "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-                        "profit_pct": 2.5,
-                        "amount": 1000000000,
-                        "dex_route": ["Raydium", "Orca"],
-                        "confidence": 0.8
-                    }
-                ] if len(token_mints) >= 2 else []
-            
             arbitrage_opportunities = []
             
-            # Check all token pairs for arbitrage
-            for i, token_a in enumerate(token_mints):
-                for token_b in token_mints[i+1:]:
-                    # Get quotes in both directions
-                    quote_a_to_b = await self.get_quote(token_a, token_b, 1_000_000_000)
-                    quote_b_to_a = await self.get_quote(token_b, token_a, 1_000_000_000)
-                    
-                    if quote_a_to_b and quote_b_to_a:
-                        # Calculate potential profit
-                        forward_rate = quote_a_to_b.price
-                        reverse_rate = 1 / quote_b_to_a.price
+            # Get real market data for arbitrage analysis
+            for i, token_mint in enumerate(token_mints):
+                for j, other_token in enumerate(token_mints[i+1:], start=i+1):
+                    try:
+                        # Get real quotes in both directions
+                        quote_a_to_b = await self.get_quote(token_mint, other_token, 1_000_000_000)  # 1 token
+                        quote_b_to_a = await self.get_quote(other_token, token_mint, 1_000_000_000)  # 1 token
                         
-                        profit_pct = ((forward_rate - reverse_rate) / reverse_rate) * 100
-                        
-                        if profit_pct > min_profit_pct:
-                            arbitrage_opportunities.append({
-                                "token_in": token_a,
-                                "token_out": token_b,
-                                "profit_pct": profit_pct,
-                                "amount": 1_000_000_000,
-                                "forward_quote": quote_a_to_b,
-                                "reverse_quote": quote_b_to_a
-                            })
+                        if quote_a_to_b and quote_b_to_a:
+                            # Calculate real arbitrage potential
+                            price_a_to_b = float(quote_a_to_b.output_amount) / float(quote_a_to_b.input_amount)
+                            price_b_to_a = float(quote_b_to_a.output_amount) / float(quote_b_to_a.input_amount)
+                            
+                            # Check for arbitrage opportunity
+                            round_trip_rate = price_a_to_b * price_b_to_a
+                            profit_pct = (round_trip_rate - 1) * 100
+                            
+                            # Only include real profitable opportunities
+                            if profit_pct >= min_profit_pct:
+                                arbitrage_opportunities.append({
+                                    "token_in": token_mint,
+                                    "token_out": other_token,
+                                    "profit_pct": profit_pct,
+                                    "amount": quote_a_to_b.input_amount,
+                                    "route_plan": quote_a_to_b.route_plan + quote_b_to_a.route_plan,
+                                    "confidence": min(0.9, profit_pct / 10),  # Real confidence based on profit margin
+                                    "price_impact_a_to_b": quote_a_to_b.price_impact_pct,
+                                    "price_impact_b_to_a": quote_b_to_a.price_impact_pct,
+                                    "timestamp": time.time()
+                                })
+                                
+                    except Exception as e:
+                        logger.debug(f"Error checking arbitrage between {token_mint[:8]}... and {other_token[:8]}...: {str(e)}")
+                        continue
             
-            return arbitrage_opportunities
-                
+            # Sort by profitability (real opportunities first)
+            arbitrage_opportunities.sort(key=lambda x: x["profit_pct"], reverse=True)
+            
+            logger.info(f"Found {len(arbitrage_opportunities)} real arbitrage opportunities")
+            return arbitrage_opportunities[:10]  # Return top 10 real opportunities
+            
         except Exception as e:
             logger.error(f"Failed to find arbitrage opportunities: {str(e)}")
             return []
             
-    async def get_random_tokens(self, count: int = 5) -> List[Dict]:
-        """Get random tokens for discovery."""
+    async def get_random_tokens(self, count: int = 10) -> List[Dict]:
+        """Get a list of real popular tokens from Jupiter (not random simulation)."""
         try:
+            # Get all tokens and select popular ones based on volume/liquidity
             all_tokens = await self.get_supported_tokens()
             
             if not all_tokens:
+                logger.warning("No tokens available from Jupiter API")
                 return []
+            
+            # Filter for real tokens with good liquidity (remove test/simulation tokens)
+            valid_tokens = []
+            for token in all_tokens:
+                # Skip test/simulation tokens
+                symbol = token.get("symbol", "").upper()
+                if any(test_word in symbol for test_word in ["TEST", "SIM", "DEMO", "MOCK", "FAKE"]):
+                    continue
                 
-            # Filter out stable coins and major tokens for meme coin discovery
-            filtered_tokens = [
-                token for token in all_tokens
-                if token.get("symbol", "").upper() not in ["USDC", "USDT", "SOL", "BTC", "ETH"]
-                and "stable" not in token.get("tags", [])
-            ]
+                # Skip tokens without proper metadata
+                if not token.get("name") or not token.get("symbol") or not token.get("address"):
+                    continue
+                
+                # Only include tokens with valid addresses (not simulation addresses)
+                address = token.get("address", "")
+                if address.startswith("SIM") or len(address) < 32:
+                    continue
+                
+                valid_tokens.append(token)
             
-            # Return random selection
+            # Sort by popularity/liquidity if available, otherwise randomize
             import random
-            return random.sample(filtered_tokens, min(count, len(filtered_tokens)))
-            
+            if len(valid_tokens) > count:
+                # Prefer well-known tokens first, then randomly select from the rest
+                popular_tokens = []
+                other_tokens = []
+                
+                known_symbols = {"SOL", "USDC", "USDT", "BONK", "WIF", "JTO", "PYTH", "RAY", "ORCA", "MNGO"}
+                
+                for token in valid_tokens:
+                    if token.get("symbol", "").upper() in known_symbols:
+                        popular_tokens.append(token)
+                    else:
+                        other_tokens.append(token)
+                
+                # Take popular tokens first, then fill with random others
+                selected_tokens = popular_tokens[:count]
+                if len(selected_tokens) < count:
+                    remaining_count = count - len(selected_tokens)
+                    random.shuffle(other_tokens)
+                    selected_tokens.extend(other_tokens[:remaining_count])
+                
+                return selected_tokens[:count]
+            else:
+                return valid_tokens[:count]
+                
         except Exception as e:
             logger.error(f"Failed to get random tokens: {str(e)}")
             return []
