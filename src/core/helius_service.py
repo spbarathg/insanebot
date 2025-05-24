@@ -29,6 +29,9 @@ class HeliusService:
         self.max_retries = 3
         self.timeout = 30
         
+        # Always running in real API mode - no simulation
+        self.simulation_mode = False
+        
         # Real-time cache for performance optimization
         self._price_cache = {}
         self._metadata_cache = {}
@@ -157,27 +160,28 @@ class HeliusService:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
                         if response.status == 200:
                             tokens = await response.json()
-                            for token in tokens:
-                                if token.get("address") == token_address:
-                                    metadata = {
-                                        "address": token_address,
-                                        "name": token.get("name", "Unknown"),
-                                        "symbol": token.get("symbol", "UNKNOWN"),
-                                        "decimals": token.get("decimals", 9),
-                                        "supply": 0,  # Jupiter doesn't provide supply
-                                        "holders": 0,  # Jupiter doesn't provide holders
-                                        "verified": "verified" in token.get("tags", []),
-                                        "logo_uri": token.get("logoURI", ""),
-                                        "timestamp": current_time
-                                    }
-                                    
-                                    # Cache the result
-                                    self._metadata_cache[cache_key] = {
-                                        'data': metadata,
-                                        'timestamp': current_time
-                                    }
-                                    
-                                    return metadata
+                            # Jupiter returns array of token addresses (strings), not objects
+                            if isinstance(tokens, list) and token_address in tokens:
+                                # Create minimal metadata for address found in Jupiter
+                                metadata = {
+                                    "address": token_address,
+                                    "name": f"Token {token_address[:8]}",
+                                    "symbol": f"TOKEN_{token_address[:8]}",
+                                    "decimals": 9,
+                                    "supply": 0,
+                                    "holders": 0,
+                                    "verified": True,  # If it's on Jupiter, it's somewhat verified
+                                    "logo_uri": "",
+                                    "timestamp": current_time
+                                }
+                                
+                                # Cache the result
+                                self._metadata_cache[cache_key] = {
+                                    'data': metadata,
+                                    'timestamp': current_time
+                                }
+                                
+                                return metadata
             except Exception as e:
                 logger.debug(f"Jupiter token list failed: {str(e)}")
             
@@ -351,21 +355,21 @@ class HeliusService:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
                         if response.status == 200:
                             tokens = await response.json()
-                            for token in tokens:
-                                if token.get("address") == token_address:
-                                    # Estimate liquidity from Jupiter data
-                                    return {
-                                        "address": token_address,
-                                        "total_liquidity_usd": 0,  # Jupiter doesn't provide direct liquidity
-                                        "liquidity_pools": [
-                                            {
-                                                "dex": "Jupiter_Aggregated",
-                                                "liquidity_usd": 0,
-                                                "volume_24h": 0
-                                            }
-                                        ],
-                                        "timestamp": time.time()
-                                    }
+                            # Jupiter returns array of token addresses (strings), not objects
+                            if isinstance(tokens, list) and token_address in tokens:
+                                # Estimate liquidity from Jupiter data
+                                return {
+                                    "address": token_address,
+                                    "total_liquidity_usd": 0,  # Jupiter doesn't provide direct liquidity
+                                    "liquidity_pools": [
+                                        {
+                                            "dex": "Jupiter_Aggregated",
+                                            "liquidity_usd": 0,
+                                            "volume_24h": 0
+                                        }
+                                    ],
+                                    "timestamp": time.time()
+                                }
             except Exception as e:
                 logger.debug(f"Jupiter liquidity check failed: {str(e)}")
             

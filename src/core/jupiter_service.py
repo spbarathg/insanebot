@@ -154,17 +154,28 @@ class JupiterService:
             if not response:
                 return None
             
-            return SwapQuote(
-                input_mint=response["inputMint"],
-                output_mint=response["outputMint"],
-                input_amount=int(response["inAmount"]),
-                output_amount=int(response["outAmount"]),
-                price_impact_pct=float(response.get("priceImpactPct", 0)),
-                platform_fee_pct=float(response.get("platformFee", {}).get("feeBps", 0)) / 10000,
-                route_plan=response.get("routePlan", []),
-                time_taken_ms=response.get("timeTaken", 0),
-                quote_id=response.get("quoteResponse", "")
-            )
+            # Handle Jupiter API response structure
+            if isinstance(response, dict):
+                # Check if the response contains the expected fields
+                required_fields = ["inputMint", "outputMint", "inAmount", "outAmount"]
+                if not all(field in response for field in required_fields):
+                    logger.warning(f"Jupiter quote response missing required fields: {response.keys()}")
+                    return None
+                
+                return SwapQuote(
+                    input_mint=response.get("inputMint", input_mint),
+                    output_mint=response.get("outputMint", output_mint),
+                    input_amount=int(response.get("inAmount", 0)),
+                    output_amount=int(response.get("outAmount", 0)),
+                    price_impact_pct=float(response.get("priceImpactPct", 0)),
+                    platform_fee_pct=float(response.get("platformFee", {}).get("feeBps", 0)) / 10000 if response.get("platformFee") else 0,
+                    route_plan=response.get("routePlan", []),
+                    time_taken_ms=response.get("timeTaken", 0),
+                    quote_id=str(response.get("quoteResponse", ""))
+                )
+            else:
+                logger.warning(f"Jupiter quote response is not a dict: {type(response)}")
+                return None
             
         except Exception as e:
             logger.error(f"Failed to get quote: {str(e)}")
