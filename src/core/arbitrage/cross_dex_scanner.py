@@ -129,12 +129,25 @@ class CrossDEXScanner:
         try:
             # Get tokens from Jupiter (real API)
             if self.jupiter_service:
-                jupiter_tokens = await self.jupiter_service.get_tokens()
-                if jupiter_tokens:
-                    self.dex_configs[DEXName.JUPITER].supported_tokens = [
-                        token['address'] for token in jupiter_tokens[:100]  # Limit for testing
-                    ]
-                    logger.info(f"Loaded {len(self.dex_configs[DEXName.JUPITER].supported_tokens)} tokens for Jupiter")
+                jupiter_response = await self.jupiter_service.get_tokens()
+                if jupiter_response:
+                    # Handle Jupiter API response - it returns array of token addresses (strings)
+                    if isinstance(jupiter_response, list) and len(jupiter_response) > 0:
+                        if isinstance(jupiter_response[0], str):
+                            # Jupiter returns array of addresses
+                            self.dex_configs[DEXName.JUPITER].supported_tokens = jupiter_response[:100]  # Limit for testing
+                            logger.info(f"Loaded {len(self.dex_configs[DEXName.JUPITER].supported_tokens)} token addresses for Jupiter")
+                        else:
+                            # Jupiter returns array of objects with address field
+                            self.dex_configs[DEXName.JUPITER].supported_tokens = [
+                                token.get('address', '') for token in jupiter_response[:100] 
+                                if token.get('address')
+                            ]
+                            logger.info(f"Loaded {len(self.dex_configs[DEXName.JUPITER].supported_tokens)} token addresses for Jupiter")
+                    else:
+                        logger.warning("Jupiter API returned empty or invalid token list")
+                else:
+                    logger.warning("Failed to get tokens from Jupiter API")
             
             # For other DEXs, use common tokens for now
             common_tokens = [
@@ -151,6 +164,16 @@ class CrossDEXScanner:
                 
         except Exception as e:
             logger.error(f"Error loading supported tokens: {str(e)}")
+            # Fallback to common tokens for all DEXs
+            common_tokens = [
+                "So11111111111111111111111111111111111111112",  # SOL
+                "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+                "DezXAZ8zDXzK82sYdDbGNQYJuUFzJPCL7yRNmEHYYAjK",  # BONK
+            ]
+            
+            for dex_name in self.dex_configs.keys():
+                self.dex_configs[dex_name].supported_tokens = common_tokens
+                logger.info(f"Fallback: Loaded {len(common_tokens)} common tokens for {dex_name.value}")
     
     async def scan_arbitrage_opportunities(self) -> List[ArbitrageOpportunity]:
         """Scan for arbitrage opportunities across all DEXs."""

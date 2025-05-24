@@ -350,57 +350,135 @@ class JupiterService:
     async def get_random_tokens(self, count: int = 10) -> List[Dict]:
         """Get a list of real popular tokens from Jupiter (not random simulation)."""
         try:
-            # Get all tokens and select popular ones based on volume/liquidity
-            all_tokens = await self.get_supported_tokens()
+            # Get all token addresses from Jupiter
+            token_addresses = await self.get_supported_tokens()
             
-            if not all_tokens:
-                logger.warning("No tokens available from Jupiter API")
+            if not token_addresses:
+                logger.warning("No token addresses available from Jupiter API")
                 return []
             
-            # Filter for real tokens with good liquidity (remove test/simulation tokens)
-            valid_tokens = []
-            for token in all_tokens:
-                # Skip test/simulation tokens
-                symbol = token.get("symbol", "").upper()
-                if any(test_word in symbol for test_word in ["TEST", "SIM", "DEMO", "MOCK", "FAKE"]):
-                    continue
+            # Jupiter /tokens endpoint returns array of strings (addresses), not objects
+            if isinstance(token_addresses, list) and len(token_addresses) > 0:
+                # If it's a list of strings (addresses), we need to create token objects
+                if isinstance(token_addresses[0], str):
+                    # Common well-known Solana tokens with metadata
+                    known_tokens = [
+                        {
+                            "address": "So11111111111111111111111111111111111111112",
+                            "symbol": "SOL",
+                            "name": "Solana",
+                            "decimals": 9
+                        },
+                        {
+                            "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                            "symbol": "USDC",
+                            "name": "USD Coin",
+                            "decimals": 6
+                        },
+                        {
+                            "address": "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+                            "symbol": "USDT",
+                            "name": "Tether USD",
+                            "decimals": 6
+                        },
+                        {
+                            "address": "DezXAZ8zDXzK82sYdDbGNQYJuUFzJPCL7yRNmEHYYAjK",
+                            "symbol": "BONK",
+                            "name": "Bonk",
+                            "decimals": 5
+                        },
+                        {
+                            "address": "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+                            "symbol": "ETH",
+                            "name": "Ether",
+                            "decimals": 8
+                        },
+                        {
+                            "address": "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj",
+                            "symbol": "STEP",
+                            "name": "Step Finance",
+                            "decimals": 9
+                        },
+                        {
+                            "address": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+                            "symbol": "MSOL",
+                            "name": "Marinade Staked SOL",
+                            "decimals": 9
+                        },
+                        {
+                            "address": "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt",
+                            "symbol": "SRM",
+                            "name": "Serum",
+                            "decimals": 6
+                        }
+                    ]
+                    
+                    # Filter known tokens that are available in Jupiter
+                    available_tokens = []
+                    for known_token in known_tokens:
+                        if known_token["address"] in token_addresses:
+                            available_tokens.append(known_token)
+                    
+                    # Add additional tokens from Jupiter list (as minimal objects)
+                    additional_count = max(0, count - len(available_tokens))
+                    for i, address in enumerate(token_addresses[:additional_count]):
+                        if address not in [t["address"] for t in available_tokens]:
+                            available_tokens.append({
+                                "address": address,
+                                "symbol": f"TOKEN_{address[:8]}",
+                                "name": f"Token {address[:8]}",
+                                "decimals": 9
+                            })
+                    
+                    return available_tokens[:count]
                 
-                # Skip tokens without proper metadata
-                if not token.get("name") or not token.get("symbol") or not token.get("address"):
-                    continue
-                
-                # Only include tokens with valid addresses (not simulation addresses)
-                address = token.get("address", "")
-                if address.startswith("SIM") or len(address) < 32:
-                    continue
-                
-                valid_tokens.append(token)
-            
-            # Sort by popularity/liquidity if available, otherwise randomize
-            import random
-            if len(valid_tokens) > count:
-                # Prefer well-known tokens first, then randomly select from the rest
-                popular_tokens = []
-                other_tokens = []
-                
-                known_symbols = {"SOL", "USDC", "USDT", "BONK", "WIF", "JTO", "PYTH", "RAY", "ORCA", "MNGO"}
-                
-                for token in valid_tokens:
-                    if token.get("symbol", "").upper() in known_symbols:
-                        popular_tokens.append(token)
+                # If it's already a list of objects, filter them properly
+                else:
+                    valid_tokens = []
+                    for token in token_addresses:
+                        # Skip test/simulation tokens
+                        symbol = token.get("symbol", "").upper()
+                        if any(test_word in symbol for test_word in ["TEST", "SIM", "DEMO", "MOCK", "FAKE"]):
+                            continue
+                        
+                        # Skip tokens without proper metadata
+                        if not token.get("name") or not token.get("symbol") or not token.get("address"):
+                            continue
+                        
+                        # Only include tokens with valid addresses (not simulation addresses)
+                        address = token.get("address", "")
+                        if address.startswith("SIM") or len(address) < 32:
+                            continue
+                        
+                        valid_tokens.append(token)
+                    
+                    # Sort by popularity/liquidity if available, otherwise randomize
+                    import random
+                    if len(valid_tokens) > count:
+                        # Prefer well-known tokens first, then randomly select from the rest
+                        popular_tokens = []
+                        other_tokens = []
+                        
+                        known_symbols = {"SOL", "USDC", "USDT", "BONK", "WIF", "JTO", "PYTH", "RAY", "ORCA", "MNGO"}
+                        
+                        for token in valid_tokens:
+                            if token.get("symbol", "").upper() in known_symbols:
+                                popular_tokens.append(token)
+                            else:
+                                other_tokens.append(token)
+                        
+                        # Take popular tokens first, then fill with random others
+                        selected_tokens = popular_tokens[:count]
+                        if len(selected_tokens) < count:
+                            remaining_count = count - len(selected_tokens)
+                            random.shuffle(other_tokens)
+                            selected_tokens.extend(other_tokens[:remaining_count])
+                        
+                        return selected_tokens[:count]
                     else:
-                        other_tokens.append(token)
-                
-                # Take popular tokens first, then fill with random others
-                selected_tokens = popular_tokens[:count]
-                if len(selected_tokens) < count:
-                    remaining_count = count - len(selected_tokens)
-                    random.shuffle(other_tokens)
-                    selected_tokens.extend(other_tokens[:remaining_count])
-                
-                return selected_tokens[:count]
-            else:
-                return valid_tokens[:count]
+                        return valid_tokens[:count]
+            
+            return []
                 
         except Exception as e:
             logger.error(f"Failed to get random tokens: {str(e)}")
