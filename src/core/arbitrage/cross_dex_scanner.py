@@ -285,11 +285,14 @@ class CrossDEXScanner:
     async def _get_jupiter_quote(self, token_address: str, amount: float) -> Optional[PriceQuote]:
         """Get quote from Jupiter API."""
         try:
+            # Convert SOL amount to lamports (Jupiter expects integer amounts)
+            amount_lamports = int(amount * 1_000_000_000)  # 1 SOL = 1,000,000,000 lamports
+            
             # Use Jupiter service to get a real quote
             quote_data = await self.jupiter_service.get_swap_quote(
                 "So11111111111111111111111111111111111111112",  # SOL
                 token_address,
-                amount
+                amount_lamports  # Now passing lamports instead of SOL
             )
             
             if not quote_data:
@@ -301,12 +304,12 @@ class CrossDEXScanner:
                 input_token="So11111111111111111111111111111111111111112",
                 output_token=token_address,
                 input_amount=amount,
-                output_amount=float(quote_data.get('outAmount', 0)) / 1e9,  # Convert from lamports
-                price=float(quote_data.get('price', 0)),
-                price_impact=float(quote_data.get('priceImpactPct', 0)),
+                output_amount=float(quote_data.output_amount) / 1e9,  # Convert from lamports
+                price=quote_data.price,
+                price_impact=quote_data.price_impact_pct / 100,  # Convert to decimal
                 liquidity=10000.0,  # Placeholder
                 fee=0.0,  # Jupiter aggregates fees
-                slippage=float(quote_data.get('slippageBps', 50)) / 10000,  # Convert BPS to decimal
+                slippage=quote_data.slippage_bps / 10000,  # Convert BPS to decimal
                 timestamp=time.time(),
                 raw_data=quote_data
             )
