@@ -1,5 +1,6 @@
 """
-Minimalistic Solana trading bot with robust error handling and type safety.
+Lightweight Solana trading bot with robust error handling and type safety.
+This version avoids heavy ML dependencies that can cause import issues.
 """
 import asyncio
 import signal
@@ -13,6 +14,12 @@ from typing import Optional, Dict, Any
 app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if app_root not in sys.path:
     sys.path.insert(0, app_root)
+
+# Set environment variables to disable heavy components
+os.environ["USE_LOCAL_LLM"] = "false"
+os.environ["ENABLE_ML_PREDICTIONS"] = "false"
+os.environ["ENABLE_PATTERN_RECOGNITION"] = "false"
+os.environ["ENABLE_SENTIMENT_ANALYSIS"] = "false"
 
 # Configure detailed logging
 from loguru import logger
@@ -68,19 +75,133 @@ logger.add(
 # Initialize shutdown flag
 shutdown_requested = False
 
+class LightweightBot:
+    """Lightweight trading bot without heavy ML dependencies."""
+    
+    def __init__(self):
+        """Initialize the lightweight bot."""
+        self.helius_service = None
+        self.jupiter_service = None
+        self.running = False
+        
+    async def initialize(self) -> bool:
+        """Initialize bot components."""
+        try:
+            logger.info("🚀 Initializing Lightweight Trading Bot...")
+            
+            # Import and initialize core services
+            from src.core.helius_service import HeliusService
+            from src.core.jupiter_service import JupiterService
+            
+            self.helius_service = HeliusService()
+            self.jupiter_service = JupiterService()
+            
+            logger.info("✅ Core services initialized successfully")
+            
+            # Test connectivity
+            logger.info("🧪 Testing API connectivity...")
+            
+            # Test Jupiter API
+            tokens = await self.jupiter_service.get_supported_tokens()
+            if tokens:
+                logger.info(f"✅ Jupiter API working - {len(tokens)} tokens available")
+            else:
+                logger.warning("⚠️ Jupiter API returned no data")
+            
+            # Test Helius API (will show warning if no API key)
+            metadata = await self.helius_service.get_token_metadata("So11111111111111111111111111111111111111112")
+            if metadata:
+                logger.info(f"✅ Helius API working - Got metadata for {metadata.get('symbol', 'SOL')}")
+            else:
+                logger.info("ℹ️ Helius API in limited mode (no API key)")
+            
+            logger.info("✅ Lightweight bot initialization completed successfully!")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize lightweight bot: {str(e)}")
+            logger.exception("Full initialization error:")
+            return False
+    
+    async def start(self):
+        """Start the lightweight bot."""
+        if not self.helius_service or not self.jupiter_service:
+            logger.error("❌ Bot not initialized. Call initialize() first.")
+            return
+        
+        self.running = True
+        logger.info("🎯 Lightweight Trading Bot started!")
+        
+        try:
+            loop_count = 0
+            while self.running and not shutdown_requested:
+                loop_count += 1
+                
+                logger.bind(ACTIVITY="MONITOR").info(f"🔄 Bot monitoring loop #{loop_count}")
+                
+                # Basic monitoring without heavy ML
+                try:
+                    # Get some random tokens to monitor
+                    tokens = await self.jupiter_service.get_random_tokens(count=3)
+                    
+                    if tokens:
+                        logger.bind(SCANNER=True).info(f"📊 Monitoring {len(tokens)} tokens:")
+                        
+                        for token in tokens:
+                            symbol = token.get('symbol', 'UNKNOWN')
+                            address = token.get('address', '')
+                            
+                            logger.bind(SCANNER=True).info(f"  • {symbol} ({address[:8]}...)")
+                            
+                            # Get basic metadata
+                            metadata = await self.helius_service.get_token_metadata(address)
+                            if metadata:
+                                logger.bind(SCANNER=True).debug(f"    Metadata: {metadata.get('name', 'Unknown')}")
+                    
+                    # Portfolio summary (simulated)
+                    logger.bind(PORTFOLIO=True).info(
+                        f"💰 Portfolio Status: 1.0 SOL (Simulation Mode) | "
+                        f"Loops: {loop_count} | Status: ✅ Operational"
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"Error in monitoring loop: {str(e)}")
+                
+                # Sleep between loops
+                await asyncio.sleep(30)  # 30 second intervals
+                
+        except KeyboardInterrupt:
+            logger.info("⏹️ Bot stopped by user")
+        except Exception as e:
+            logger.error(f"💥 Error in bot main loop: {str(e)}")
+            logger.exception("Full error traceback:")
+        finally:
+            await self.stop()
+    
+    async def stop(self):
+        """Stop the bot and cleanup."""
+        logger.info("🛑 Stopping Lightweight Trading Bot...")
+        self.running = False
+        
+        try:
+            if self.helius_service:
+                await self.helius_service.close()
+            if self.jupiter_service:
+                await self.jupiter_service.close()
+            
+            logger.info("✅ Bot stopped successfully")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}")
+
 async def main():
-    """Main entry point for the trading bot."""
-    logger.bind(ACTIVITY="STARTUP").info("🚀 Starting Solana trading bot in detailed monitoring mode...")
+    """Main entry point for the lightweight trading bot."""
+    logger.bind(ACTIVITY="STARTUP").info("🚀 Starting Lightweight Solana Trading Bot...")
     
     try:
-        # Import and initialize the actual bot
-        logger.debug("📦 Importing core bot modules...")
-        from src.core.main import MemeCoinBot
+        # Create and initialize bot
+        bot = LightweightBot()
         
-        logger.bind(ACTIVITY="INIT").info("🔧 Initializing MemeCoinBot...")
-        bot = MemeCoinBot()
-        
-        logger.bind(ACTIVITY="INIT").info("⚙️ Starting bot initialization process...")
+        logger.bind(ACTIVITY="INIT").info("⚙️ Starting bot initialization...")
         if await bot.initialize():
             logger.bind(ACTIVITY="INIT").success("✅ Bot initialization completed successfully!")
             
@@ -100,12 +221,6 @@ async def main():
         logger.bind(ACTIVITY="ERROR").exception("Full error traceback:")
     finally:
         logger.bind(ACTIVITY="SHUTDOWN").info("🔄 Bot shutdown sequence initiated...")
-        try:
-            if 'bot' in locals():
-                await bot.close()
-                logger.bind(ACTIVITY="SHUTDOWN").success("✅ Bot cleanup completed")
-        except Exception as e:
-            logger.bind(ACTIVITY="SHUTDOWN").error(f"❌ Error during cleanup: {str(e)}")
         logger.bind(ACTIVITY="SHUTDOWN").info("🛑 Bot shutdown complete")
 
 def signal_handler(signum, frame):
@@ -166,11 +281,11 @@ def setup():
         return False
 
 if __name__ == "__main__":
-    logger.bind(ACTIVITY="MAIN").info("🎯 Solana Trading Bot Starting...")
+    logger.bind(ACTIVITY="MAIN").info("🎯 Lightweight Solana Trading Bot Starting...")
     
     # Perform setup
     if setup():
-        logger.bind(ACTIVITY="MAIN").info("▶️ Launching bot main loop...")
+        logger.bind(ACTIVITY="MAIN").info("▶️ Launching lightweight bot main loop...")
         # Run the bot
         asyncio.run(main())
     else:

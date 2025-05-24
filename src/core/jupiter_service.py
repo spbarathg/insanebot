@@ -70,7 +70,7 @@ class JupiterService:
         self._quote_cache = {}
         self._cache_ttl = 5  # 5 seconds cache for quotes (very short for real-time data)
         
-        logger.info("Jupiter Service initialized - REAL API MODE ONLY")
+        logger.info("✅ Jupiter Service initialized - REAL API MODE ONLY")
     
     async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
         """Make API request to Jupiter with real data only."""
@@ -78,7 +78,8 @@ class JupiterService:
             if not self.session:
                 import aiohttp
                 timeout = aiohttp.ClientTimeout(total=self.timeout)
-                self.session = aiohttp.ClientSession(timeout=timeout)
+                headers = {"User-Agent": "Solana-Trading-Bot/1.0"}
+                self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
             
             url = f"{self.base_url}/{endpoint}"
             
@@ -87,23 +88,40 @@ class JupiterService:
                     if method == "GET":
                         async with self.session.get(url, params=params) as response:
                             if response.status == 200:
-                                data = await response.json()
-                                logger.debug(f"Jupiter API success: {endpoint}")
-                                return data
+                                # Check content type
+                                content_type = response.headers.get('content-type', '')
+                                if 'application/json' in content_type:
+                                    data = await response.json()
+                                    logger.debug(f"Jupiter API success: {endpoint}")
+                                    return data
+                                else:
+                                    logger.warning(f"Jupiter API returned non-JSON content: {content_type}")
+                                    text_response = await response.text()
+                                    logger.debug(f"Response content: {text_response[:200]}...")
+                                    return None
                             elif response.status == 429:  # Rate limited
                                 wait_time = 2 ** attempt
                                 logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
                                 await asyncio.sleep(wait_time)
                                 continue
+                            elif response.status == 404:
+                                logger.debug(f"Jupiter API endpoint not found: {endpoint}")
+                                return None
                             else:
                                 logger.warning(f"Jupiter API error {response.status} for {endpoint}")
                                 break
                     elif method == "POST":
                         async with self.session.post(url, json=params) as response:
                             if response.status == 200:
-                                data = await response.json()
-                                logger.debug(f"Jupiter API POST success: {endpoint}")
-                                return data
+                                # Check content type
+                                content_type = response.headers.get('content-type', '')
+                                if 'application/json' in content_type:
+                                    data = await response.json()
+                                    logger.debug(f"Jupiter API POST success: {endpoint}")
+                                    return data
+                                else:
+                                    logger.warning(f"Jupiter API returned non-JSON content: {content_type}")
+                                    return None
                             elif response.status == 429:  # Rate limited
                                 wait_time = 2 ** attempt
                                 logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
@@ -121,7 +139,7 @@ class JupiterService:
                     logger.error(f"Jupiter API request error: {str(e)}")
                     break
             
-            logger.error(f"Jupiter API request failed after {self.max_retries} attempts: {endpoint}")
+            logger.debug(f"Jupiter API request failed after {self.max_retries} attempts: {endpoint}")
             return None
             
         except Exception as e:

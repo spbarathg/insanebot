@@ -37,19 +37,29 @@ class HeliusService:
         self._metadata_cache = {}
         self._cache_ttl = 10  # 10 seconds cache for real-time data
         
-        if not self.api_key or self.api_key in ["", "demo_key_for_testing"]:
-            logger.warning("No valid Helius API key provided - some features may be limited")
+        # Check API key validity
+        if not self.api_key or self.api_key in ["", "demo_key_for_testing", "your-helius-api-key"]:
+            logger.warning("⚠️ No valid Helius API key provided - running in limited mode")
+            logger.info("💡 To get full functionality, get a free API key at: https://helius.xyz/")
+            self.api_key = None  # Set to None to clearly indicate no valid key
+        else:
+            logger.info("✅ Helius API key configured")
         
         logger.info("Helius Service initialized - REAL API MODE ONLY")
     
     async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
         """Make API request to Helius with real data only."""
         try:
+            # If no valid API key, return None gracefully
+            if not self.api_key:
+                logger.debug(f"Skipping Helius API call to {endpoint} - no valid API key")
+                return None
+                
             if not self.session:
                 import aiohttp
                 timeout = aiohttp.ClientTimeout(total=self.timeout)
                 headers = {"User-Agent": "Solana-Trading-Bot/1.0"}
-                if self.api_key and self.api_key not in ["", "demo_key_for_testing"]:
+                if self.api_key:
                     headers["Authorization"] = f"Bearer {self.api_key}"
                 
                 self.session = aiohttp.ClientSession(timeout=timeout, headers=headers)
@@ -57,7 +67,7 @@ class HeliusService:
             # Add API key to params if available
             if params is None:
                 params = {}
-            if self.api_key and self.api_key not in ["", "demo_key_for_testing"]:
+            if self.api_key:
                 params["api-key"] = self.api_key
             
             url = f"{self.base_url}/{endpoint}"
@@ -76,7 +86,11 @@ class HeliusService:
                                 await asyncio.sleep(wait_time)
                                 continue
                             elif response.status == 401:
-                                logger.error("Helius API authentication failed - check API key")
+                                logger.error("❌ Helius API authentication failed - check API key")
+                                logger.info("💡 Get a free API key at: https://helius.xyz/")
+                                break
+                            elif response.status == 403:
+                                logger.error("❌ Helius API access forbidden - check API key permissions")
                                 break
                             else:
                                 logger.warning(f"Helius API error {response.status} for {endpoint}")
@@ -92,6 +106,9 @@ class HeliusService:
                                 logger.warning(f"Helius API rate limited, waiting {wait_time}s")
                                 await asyncio.sleep(wait_time)
                                 continue
+                            elif response.status == 401:
+                                logger.error("❌ Helius API authentication failed - check API key")
+                                break
                             else:
                                 logger.warning(f"Helius API POST error {response.status} for {endpoint}")
                                 break
@@ -104,7 +121,7 @@ class HeliusService:
                     logger.error(f"Helius API request error: {str(e)}")
                     break
             
-            logger.error(f"Helius API request failed after {self.max_retries} attempts: {endpoint}")
+            logger.debug(f"Helius API request failed after {self.max_retries} attempts: {endpoint}")
             return None
             
         except Exception as e:
