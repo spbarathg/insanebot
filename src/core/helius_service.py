@@ -195,6 +195,35 @@ class HeliusService:
             logger.error(f"Failed to get token price for {token_address}: {str(e)}")
             raise
     
+    async def get_token_liquidity(self, token_address: str) -> Dict[str, Any]:
+        """Get token liquidity information."""
+        try:
+            if self.simulation_mode:
+                return {
+                    "address": token_address,
+                    "total_liquidity_usd": 10000 + (time.time() % 50000),
+                    "liquidity_pools": [
+                        {
+                            "dex": "Raydium",
+                            "liquidity_usd": 5000 + (time.time() % 25000),
+                            "volume_24h": 2000 + (time.time() % 10000)
+                        },
+                        {
+                            "dex": "Orca", 
+                            "liquidity_usd": 3000 + (time.time() % 15000),
+                            "volume_24h": 1500 + (time.time() % 7500)
+                        }
+                    ],
+                    "timestamp": time.time()
+                }
+            
+            response = await self._make_api_request(f"tokens/{token_address}/liquidity")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to get token liquidity for {token_address}: {str(e)}")
+            raise
+    
     async def get_new_tokens(self, limit: int = 10, min_age_minutes: int = 5) -> List[Dict]:
         """Get recently created tokens."""
         try:

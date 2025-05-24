@@ -376,14 +376,18 @@ class JupiterService:
             )
     
     async def get_supported_tokens(self) -> List[Dict]:
-        """Get list of tokens supported by Jupiter."""
+        """Get list of all supported tokens from Jupiter."""
         try:
             response = await self._make_api_request("tokens")
-            return response if isinstance(response, list) else []
+            return response if isinstance(response, list) else response.get("tokens", [])
             
         except Exception as e:
             logger.error(f"Failed to get supported tokens: {str(e)}")
             return []
+    
+    async def get_tokens(self) -> List[Dict]:
+        """Alias for get_supported_tokens - used by cross-dex scanner."""
+        return await self.get_supported_tokens()
     
     async def get_token_price(self, token_mint: str, vs_token_mint: str = "So11111111111111111111111111111111111111112") -> Optional[float]:
         """Get token price in terms of another token (default: SOL)."""
