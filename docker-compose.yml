@@ -42,10 +42,7 @@ services:
       - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
       - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
       - LOG_LEVEL=INFO
-      - JUPITER_API_KEY=${JUPITER_API_KEY:-demo_key_for_testing}
       - JUPITER_API_URL=https://quote-api.jup.ag/v6
-      - HELIUS_API_KEY=${HELIUS_API_KEY:-demo_key_for_testing}
-      - PRIVATE_KEY=${PRIVATE_KEY:-demo_private_key_for_testing}
       - PYTHONUNBUFFERED=1
 
   prometheus:
