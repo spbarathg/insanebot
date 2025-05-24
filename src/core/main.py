@@ -95,7 +95,9 @@ except ImportError as e:
     
     # Create placeholder class
     class ExecutionEngine:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, jupiter_service, helius_service): 
+            self.jupiter_service = jupiter_service
+            self.helius_service = helius_service
         async def initialize(self): return True
         async def execute_trade(self, *args, **kwargs): return {"success": False, "message": "Advanced execution not available"}
 
@@ -688,17 +690,17 @@ class MemeCoinBot:
             if EXECUTION_ENGINE_AVAILABLE:
                 try:
                     logger.info("🔧 Initializing Advanced Execution Engine...")
-                    self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service, self.wallet_manager)
+                    self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service)
                     if not await self.execution_engine.initialize():
                         logger.warning("⚠️ Execution Engine initialization failed - using basic execution")
-                        self.execution_engine = ExecutionEngine()  # Use fallback
+                        self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service)  # Use fallback with correct args
                     else:
                         logger.info("✅ Execution Engine initialized successfully")
                 except Exception as e:
                     logger.warning(f"⚠️ Execution Engine error: {str(e)} - using basic execution")
-                    self.execution_engine = ExecutionEngine()  # Use fallback
+                    self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service)  # Use fallback with correct args
             else:
-                self.execution_engine = ExecutionEngine()  # Use fallback
+                self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service)  # Use fallback with correct args
                 logger.info("⚠️ Using basic execution engine (advanced execution not available)")
             
             logger.success("✅ All services initialized successfully!")
