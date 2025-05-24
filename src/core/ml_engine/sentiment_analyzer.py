@@ -12,7 +12,7 @@ This module analyzes market sentiment from multiple sources:
 import time
 import logging
 import math
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from collections import deque
 import random
 

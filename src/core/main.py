@@ -306,33 +306,33 @@ class MarketScanner:
         try:
             # Get random tokens from Jupiter
             random_tokens = await self.jupiter_service.get_random_tokens(count=5)
-            
-            new_tokens = []
+        
+        new_tokens = []
             for token_data in random_tokens:
                 token_address = token_data.get('address')
                 if not token_address:
                     continue
                     
                 # Skip if already in watchlist or candidates
-                if token_address in self.token_watchlist or token_address in self.new_token_candidates:
+            if token_address in self.token_watchlist or token_address in self.new_token_candidates:
                     continue
                 
                 # Skip common stable coins and major tokens
                 symbol = token_data.get('symbol', '').upper()
                 if symbol in {'USDC', 'USDT', 'SOL', 'BTC', 'ETH', 'WBTC', 'WETH'}:
-                    continue
-                    
-                new_tokens.append(token_address)
-                self.new_token_candidates.append(token_address)
+                continue
                 
+            new_tokens.append(token_address)
+            self.new_token_candidates.append(token_address)
+            
                 logger.info(f"Found new token candidate: {symbol} ({token_address[:8]}...)")
                 
-            if new_tokens:
-                logger.info(f"Found {len(new_tokens)} new potential tokens")
+        if new_tokens:
+            logger.info(f"Found {len(new_tokens)} new potential tokens")
             else:
                 logger.info("No new tokens found in this scan")
-                
-            return new_tokens
+            
+        return new_tokens
             
         except Exception as e:
             logger.error(f"Error scanning for new tokens: {str(e)}")
@@ -416,7 +416,7 @@ class MarketScanner:
                 if token_address not in self.token_watchlist:
                     # Add to watchlist if there's room
                     if len(self.token_watchlist) < self.max_watchlist_size:
-                        self.token_watchlist.append(token_address)
+                    self.token_watchlist.append(token_address)
                         logger.info(f"✅ Added {evaluation.get('symbol', 'Unknown')} to watchlist with score {evaluation.get('score', 0):.2f}")
                     else:
                         # Remove a less promising token if watchlist is full
@@ -427,7 +427,7 @@ class MarketScanner:
                 
                 # Remove from candidates
                 if token_address in self.new_token_candidates:
-                    self.new_token_candidates.remove(token_address)
+                self.new_token_candidates.remove(token_address)
             elif evaluation.get("score", 0) < 0.05:
                 # Remove tokens with extremely low scores immediately (reduced from 0.2 to 0.05)
                 if token_address in self.new_token_candidates:
@@ -589,7 +589,7 @@ class MemeCoinBot:
         if not all([self.helius_service, self.jupiter_service, self.local_llm, self.portfolio, self.arbitrage_scanner]):
             logger.bind(ACTIVITY="BOT_START").error("❌ Bot not initialized. Call initialize() first.")
             return
-        
+            
         self.running = True
         logger.bind(ACTIVITY="BOT_START").success("🎯 MemeCoinBot trading loop started!")
         
@@ -628,7 +628,7 @@ class MemeCoinBot:
                     # Analyze each token on the watchlist
                     for token_address in current_watchlist:
                         if not self.running:
-                            break
+                    break
                         
                         self.total_scans += 1
                         await self.check_token_opportunity(token_address)
@@ -718,8 +718,8 @@ class MemeCoinBot:
                 time_since_last_trade = now - self.trade_cooldowns[token_address]
                 if time_since_last_trade < self.min_trade_interval:
                     logger.bind(SCANNER=True).debug(f"⏸️ {token_address[:8]}... still in cooldown ({self.min_trade_interval - time_since_last_trade:.0f}s remaining)")
-                    return
-            
+                return
+                
             # Skip if we're at max concurrent trades
             if self.active_trades >= self.max_concurrent_trades:
                 logger.bind(SCANNER=True).debug(f"⏸️ Max concurrent trades reached ({self.active_trades}/{self.max_concurrent_trades})")
@@ -731,7 +731,7 @@ class MemeCoinBot:
             if not metadata:
                 logger.bind(SCANNER=True).warning(f"❌ No metadata for token {token_address[:8]}...")
                 return
-            
+                
             # Get price information
             logger.bind(SCANNER=True).debug(f"💰 Getting price for {metadata.get('symbol', 'UNKNOWN')}...")
             price_info = await self.helius_service.get_token_price(token_address)
@@ -747,7 +747,7 @@ class MemeCoinBot:
                 
             # Get holders data for ML analysis
             holders_data = await self.helius_service.get_token_holders(token_address, limit=20)
-            
+                
             # Combine data for analysis
             token_data = {
                 "address": token_address,
@@ -1116,7 +1116,7 @@ class MemeCoinBot:
         except Exception as e:
             logger.error(f"Error combining ML and LLM decisions: {str(e)}")
             return llm_recommendation
-    
+            
     async def execute_trade(self, token_data: Dict, action: str, position_size: float, reasoning: str):
         """Execute a trade using the advanced execution engine."""
         try:
@@ -1177,26 +1177,26 @@ class MemeCoinBot:
                 
                 if result.success:
                     # Create trade data for portfolio tracking
-                    trade_data = {
-                        "action": "buy",
-                        "token": token_symbol,
-                        "token_address": token_address,
+                trade_data = {
+                    "action": "buy",
+                    "token": token_symbol,
+                    "token_address": token_address,
                         "amount_sol": result.executed_amount,
                         "received_amount": result.received_amount,
                         "price_usd": result.actual_price,
-                        "sol_price": sol_price,
+                    "sol_price": sol_price,
                         "slippage": result.slippage,
                         "gas_used": result.gas_used,
                         "execution_time": result.execution_time,
                         "execution_strategy": execution_strategy.value,
-                        "timestamp": time.time(),
-                        "status": "success",
+                    "timestamp": time.time(),
+                    "status": "success",
                         "transaction_id": result.transaction_id
-                    }
-                    
-                    # Update portfolio
-                    self.portfolio.add_trade(trade_data)
-                    self.active_trades += 1
+                }
+                
+                # Update portfolio
+                self.portfolio.add_trade(trade_data)
+                self.active_trades += 1
                     self.advanced_executions += 1
                     
                     logger.info(f"✅ Advanced BUY execution successful: {result.executed_amount:.6f} SOL → {result.received_amount:.2f} {token_symbol}")
@@ -1221,26 +1221,26 @@ class MemeCoinBot:
                 
                 if result.success:
                     # Create trade data for portfolio tracking
-                    trade_data = {
-                        "action": "sell",
-                        "token": token_symbol,
-                        "token_address": token_address,
+                trade_data = {
+                    "action": "sell",
+                    "token": token_symbol,
+                    "token_address": token_address,
                         "amount_sol": result.received_amount,  # SOL received
                         "sold_amount": result.executed_amount,  # Token amount sold
                         "price_usd": result.actual_price,
-                        "sol_price": sol_price,
+                    "sol_price": sol_price,
                         "slippage": result.slippage,
                         "gas_used": result.gas_used,
                         "execution_time": result.execution_time,
                         "execution_strategy": execution_strategy.value,
-                        "timestamp": time.time(),
-                        "status": "success",
+                    "timestamp": time.time(),
+                    "status": "success",
                         "transaction_id": result.transaction_id
-                    }
-                    
-                    # Update portfolio
-                    self.portfolio.add_trade(trade_data)
-                    self.active_trades = max(0, self.active_trades - 1)
+                }
+                
+                # Update portfolio
+                self.portfolio.add_trade(trade_data)
+                self.active_trades = max(0, self.active_trades - 1)
                     self.advanced_executions += 1
                     
                     logger.info(f"✅ Advanced SELL execution successful: {result.executed_amount:.2f} {token_symbol} → {result.received_amount:.6f} SOL")
@@ -1268,10 +1268,10 @@ class MemeCoinBot:
                 await self.execution_engine.close()
                 
             if self.helius_service:
-                await self.helius_service.close()
+            await self.helius_service.close()
                 
             if self.jupiter_service:
-                await self.jupiter_service.close()
+            await self.jupiter_service.close()
                 
             if self.local_llm:
                 await self.local_llm.close()
