@@ -27,6 +27,28 @@ from src.core.jupiter_service import JupiterService
 # Import arbitrage scanner
 from .arbitrage import CrossDEXScanner
 
+# Import ML engine components
+from .ml_engine import (
+    PricePredictor, 
+    PatternRecognizer, 
+    SentimentAnalyzer, 
+    RiskScorer,
+    MLSignal,
+    PredictionResult,
+    PatternRecognition,
+    SentimentResult,
+    RiskScore
+)
+
+# Import execution engine
+from .execution_engine import (
+    ExecutionEngine,
+    OrderType,
+    ExecutionStrategy,
+    ExecutionParams,
+    ExecutionResult
+)
+
 # Configure logging
 logger.add("logs/portfolio.log", rotation="5 MB", level="INFO", 
           filter=lambda record: "PORTFOLIO" in record.get("extra", {}))
@@ -440,6 +462,15 @@ class MemeCoinBot:
         self.market_scanner = None
         self.arbitrage_scanner = None  # Add arbitrage scanner
         
+        # Add ML engine components
+        self.price_predictor = None
+        self.pattern_recognizer = None
+        self.sentiment_analyzer = None
+        self.risk_scorer = None
+        
+        # Add execution engine
+        self.execution_engine = None
+        
         # Trading state
         self.running = False
         self.active_trades = 0
@@ -453,6 +484,9 @@ class MemeCoinBot:
         self.opportunities_analyzed = 0
         self.trades_executed = 0
         self.arbitrage_opportunities_found = 0  # Track arbitrage opportunities
+        self.ml_predictions_made = 0  # Track ML predictions
+        self.patterns_detected = 0  # Track pattern detections
+        self.advanced_executions = 0  # Track advanced execution engine usage
         
         logger.info("MemeCoinBot initialized")
         
@@ -498,6 +532,44 @@ class MemeCoinBot:
             self.arbitrage_scanner = CrossDEXScanner(self.jupiter_service, self.helius_service)
             if not await self.arbitrage_scanner.initialize():
                 logger.error("❌ Failed to initialize Arbitrage Scanner")
+                return False
+            
+            # Initialize ML Engine Components
+            logger.info("🧠 Initializing ML Engine...")
+            
+            # Price Predictor
+            logger.info("🔧 Initializing Price Predictor...")
+            self.price_predictor = PricePredictor()
+            if not await self.price_predictor.initialize():
+                logger.error("❌ Failed to initialize Price Predictor")
+                return False
+            
+            # Pattern Recognizer
+            logger.info("🔧 Initializing Pattern Recognizer...")
+            self.pattern_recognizer = PatternRecognizer()
+            if not await self.pattern_recognizer.initialize():
+                logger.error("❌ Failed to initialize Pattern Recognizer")
+                return False
+            
+            # Sentiment Analyzer
+            logger.info("🔧 Initializing Sentiment Analyzer...")
+            self.sentiment_analyzer = SentimentAnalyzer()
+            if not await self.sentiment_analyzer.initialize():
+                logger.error("❌ Failed to initialize Sentiment Analyzer")
+                return False
+            
+            # Risk Scorer
+            logger.info("🔧 Initializing Risk Scorer...")
+            self.risk_scorer = RiskScorer()
+            if not await self.risk_scorer.initialize():
+                logger.error("❌ Failed to initialize Risk Scorer")
+                return False
+            
+            # Advanced Execution Engine
+            logger.info("🔧 Initializing Advanced Execution Engine...")
+            self.execution_engine = ExecutionEngine(self.jupiter_service, self.helius_service)
+            if not await self.execution_engine.initialize():
+                logger.error("❌ Failed to initialize Execution Engine")
                 return False
             
             logger.success("✅ All services initialized successfully!")
@@ -585,13 +657,16 @@ class MemeCoinBot:
             await self.stop()
     
     async def _log_performance_summary(self, arbitrage_opportunities: List = None):
-        """Log performance summary including arbitrage statistics."""
+        """Log performance summary including arbitrage and execution statistics."""
         try:
             # Portfolio summary
             portfolio_summary = self.portfolio.get_portfolio_summary()
             
             # Arbitrage scanner stats
             arbitrage_stats = self.arbitrage_scanner.get_scanner_stats() if self.arbitrage_scanner else {}
+            
+            # Execution engine stats
+            execution_stats = self.execution_engine.get_performance_stats() if self.execution_engine else {}
             
             logger.bind(SUMMARY=True).info(
                 f"📈 Portfolio: {portfolio_summary['current_value']:.3f} SOL "
@@ -607,6 +682,21 @@ class MemeCoinBot:
                     f"{arbitrage_stats.get('total_profit_made', 0):.4f} SOL profit"
                 )
             
+            if execution_stats:
+                logger.bind(EXECUTION=True).info(
+                    f"⚡ Advanced Execution: {execution_stats.get('total_executions', 0)} total, "
+                    f"{execution_stats.get('success_rate', 0):.1%} success rate, "
+                    f"avg slippage: {execution_stats.get('average_slippage', 0):.2%}, "
+                    f"avg time: {execution_stats.get('average_execution_time', 0):.1f}s"
+                )
+            
+            # ML Engine summary
+            logger.bind(ML=True).info(
+                f"🧠 ML Analysis: {self.ml_predictions_made} predictions, "
+                f"{self.patterns_detected} patterns detected, "
+                f"{self.advanced_executions} advanced executions"
+            )
+            
             # Current arbitrage opportunities
             if arbitrage_opportunities:
                 for opp in arbitrage_opportunities[:3]:  # Show top 3
@@ -620,7 +710,7 @@ class MemeCoinBot:
             logger.error(f"Error logging performance summary: {str(e)}")
     
     async def check_token_opportunity(self, token_address: str):
-        """Check a specific token for trading opportunities."""
+        """Check a specific token for trading opportunities with ML analysis."""
         try:
             # Check cooldown period
             now = time.time()
@@ -655,6 +745,9 @@ class MemeCoinBot:
                 logger.bind(SCANNER=True).warning(f"❌ No liquidity data for token {token_address[:8]}...")
                 return
                 
+            # Get holders data for ML analysis
+            holders_data = await self.helius_service.get_token_holders(token_address, limit=20)
+            
             # Combine data for analysis
             token_data = {
                 "address": token_address,
@@ -680,19 +773,105 @@ class MemeCoinBot:
             token_prices = {token_address: token_data["price_usd"]}
             self.portfolio.update_prices(token_prices)
             
-            # Get trading recommendation from LLM
-            logger.bind(SCANNER=True).debug(f"🤖 Getting LLM analysis for {metadata.get('symbol', 'UNKNOWN')}...")
-            recommendation = await self.local_llm.analyze_market(token_data)
+            # ===== ML ANALYSIS PIPELINE =====
             
-            if not recommendation:
-                logger.bind(SCANNER=True).warning(f"❌ No recommendation for {metadata.get('symbol', 'UNKNOWN')}")
+            # Phase 1: Price Prediction
+            logger.bind(ML=True).debug(f"🔮 Running price prediction for {metadata.get('symbol', 'UNKNOWN')}...")
+            price_prediction = None
+            try:
+                price_prediction = await self.price_predictor.predict_price(
+                    token_address, token_data, token_data["price_history"]
+                )
+                if price_prediction:
+                    self.ml_predictions_made += 1
+                    logger.bind(ML=True).info(
+                        f"🔮 Price prediction for {metadata.get('symbol', 'UNKNOWN')}: "
+                        f"1h: ${price_prediction.predicted_price_1h:.6f} ({price_prediction.expected_return_1h:+.1%}), "
+                        f"24h: ${price_prediction.predicted_price_24h:.6f} ({price_prediction.expected_return_24h:+.1%}), "
+                        f"Confidence: {price_prediction.weighted_confidence:.2f}"
+                    )
+            except Exception as e:
+                logger.bind(ML=True).error(f"Error in price prediction: {str(e)}")
+            
+            # Phase 2: Pattern Recognition
+            logger.bind(ML=True).debug(f"📊 Running pattern recognition for {metadata.get('symbol', 'UNKNOWN')}...")
+            patterns = []
+            try:
+                patterns = await self.pattern_recognizer.recognize_patterns(
+                    token_address, token_data, token_data["price_history"]
+                )
+                if patterns:
+                    self.patterns_detected += len(patterns)
+                    for pattern in patterns[:3]:  # Show top 3 patterns
+                        logger.bind(ML=True).info(
+                            f"📈 Pattern detected: {pattern.pattern_type.value} "
+                            f"(Confidence: {pattern.confidence:.2f}, "
+                            f"Expected: {pattern.expected_direction} {pattern.expected_move:+.1%})"
+                        )
+            except Exception as e:
+                logger.bind(ML=True).error(f"Error in pattern recognition: {str(e)}")
+            
+            # Phase 3: Sentiment Analysis
+            logger.bind(ML=True).debug(f"😊 Running sentiment analysis for {metadata.get('symbol', 'UNKNOWN')}...")
+            sentiment_result = None
+            try:
+                sentiment_result = await self.sentiment_analyzer.analyze_sentiment(
+                    token_address, token_data, token_data["price_history"], holders_data
+                )
+                if sentiment_result:
+                    logger.bind(ML=True).info(
+                        f"😊 Sentiment for {metadata.get('symbol', 'UNKNOWN')}: "
+                        f"{sentiment_result.overall_sentiment.value} "
+                        f"(Score: {sentiment_result.sentiment_score:+.2f}, "
+                        f"Fear/Greed: {sentiment_result.fear_greed_index:.0f})"
+                    )
+            except Exception as e:
+                logger.bind(ML=True).error(f"Error in sentiment analysis: {str(e)}")
+            
+            # Phase 4: Risk Assessment
+            logger.bind(ML=True).debug(f"⚠️ Running risk assessment for {metadata.get('symbol', 'UNKNOWN')}...")
+            risk_score = None
+            try:
+                risk_score = await self.risk_scorer.calculate_risk_score(
+                    token_address, token_data, token_data["price_history"], holders_data
+                )
+                if risk_score:
+                    logger.bind(ML=True).info(
+                        f"⚠️ Risk assessment for {metadata.get('symbol', 'UNKNOWN')}: "
+                        f"{risk_score.risk_category.upper()} risk "
+                        f"(Score: {risk_score.overall_risk_score:.2f}, "
+                        f"Max position: {risk_score.recommended_position_size:.1%})"
+                    )
+            except Exception as e:
+                logger.bind(ML=True).error(f"Error in risk assessment: {str(e)}")
+            
+            # Phase 5: Generate ML Trading Signal
+            ml_signal = self._generate_ml_signal(
+                token_address, token_data, price_prediction, patterns, sentiment_result, risk_score
+            )
+            
+            # Store ML results in cache for execution engine optimization
+            if ml_signal:
+                self.market_data_cache[f"{token_address}_ml_signal"] = ml_signal
+            if risk_score:
+                self.market_data_cache[f"{token_address}_risk_score"] = risk_score
+            
+            # Get traditional LLM recommendation for comparison
+            logger.bind(SCANNER=True).debug(f"🤖 Getting LLM analysis for {metadata.get('symbol', 'UNKNOWN')}...")
+            llm_recommendation = await self.local_llm.analyze_market(token_data)
+            
+            if not llm_recommendation:
+                logger.bind(SCANNER=True).warning(f"❌ No LLM recommendation for {metadata.get('symbol', 'UNKNOWN')}")
                 return
             
-            action = recommendation.get("action", "hold").lower()
-            confidence = recommendation.get("confidence", 0)
-            reasoning = recommendation.get("reasoning", "No reasoning provided")
+            # Combine ML signal with LLM recommendation
+            final_decision = self._combine_ml_and_llm_decisions(ml_signal, llm_recommendation, token_data)
             
-            # Log the analysis result
+            action = final_decision.get("action", "hold").lower()
+            confidence = final_decision.get("confidence", 0)
+            reasoning = final_decision.get("reasoning", "No reasoning provided")
+            
+            # Log the combined analysis result
             action_emoji = "🟢" if action == "buy" else "🔴" if action == "sell" else "🟡"
             confidence_bar = "█" * int(confidence * 10) + "░" * (10 - int(confidence * 10))
             
@@ -703,20 +882,34 @@ class MemeCoinBot:
                 f"Price: ${token_data['price_usd']:.6f}"
             )
             
+            if ml_signal:
+                logger.bind(ML=True).info(
+                    f"🧠 ML Signal: {ml_signal.signal_type.upper()} "
+                    f"(Strength: {ml_signal.signal_strength:.2f}, "
+                    f"Quality: {ml_signal.quality_score:.2f})"
+                )
+            
             logger.bind(ANALYSIS=True).debug(f"💭 Reasoning: {reasoning}")
             
             # Determine if we should trade
-            min_confidence = 0.6 if action in ["buy", "sell"] else 0.5
+            min_confidence = 0.65 if action in ["buy", "sell"] else 0.5  # Higher threshold with ML
             should_trade = (
                 action in ["buy", "sell"] and
                 confidence >= min_confidence and
-                self.active_trades < self.max_concurrent_trades
+                self.active_trades < self.max_concurrent_trades and
+                (not risk_score or risk_score.is_safe_to_trade)  # Check ML risk assessment
             )
             
             # Execute trade if conditions are met
             if should_trade:
+                # Use ML-recommended position size if available
+                position_size = final_decision.get("position_size", 0.01)
+                if risk_score and risk_score.recommended_position_size < position_size:
+                    position_size = risk_score.recommended_position_size
+                    logger.bind(ML=True).info(f"🎯 Position size adjusted by risk analysis: {position_size:.1%}")
+                
                 logger.bind(TRADE=True).info(f"🚀 Executing {action.upper()} trade for {metadata.get('symbol', 'UNKNOWN')}")
-                await self.execute_trade(token_data, action, recommendation.get("position_size", 0.01), recommendation.get("reasoning", ""))
+                await self.execute_trade(token_data, action, position_size, reasoning)
                 # Set cooldown for this token
                 self.trade_cooldowns[token_address] = now
                 logger.bind(SCANNER=True).info(f"⏰ Set cooldown for {metadata.get('symbol', 'UNKNOWN')} until {datetime.fromtimestamp(now + self.min_trade_interval).strftime('%H:%M:%S')}")
@@ -724,9 +917,208 @@ class MemeCoinBot:
         except Exception as e:
             logger.bind(SCANNER=True).error(f"💥 Error checking token {token_address[:8]}...: {str(e)}")
             logger.bind(SCANNER=True).exception("Full error traceback:")
+    
+    def _generate_ml_signal(self, token_address: str, token_data: Dict, 
+                           price_prediction: PredictionResult = None, 
+                           patterns: List[PatternRecognition] = None, 
+                           sentiment: SentimentResult = None, 
+                           risk: RiskScore = None) -> MLSignal:
+        """Generate ML trading signal from analysis components"""
+        try:
+            if not any([price_prediction, patterns, sentiment, risk]):
+                return None
             
+            current_time = time.time()
+            current_price = token_data.get('price_usd', 0)
+            
+            # Determine signal type and strength
+            signal_strength = 0.0
+            signal_type = "hold"
+            reasoning = []
+            
+            # Price prediction influence
+            if price_prediction:
+                expected_return = price_prediction.expected_return_24h
+                confidence = price_prediction.weighted_confidence
+                
+                if expected_return > 0.1 and confidence > 0.6:  # >10% expected return with good confidence
+                    signal_strength += 0.4
+                    signal_type = "buy"
+                    reasoning.append(f"ML predicts {expected_return:+.1%} return (confidence: {confidence:.2f})")
+                elif expected_return < -0.05 and confidence > 0.6:  # <-5% expected return
+                    signal_strength += 0.3
+                    signal_type = "sell"
+                    reasoning.append(f"ML predicts {expected_return:+.1%} decline (confidence: {confidence:.2f})")
+            
+            # Pattern analysis influence
+            if patterns:
+                bullish_patterns = [p for p in patterns if p.expected_direction == "up"]
+                bearish_patterns = [p for p in patterns if p.expected_direction == "down"]
+                
+                bullish_strength = sum(p.reliability_score for p in bullish_patterns)
+                bearish_strength = sum(p.reliability_score for p in bearish_patterns)
+                
+                if bullish_strength > bearish_strength and bullish_strength > 0.5:
+                    signal_strength += min(0.3, bullish_strength * 0.3)
+                    if signal_type != "sell":
+                        signal_type = "buy"
+                    reasoning.append(f"Bullish patterns detected (strength: {bullish_strength:.2f})")
+                elif bearish_strength > bullish_strength and bearish_strength > 0.5:
+                    signal_strength += min(0.3, bearish_strength * 0.3)
+                    if signal_type != "buy":
+                        signal_type = "sell"
+                    reasoning.append(f"Bearish patterns detected (strength: {bearish_strength:.2f})")
+            
+            # Sentiment influence
+            if sentiment:
+                sentiment_score = sentiment.sentiment_score
+                confidence = sentiment.confidence
+                
+                if sentiment_score > 0.3 and confidence > 0.6:  # Positive sentiment
+                    signal_strength += min(0.2, sentiment_score * confidence * 0.3)
+                    if signal_type != "sell":
+                        signal_type = "buy"
+                    reasoning.append(f"Positive sentiment ({sentiment.overall_sentiment.value})")
+                elif sentiment_score < -0.3 and confidence > 0.6:  # Negative sentiment
+                    signal_strength += min(0.2, abs(sentiment_score) * confidence * 0.3)
+                    if signal_type != "buy":
+                        signal_type = "sell"
+                    reasoning.append(f"Negative sentiment ({sentiment.overall_sentiment.value})")
+            
+            # Risk assessment influence
+            if risk:
+                if risk.overall_risk_score > 0.8:  # Very high risk
+                    signal_strength *= 0.3  # Drastically reduce signal strength
+                    reasoning.append(f"High risk reduces signal strength ({risk.risk_category})")
+                elif risk.overall_risk_score > 0.6:  # High risk
+                    signal_strength *= 0.6  # Moderately reduce signal strength
+                    reasoning.append(f"Elevated risk ({risk.risk_category})")
+                elif risk.overall_risk_score < 0.3:  # Low risk
+                    signal_strength *= 1.2  # Slightly boost signal strength
+                    reasoning.append(f"Low risk environment ({risk.risk_category})")
+            
+            # Ensure signal strength is within bounds
+            signal_strength = min(1.0, signal_strength)
+            
+            # Calculate confidence based on data availability
+            confidence = 0.5  # Base confidence
+            if price_prediction:
+                confidence += 0.2
+            if patterns:
+                confidence += 0.1
+            if sentiment:
+                confidence += 0.1
+            if risk:
+                confidence += 0.1
+            confidence = min(0.95, confidence)
+            
+            # Calculate target and stop loss prices
+            if signal_type == "buy":
+                target_price = current_price * 1.05  # 5% target
+                stop_loss_price = current_price * 0.95  # 5% stop loss
+                if risk and risk.stop_loss_level:
+                    stop_loss_price = min(stop_loss_price, risk.stop_loss_level)
+            elif signal_type == "sell":
+                target_price = current_price * 0.95  # 5% target (for short)
+                stop_loss_price = current_price * 1.05  # 5% stop loss (for short)
+            else:
+                target_price = current_price
+                stop_loss_price = current_price * 0.9
+            
+            # Position size recommendation
+            position_size = 0.02  # Default 2%
+            if risk:
+                position_size = risk.recommended_position_size
+            
+            # Create ML signal
+            ml_signal = MLSignal(
+                token_address=token_address,
+                token_symbol=token_data.get('symbol', 'UNKNOWN'),
+                signal_type=signal_type,
+                signal_strength=signal_strength,
+                confidence=confidence,
+                predicted_return=price_prediction.expected_return_24h if price_prediction else 0.0,
+                risk_score=risk.overall_risk_score if risk else 0.5,
+                sentiment_score=sentiment.sentiment_score if sentiment else 0.0,
+                pattern_signals=patterns or [],
+                price_prediction=price_prediction,
+                timeframe="24h",
+                entry_price=current_price,
+                target_price=target_price,
+                stop_loss_price=stop_loss_price,
+                position_size_recommendation=position_size,
+                reasoning=reasoning,
+                signal_timestamp=current_time,
+                expires_at=current_time + 3600  # 1 hour expiration
+            )
+            
+            return ml_signal
+            
+        except Exception as e:
+            logger.error(f"Error generating ML signal: {str(e)}")
+            return None
+    
+    def _combine_ml_and_llm_decisions(self, ml_signal: MLSignal, llm_recommendation: Dict, token_data: Dict) -> Dict:
+        """Combine ML signal with LLM recommendation for final decision"""
+        try:
+            # Extract LLM recommendation
+            llm_action = llm_recommendation.get("action", "hold").lower()
+            llm_confidence = llm_recommendation.get("confidence", 0)
+            llm_reasoning = llm_recommendation.get("reasoning", "")
+            
+            # If no ML signal, use LLM recommendation
+            if not ml_signal:
+                return {
+                    "action": llm_action,
+                    "confidence": llm_confidence,
+                    "reasoning": f"LLM only: {llm_reasoning}",
+                    "position_size": llm_recommendation.get("position_size", 0.01)
+                }
+            
+            # Combine signals
+            combined_reasoning = []
+            
+            # Agreement boost
+            if ml_signal.signal_type == llm_action:
+                # Both agree - boost confidence
+                combined_confidence = min(0.95, (ml_signal.confidence + llm_confidence) * 0.7)
+                combined_action = ml_signal.signal_type
+                combined_reasoning.append(f"ML and LLM agree on {combined_action.upper()}")
+            else:
+                # Disagreement - be more conservative
+                if ml_signal.signal_strength > llm_confidence:
+                    combined_action = ml_signal.signal_type
+                    combined_confidence = ml_signal.confidence * 0.8
+                    combined_reasoning.append(f"ML signal stronger: {ml_signal.signal_type.upper()}")
+                else:
+                    combined_action = llm_action
+                    combined_confidence = llm_confidence * 0.8
+                    combined_reasoning.append(f"LLM signal stronger: {llm_action.upper()}")
+                
+                combined_reasoning.append("Signals disagree - reduced confidence")
+            
+            # Add specific reasoning from both
+            combined_reasoning.extend(ml_signal.reasoning)
+            combined_reasoning.append(f"LLM: {llm_reasoning}")
+            
+            # Position sizing - use more conservative approach
+            ml_position_size = ml_signal.position_size_recommendation if ml_signal else 0.01
+            llm_position_size = llm_recommendation.get("position_size", 0.01)
+            combined_position_size = min(ml_position_size, llm_position_size)
+            
+            return {
+                "action": combined_action,
+                "confidence": combined_confidence,
+                "reasoning": " | ".join(combined_reasoning),
+                "position_size": combined_position_size
+            }
+            
+        except Exception as e:
+            logger.error(f"Error combining ML and LLM decisions: {str(e)}")
+            return llm_recommendation
+    
     async def execute_trade(self, token_data: Dict, action: str, position_size: float, reasoning: str):
-        """Execute a trade (simulated)."""
+        """Execute a trade using the advanced execution engine."""
         try:
             token_symbol = token_data.get("symbol", "UNKNOWN")
             token_address = token_data.get("address", "")
@@ -736,51 +1128,131 @@ class MemeCoinBot:
             sol_price = 100.0  # Approximate SOL price in USD
             amount = position_size  # In SOL
             
+            # Determine execution strategy based on market conditions and ML analysis
+            execution_strategy = ExecutionStrategy.SMART  # Default to smart strategy
+            
+            # Get ML analysis for execution optimization
+            ml_signal = self.market_data_cache.get(f"{token_address}_ml_signal")
+            risk_score = self.market_data_cache.get(f"{token_address}_risk_score")
+            
+            # Adjust execution strategy based on ML insights
+            if risk_score:
+                if risk_score.overall_risk_score > 0.7:
+                    execution_strategy = ExecutionStrategy.STEALTH  # High risk = stealth
+                elif risk_score.overall_risk_score < 0.3:
+                    execution_strategy = ExecutionStrategy.AGGRESSIVE  # Low risk = aggressive
+            
+            # Set execution parameters based on risk and market conditions
+            execution_params = ExecutionParams(
+                max_slippage=0.015,  # 1.5% max slippage
+                max_price_impact=0.02,  # 2% max price impact
+                execution_timeout=60.0,  # 60 seconds timeout
+                split_threshold=500.0,  # Split orders >$500
+                max_order_chunks=8,
+                mev_protection=True,
+                gas_optimization=True
+            )
+            
+            # Adjust parameters based on risk assessment
+            if risk_score:
+                if risk_score.overall_risk_score > 0.6:
+                    execution_params.max_slippage *= 0.8  # Tighter slippage for risky tokens
+                    execution_params.split_threshold *= 0.5  # Split smaller amounts
+                elif risk_score.overall_risk_score < 0.3:
+                    execution_params.max_slippage *= 1.2  # Allow more slippage for low risk
+            
             if action == "buy":
-                logger.info(f"Executing BUY: {amount} SOL of {token_symbol} at ${price}")
-                logger.info(f"Reasoning: {reasoning}")
+                logger.info(f"🚀 Executing ADVANCED BUY: {amount} SOL of {token_symbol} using {execution_strategy.value} strategy")
+                logger.info(f"💭 Reasoning: {reasoning}")
                 
-                # Simulate a successful buy
-                trade_data = {
-                    "action": "buy",
-                    "token": token_symbol,
-                    "token_address": token_address,
-                    "amount_sol": amount,
-                    "price_usd": price,
-                    "sol_price": sol_price,
-                    "timestamp": time.time(),
-                    "status": "success",
-                    "transaction_id": f"SIM_BUY_{int(time.time())}"
-                }
+                # Execute buy using execution engine
+                result = await self.execution_engine.execute_trade(
+                    order_type=OrderType.MARKET,
+                    input_token="So11111111111111111111111111111111111111112",  # SOL
+                    output_token=token_address,
+                    amount=amount,
+                    strategy=execution_strategy,
+                    execution_params=execution_params
+                )
                 
-                # Update portfolio
-                self.portfolio.add_trade(trade_data)
-                self.active_trades += 1
+                if result.success:
+                    # Create trade data for portfolio tracking
+                    trade_data = {
+                        "action": "buy",
+                        "token": token_symbol,
+                        "token_address": token_address,
+                        "amount_sol": result.executed_amount,
+                        "received_amount": result.received_amount,
+                        "price_usd": result.actual_price,
+                        "sol_price": sol_price,
+                        "slippage": result.slippage,
+                        "gas_used": result.gas_used,
+                        "execution_time": result.execution_time,
+                        "execution_strategy": execution_strategy.value,
+                        "timestamp": time.time(),
+                        "status": "success",
+                        "transaction_id": result.transaction_id
+                    }
+                    
+                    # Update portfolio
+                    self.portfolio.add_trade(trade_data)
+                    self.active_trades += 1
+                    self.advanced_executions += 1
+                    
+                    logger.info(f"✅ Advanced BUY execution successful: {result.executed_amount:.6f} SOL → {result.received_amount:.2f} {token_symbol}")
+                    logger.info(f"📊 Execution stats: {result.slippage:.2%} slippage, {result.execution_time:.1f}s, {len(result.routes_used)} routes")
+                    
+                else:
+                    logger.error(f"❌ Advanced BUY execution failed: {', '.join(result.errors)}")
                 
             elif action == "sell":
-                logger.info(f"Executing SELL: {amount} SOL of {token_symbol} at ${price}")
-                logger.info(f"Reasoning: {reasoning}")
+                logger.info(f"🚀 Executing ADVANCED SELL: {amount} SOL worth of {token_symbol} using {execution_strategy.value} strategy")
+                logger.info(f"💭 Reasoning: {reasoning}")
                 
-                # Simulate a successful sell
-                trade_data = {
-                    "action": "sell",
-                    "token": token_symbol,
-                    "token_address": token_address,
-                    "amount_sol": amount,
-                    "price_usd": price,
-                    "sol_price": sol_price,
-                    "timestamp": time.time(),
-                    "status": "success",
-                    "transaction_id": f"SIM_SELL_{int(time.time())}"
-                }
+                # Execute sell using execution engine
+                result = await self.execution_engine.execute_trade(
+                    order_type=OrderType.MARKET,
+                    input_token=token_address,
+                    output_token="So11111111111111111111111111111111111111112",  # SOL
+                    amount=amount,
+                    strategy=execution_strategy,
+                    execution_params=execution_params
+                )
                 
-                # Update portfolio
-                self.portfolio.add_trade(trade_data)
-                self.active_trades = max(0, self.active_trades - 1)
+                if result.success:
+                    # Create trade data for portfolio tracking
+                    trade_data = {
+                        "action": "sell",
+                        "token": token_symbol,
+                        "token_address": token_address,
+                        "amount_sol": result.received_amount,  # SOL received
+                        "sold_amount": result.executed_amount,  # Token amount sold
+                        "price_usd": result.actual_price,
+                        "sol_price": sol_price,
+                        "slippage": result.slippage,
+                        "gas_used": result.gas_used,
+                        "execution_time": result.execution_time,
+                        "execution_strategy": execution_strategy.value,
+                        "timestamp": time.time(),
+                        "status": "success",
+                        "transaction_id": result.transaction_id
+                    }
+                    
+                    # Update portfolio
+                    self.portfolio.add_trade(trade_data)
+                    self.active_trades = max(0, self.active_trades - 1)
+                    self.advanced_executions += 1
+                    
+                    logger.info(f"✅ Advanced SELL execution successful: {result.executed_amount:.2f} {token_symbol} → {result.received_amount:.6f} SOL")
+                    logger.info(f"📊 Execution stats: {result.slippage:.2%} slippage, {result.execution_time:.1f}s, {len(result.routes_used)} routes")
+                    
+                else:
+                    logger.error(f"❌ Advanced SELL execution failed: {', '.join(result.errors)}")
                 
         except Exception as e:
-            logger.error(f"Error executing trade: {str(e)}")
-            
+            logger.error(f"💥 Error in advanced trade execution: {str(e)}")
+            logger.exception("Full execution error traceback:")
+    
     async def stop(self):
         """Stop the bot and cleanup resources."""
         logger.bind(ACTIVITY="BOT_STOP").info("🛑 Stopping MemeCoinBot...")
@@ -791,6 +1263,9 @@ class MemeCoinBot:
             # Close all services
             if self.arbitrage_scanner:
                 await self.arbitrage_scanner.close()
+                
+            if self.execution_engine:
+                await self.execution_engine.close()
                 
             if self.helius_service:
                 await self.helius_service.close()
