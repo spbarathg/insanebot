@@ -4,9 +4,11 @@ Tests the interaction between all components of the trading bot.
 """
 import pytest
 import asyncio
+import time
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from solana.keypair import Keypair
-from solana.publickey import PublicKey
+from solders.pubkey import Pubkey
 from solana.transaction import Transaction
 
 # Import all necessary components

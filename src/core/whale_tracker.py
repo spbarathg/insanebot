@@ -1,13 +1,17 @@
 import json
 import asyncio
-from typing import Dict, List, Optional
+import logging
+import os
+import time
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
+from loguru import logger
+from solders.pubkey import Pubkey
 from ..utils.logging_config import (
     whale_logger, handle_errors, log_performance,
     log_async_performance, NetworkError
 )
 from ..utils.config import settings
-from solana.publickey import PublicKey
 
 class WhaleTracker:
     def __init__(self):
@@ -143,7 +147,7 @@ class WhaleTracker:
         try:
             # Get recent transactions from Solana RPC
             response = await self.client.get_signatures_for_address(
-                PublicKey(wallet_address),
+                Pubkey(wallet_address),
                 limit=100  # Get last 100 transactions
             )
             

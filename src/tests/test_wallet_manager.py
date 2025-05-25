@@ -3,9 +3,13 @@ Test suite for wallet management functionality.
 """
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+import os
+from unittest.mock import Mock, AsyncMock, patch
+import json
+import time
+from solders.pubkey import Pubkey  # Fixed import
+from src.core.wallet_manager import WalletManager, WalletSecurityError, InsufficientFundsError
 from solana.keypair import Keypair
-from solana.publickey import PublicKey
 
 # Mock the WalletManager class to avoid import errors
 class WalletManager:
@@ -138,8 +142,8 @@ def mock_solana_client():
 @pytest.fixture
 def mock_wallet():
     """Create a mock wallet with a keypair"""
-    return MagicMock(
-        public_key=PublicKey("8oxK7xCeMcVVLs1vLBxZnY8SqAEFQ4VKQV95ufRifeKW"),
+    return Mock(
+        public_key=Pubkey("8oxK7xCeMcVVLs1vLBxZnY8SqAEFQ4VKQV95ufRifeKW"),
         get_balance=AsyncMock(return_value=1.0),
         get_token_balance=AsyncMock(return_value=1.0)
     )
@@ -148,7 +152,7 @@ def mock_wallet():
 async def wallet_manager():
     """Create a wallet manager for testing."""
     wm = WalletManager()
-    wm.wallet = MagicMock()
+    wm.wallet = Mock()
     wm.rpc_client = AsyncMock()
     await wm.initialize()
     yield wm

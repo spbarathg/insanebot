@@ -6,7 +6,7 @@ from loguru import logger
 import aiohttp
 import websockets
 from config import settings
-from solana.publickey import PublicKey
+from solders.pubkey import Pubkey
 
 class DataIngestion:
     def __init__(self, quicknode_service=None, helius_service=None, jupiter_service=None):
@@ -148,7 +148,7 @@ class DataIngestion:
             for address in matches:
                 try:
                     # Check if it's a valid public key
-                    pubkey = PublicKey(address)
+                    pubkey = Pubkey(address)
                     
                     # Check if it's a token mint
                     if self._is_token_mint(pubkey):
@@ -162,7 +162,7 @@ class DataIngestion:
             logger.error(f"Error extracting token address: {e}")
             return None
             
-    def _is_token_mint(self, pubkey: PublicKey) -> bool:
+    def _is_token_mint(self, pubkey: Pubkey) -> bool:
         """Check if a public key is a token mint"""
         try:
             # Get account info

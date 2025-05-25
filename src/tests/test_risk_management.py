@@ -7,10 +7,11 @@ import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 from solana.keypair import Keypair
-from solana.publickey import PublicKey
+from solders.pubkey import Pubkey
 
 from src.core.config import CORE_CONFIG, TRADING_CONFIG
 from src.core.wallet import WalletManager
+from src.core.risk_management import RiskManager, RiskViolationError
 
 # Create a mock WalletManager for testing
 class MockWalletManager:
