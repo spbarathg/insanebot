@@ -8,22 +8,32 @@ from .core_config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG
 # Create a unified settings object for backward compatibility
 class Settings:
     def __init__(self):
-        # Core settings
+        # Core trading settings
         self.MIN_LIQUIDITY = CORE_CONFIG["trading"]["min_liquidity"]
         self.MAX_SLIPPAGE = CORE_CONFIG["trading"]["max_slippage"]
         self.MIN_PROFIT_THRESHOLD = CORE_CONFIG["trading"]["min_profit_threshold"]
         self.MAX_POSITION_SIZE = CORE_CONFIG["trading"]["max_position_size"]
         self.COOLDOWN_PERIOD = CORE_CONFIG["trading"]["cooldown_period"]
         
-        # Monitoring settings
+        # Monitoring settings (using existing keys)
         self.CHECK_INTERVAL = CORE_CONFIG["monitoring"]["check_interval"]
-        self.HEARTBEAT_INTERVAL = CORE_CONFIG["monitoring"]["heartbeat_interval"]
-        self.PERFORMANCE_TRACKING = CORE_CONFIG["monitoring"]["performance_tracking"]
+        self.MAX_RETRIES = CORE_CONFIG["monitoring"]["max_retries"]
+        self.RETRY_DELAY = CORE_CONFIG["monitoring"]["retry_delay"]
         
-        # Market settings
-        self.TARGET_POOLS = MARKET_CONFIG["target_pools"]
-        self.EXCLUDED_TOKENS = MARKET_CONFIG["excluded_tokens"]
-        self.PRICE_IMPACT_THRESHOLD = MARKET_CONFIG["price_impact_threshold"]
+        # Error handling settings
+        self.MAX_CONSECUTIVE_ERRORS = CORE_CONFIG["error_handling"]["max_consecutive_errors"]
+        self.ERROR_COOLDOWN = CORE_CONFIG["error_handling"]["error_cooldown"]
+        
+        # Market settings (using existing keys)
+        self.VOLATILITY_THRESHOLD = MARKET_CONFIG["volatility_threshold"]
+        self.MIN_HOLDERS = MARKET_CONFIG["min_holders"]
+        self.MAX_TOKEN_AGE = MARKET_CONFIG["max_token_age"]
+        
+        # Trading settings (using existing keys)
+        self.MIN_POSITION_SIZE = TRADING_CONFIG["min_position_size"]
+        self.STOP_LOSS = TRADING_CONFIG["stop_loss"]
+        self.TAKE_PROFIT = TRADING_CONFIG["take_profit"]
+        self.MAX_CONCURRENT_TRADES = TRADING_CONFIG["max_concurrent_trades"]
         
         # Risk management settings
         self.RISK_LIMITS = {
@@ -50,7 +60,6 @@ class Settings:
         
         # API settings
         self.API_TIMEOUT = 30
-        self.MAX_RETRIES = 3
         self.RATE_LIMIT_DELAY = 0.1
 
 # Create the settings instance
