@@ -18,7 +18,7 @@ sys.path.append(str(Path(__file__).parent))
 
 # Import Enhanced Ant Bot components
 from src.core.ai.ant_hierarchy import FoundingAntQueen, AntRole
-from src.core.ai.enhanced_ai_coordinator import EnhancedAICoordinator
+from src.core.ai.enhanced_ai_coordinator import AICoordinator
 from src.core.system_replicator import SystemReplicator
 from src.core.enhanced_main import AntBotSystem
 
@@ -177,7 +177,7 @@ class EnhancedAntBotRunner:
         logger.info("🧠 Initializing AI coordination system...")
         
         # Create AI coordinator with learning capabilities
-        self.ai_coordinator = EnhancedAICoordinator()
+        self.ai_coordinator = AICoordinator()
         
         # Initialize AI models (Grok + Local LLM)
         await self.ai_coordinator.initialize()
