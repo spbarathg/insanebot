@@ -17,40 +17,53 @@ class Settings:
         
         # Monitoring settings
         self.CHECK_INTERVAL = CORE_CONFIG["monitoring"]["check_interval"]
-        self.MAX_RETRIES = CORE_CONFIG["monitoring"]["max_retries"]
-        self.RETRY_DELAY = CORE_CONFIG["monitoring"]["retry_delay"]
-        
-        # Error handling
-        self.MAX_CONSECUTIVE_ERRORS = CORE_CONFIG["error_handling"]["max_consecutive_errors"]
-        self.ERROR_COOLDOWN = CORE_CONFIG["error_handling"]["error_cooldown"]
+        self.HEARTBEAT_INTERVAL = CORE_CONFIG["monitoring"]["heartbeat_interval"]
+        self.PERFORMANCE_TRACKING = CORE_CONFIG["monitoring"]["performance_tracking"]
         
         # Market settings
-        self.VOLATILITY_THRESHOLD = MARKET_CONFIG["volatility_threshold"]
-        self.MIN_HOLDERS = MARKET_CONFIG["min_holders"]
-        self.MAX_TOKEN_AGE = MARKET_CONFIG["max_token_age"]
+        self.TARGET_POOLS = MARKET_CONFIG["target_pools"]
+        self.EXCLUDED_TOKENS = MARKET_CONFIG["excluded_tokens"]
+        self.PRICE_IMPACT_THRESHOLD = MARKET_CONFIG["price_impact_threshold"]
         
-        # Trading settings
-        self.MIN_POSITION_SIZE = TRADING_CONFIG["min_position_size"]
-        self.STOP_LOSS = TRADING_CONFIG["stop_loss"]
-        self.TAKE_PROFIT = TRADING_CONFIG["take_profit"]
-        self.MAX_CONCURRENT_TRADES = TRADING_CONFIG["max_concurrent_trades"]
+        # Risk management settings
+        self.RISK_LIMITS = {
+            "max_exposure": 0.8,  # Maximum 80% of capital exposed
+            "max_token_exposure": 0.2,  # Maximum 20% in any single token
+            "max_portfolio_exposure": 1.0,  # Maximum 100% portfolio exposure
+            "max_daily_loss": 0.05,  # Maximum 5% daily loss
+            "stop_loss_threshold": 0.1,  # 10% stop loss
+            "max_consecutive_losses": 3
+        }
         
-        # System monitoring thresholds
-        self.CPU_WARNING_THRESHOLD = 80.0
-        self.MEMORY_WARNING_THRESHOLD = 85.0
-        self.DISK_WARNING_THRESHOLD = 90.0
-        self.WIN_RATE_WARNING_THRESHOLD = 0.3
-        self.PROFIT_WARNING_THRESHOLD = -10.0
+        # Position limits
+        self.POSITION_LIMITS = {
+            "max_position_size": 0.1,  # Maximum 0.1 SOL per position
+            "min_position_size": 0.001,  # Minimum 0.001 SOL per position
+            "max_positions": 10,  # Maximum 10 concurrent positions
+            "position_timeout": 3600  # 1 hour position timeout
+        }
+        
+        # File paths
+        self.PORTFOLIO_FILE = "data/portfolio.json"
+        self.PERFORMANCE_FILE = "data/performance.json"
+        self.TRADE_LOG_FILE = "data/trades.json"
+        
+        # API settings
+        self.API_TIMEOUT = 30
+        self.MAX_RETRIES = 3
+        self.RATE_LIMIT_DELAY = 0.1
 
-# Create settings instance
+# Create the settings instance
 settings = Settings()
 
+# Export everything for backward compatibility
 __all__ = [
     'ANT_PRINCESS_CONFIG',
-    'QUEEN_CONFIG',
+    'QUEEN_CONFIG', 
     'SYSTEM_CONSTANTS',
     'CORE_CONFIG',
     'MARKET_CONFIG',
     'TRADING_CONFIG',
+    'Settings',
     'settings'
 ] 
