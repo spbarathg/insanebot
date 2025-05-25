@@ -1,8 +1,31 @@
 from typing import Dict, List, Optional
 import asyncio
 import logging
+import sys
+import os
 from datetime import datetime
-from config.ant_princess_config import ANT_PRINCESS_CONFIG
+
+# Add project root to path for config imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+
+try:
+    from config.ant_princess_config import ANT_PRINCESS_CONFIG
+except ImportError:
+    # Fallback configuration if config module not available
+    ANT_PRINCESS_CONFIG = {
+        "market_weight": 0.6,
+        "sentiment_weight": 0.3,
+        "wallet_weight": 0.1,
+        "buy_threshold": 0.7,
+        "sell_threshold": -0.3,
+        "base_position_size": 0.01,
+        "max_position_size": 0.1,
+        "multiplication_thresholds": {
+            "performance_score": 0.8,
+            "experience_threshold": 10
+        }
+    }
+
 from .grok_engine import GrokEngine
 from ..trading.trade_execution import TradeExecution
 

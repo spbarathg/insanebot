@@ -31,6 +31,7 @@ from src.core.portfolio_risk_manager import PortfolioRiskManager
 from src.core.data_ingestion import DataIngestion
 from src.core.helius_service import HeliusService
 from src.core.jupiter_service import JupiterService
+from src.core.quicknode_service import QuickNodeService
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,7 @@ class AntBotSystem:
         # External Services
         self.helius_service: Optional[HeliusService] = None
         self.jupiter_service: Optional[JupiterService] = None
+        self.quicknode_service: Optional[QuickNodeService] = None
         
         # System State
         self.system_metrics = {
@@ -105,7 +107,11 @@ class AntBotSystem:
             
             # Step 6: Initialize data ingestion
             logger.info("📊 Initializing Data Ingestion...")
-            self.data_ingestion = DataIngestion()
+            self.data_ingestion = DataIngestion(
+                quicknode_service=self.quicknode_service,
+                helius_service=self.helius_service,
+                jupiter_service=self.jupiter_service
+            )
             await self.data_ingestion.start()
             
             logger.info("✅ Ant Bot System initialization complete!")
@@ -120,15 +126,16 @@ class AntBotSystem:
             return False
     
     async def _initialize_external_services(self) -> bool:
-        """Initialize external services (Helius, Jupiter)"""
+        """Initialize external services (Helius, Jupiter, QuickNode)"""
         try:
-            # Initialize Helius service
+            # Initialize QuickNode service (PRIORITY - most reliable)
+            self.quicknode_service = QuickNodeService()
+            
+            # Initialize Helius service (backup)
             self.helius_service = HeliusService()
-            await self.helius_service.initialize()
             
             # Initialize Jupiter service
             self.jupiter_service = JupiterService()
-            await self.jupiter_service.initialize()
             
             logger.info("✅ External services initialized")
             return True
@@ -452,6 +459,8 @@ class AntBotSystem:
                 await self.helius_service.close()
             if self.jupiter_service:
                 await self.jupiter_service.close()
+            if self.quicknode_service:
+                await self.quicknode_service.close()
             logger.info("✅ External services closed")
             
             # Save final system state

@@ -9,16 +9,28 @@ from config import settings
 from solana.publickey import PublicKey
 
 class DataIngestion:
-    def __init__(self):
+    def __init__(self, quicknode_service=None, helius_service=None, jupiter_service=None):
         self.session: Optional[aiohttp.ClientSession] = None
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        
+        # API Services (QuickNode Primary + Helius Backup + Jupiter DEX)
+        self.quicknode_service = quicknode_service
+        self.helius_service = helius_service
+        self.jupiter_service = jupiter_service
+        
+        # Cache systems
         self.sentiment_cache: Dict[str, float] = {}
         self.whale_cache: Dict[str, Dict] = {}
         self.whale_whitelist: List[str] = []
-        self._load_whale_whitelist()
-        self.running = False
         self.market_data_cache = {}
         self.last_update = 0
+        
+        # Service status
+        self.running = False
+        self.primary_service_active = False
+        
+        logger.info("Data Ingestion initialized with QuickNode Primary + Helius Backup + Jupiter DEX")
+        self._load_whale_whitelist()
 
     def _load_whale_whitelist(self):
         """Load whitelist of high-win-rate whale wallets"""
@@ -41,12 +53,26 @@ class DataIngestion:
         try:
             self.session = aiohttp.ClientSession()
             self.running = True
-            logger.info("Data ingestion service started")
+            
+            # Check service availability
+            self._check_service_availability()
+            
+            logger.info("✅ Data ingestion service started")
             await self._connect_websocket()
             return True
         except Exception as e:
-            logger.error(f"Failed to start data ingestion: {str(e)}")
+            logger.error(f"❌ Failed to start data ingestion: {str(e)}")
             return False
+
+    def _check_service_availability(self):
+        """Check which API services are available"""
+        if self.quicknode_service and self.quicknode_service.endpoint_url:
+            self.primary_service_active = True
+            logger.info("🚀 QuickNode primary service active for data ingestion")
+        elif self.helius_service and self.helius_service.api_key:
+            logger.info("🔄 Using Helius backup for data ingestion")
+        else:
+            logger.warning("⚠️ No premium API services available for data ingestion")
 
     async def close(self) -> None:
         """Close the data ingestion service"""
@@ -56,9 +82,9 @@ class DataIngestion:
                 await self.session.close()
             if self.ws:
                 await self.ws.close()
-            logger.info("Data ingestion service closed")
+            logger.info("✅ Data ingestion service closed")
         except Exception as e:
-            logger.error(f"Error closing data ingestion: {str(e)}")
+            logger.error(f"❌ Error closing data ingestion: {str(e)}")
 
     async def _connect_websocket(self):
         """Connect to X WebSocket for real-time sentiment"""
@@ -195,25 +221,52 @@ class DataIngestion:
     def get_whale_activity(self, token: str) -> Dict:
         """Get whale activity for token"""
         cache_entry = self.whale_cache.get(token)
-        if cache_entry and time.time() - cache_entry['timestamp'] < settings.WHALE_WINDOW:
+        if cache_entry and time.time() - cache_entry['timestamp'] < 300:  # 5 minutes
             return cache_entry['data']
         return {'buy_count': 0, 'total_buy_volume': 0}
 
-    async def _update_whale_activity(self, token: str):
-        """Update whale activity for token"""
+    async def update_whale_activity(self, token: str):
+        """Update whale activity using available services"""
         try:
-            async with self.session.get(
-                f'https://api.quicknode.com/v1/whales/{token}',
-                headers={'Authorization': f'Bearer {settings.QUICKNODE_API_KEY}'}
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    self.whale_cache[token] = {
-                        'data': data,
-                        'timestamp': time.time()
-                    }
+            if self.primary_service_active:
+                # Use QuickNode to get recent transactions
+                transactions = await self.quicknode_service.get_token_transactions(token, limit=20)
+                whale_activity = self._analyze_whale_transactions(transactions)
+            elif self.helius_service:
+                # Use Helius to get transactions
+                transactions = await self.helius_service.get_token_transactions(token, limit=20)
+                whale_activity = self._analyze_whale_transactions(transactions)
+            else:
+                whale_activity = {'buy_count': 0, 'total_buy_volume': 0}
+            
+            self.whale_cache[token] = {
+                'data': whale_activity,
+                'timestamp': time.time()
+            }
+            
         except Exception as e:
-            logger.error(f"Update whale activity error: {e}")
+            logger.error(f"Error updating whale activity: {str(e)}")
+
+    def _analyze_whale_transactions(self, transactions: List[Dict]) -> Dict:
+        """Analyze transactions for whale activity"""
+        try:
+            whale_buys = 0
+            total_volume = 0
+            
+            for tx in transactions:
+                # Simple whale detection (transactions > 10 SOL)
+                if tx.get("amount", 0) > 10:
+                    whale_buys += 1
+                    total_volume += tx.get("amount", 0)
+            
+            return {
+                'buy_count': whale_buys,
+                'total_buy_volume': total_volume
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing whale transactions: {str(e)}")
+            return {'buy_count': 0, 'total_buy_volume': 0}
 
     def _is_whitelisted_whale(self, address: str) -> bool:
         """Check if address is in whale whitelist"""
@@ -249,135 +302,130 @@ class DataIngestion:
             logger.error(f"Update whale whitelist error: {e}")
 
     async def get_market_data(self) -> List[Dict]:
-        """Get market data for all tokens"""
+        """Get market data using QuickNode primary with Helius fallback"""
         try:
-            # Check cache
-            current_time = asyncio.get_event_loop().time()
-            if current_time - self.last_update < settings.DATA_REFRESH_INTERVAL:
-                return list(self.market_data_cache.values())
-
-            # Fetch data from multiple sources
-            async with asyncio.TaskGroup() as group:
-                birdeye_task = group.create_task(self._fetch_birdeye_data())
-                dexscreener_task = group.create_task(self._fetch_dexscreener_data())
-
-            # Combine and deduplicate data
-            market_data = {}
+            # Check cache first
+            current_time = time.time()
+            if (current_time - self.last_update) < 30:  # 30 second cache
+                return self.market_data_cache.get("tokens", [])
             
-            # Process Birdeye data
-            birdeye_data = await birdeye_task
-            for token in birdeye_data:
-                market_data[token['address']] = {
-                    'address': token['address'],
-                    'symbol': token['symbol'],
-                    'price': token['price'],
-                    'volume_24h': token['volume_24h'],
-                    'liquidity': token['liquidity'],
-                    'market_cap': token['market_cap'],
-                    'created_at': token['created_at'],
-                    'source': 'birdeye'
-                }
+            # Try QuickNode first (primary)
+            if self.primary_service_active:
+                market_data = await self._get_market_data_quicknode()
+                if market_data:
+                    self.market_data_cache["tokens"] = market_data
+                    self.last_update = current_time
+                    return market_data
+            
+            # Fallback to Helius
+            if self.helius_service and self.helius_service.api_key:
+                logger.debug("Using Helius fallback for market data")
+                market_data = await self._get_market_data_helius()
+                if market_data:
+                    self.market_data_cache["tokens"] = market_data
+                    self.last_update = current_time
+                    return market_data
+            
+            # Return cached data if available
+            return self.market_data_cache.get("tokens", [])
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting market data: {str(e)}")
+            return self.market_data_cache.get("tokens", [])
 
-            # Process DexScreener data
-            dexscreener_data = await dexscreener_task
-            for token in dexscreener_data:
-                if token['address'] not in market_data:
-                    market_data[token['address']] = {
-                        'address': token['address'],
-                        'symbol': token['symbol'],
-                        'price': token['price'],
-                        'volume_24h': token['volume_24h'],
-                        'liquidity': token['liquidity'],
-                        'market_cap': token['market_cap'],
-                        'created_at': token['created_at'],
-                        'source': 'dexscreener'
+    async def _get_market_data_quicknode(self) -> List[Dict]:
+        """Get market data using QuickNode"""
+        try:
+            market_data = []
+            
+            # Get trending tokens from Jupiter (for discovery)
+            if self.jupiter_service:
+                tokens = await self.jupiter_service.get_random_tokens(count=10)
+            else:
+                # Fallback token list
+                tokens = [
+                    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+                    "So11111111111111111111111111111111111111112",   # SOL
+                ]
+            
+            # Get detailed data for each token using QuickNode
+            for token_address in tokens[:5]:  # Limit to 5 for performance
+                try:
+                    # Get metadata from QuickNode
+                    metadata = await self.quicknode_service.get_token_metadata(token_address)
+                    
+                    # Get price data from QuickNode
+                    price_data = await self.quicknode_service.get_token_price_from_dex_pools(token_address)
+                    
+                    # Get holder data from QuickNode
+                    holders = await self.quicknode_service.get_token_holders(token_address, limit=10)
+                    
+                    # Combine data
+                    token_data = {
+                        "address": token_address,
+                        "symbol": metadata.get("symbol", "UNKNOWN"),
+                        "name": metadata.get("name", "Unknown Token"),
+                        "price": price_data.get("price", 0),
+                        "price_usd": price_data.get("price_usd", 0),
+                        "liquidity": price_data.get("liquidity", 0),
+                        "volume_24h": price_data.get("volume_24h", 0),
+                        "holders": len(holders),
+                        "market_cap": metadata.get("supply", 0) * price_data.get("price", 0),
+                        "verified": metadata.get("verified", False),
+                        "source": "quicknode_primary",
+                        "timestamp": time.time()
                     }
-
-            # Update cache
-            self.market_data_cache = market_data
-            self.last_update = current_time
-
-            return list(market_data.values())
-
-        except Exception as e:
-            logger.error(f"Error fetching market data: {str(e)}")
-            return []
-
-    async def _fetch_birdeye_data(self) -> List[Dict]:
-        """Fetch data from Birdeye API"""
-        try:
-            headers = {
-                'X-API-KEY': settings.BIRDEYE_API_KEY,
-                'Accept': 'application/json'
-            }
+                    
+                    market_data.append(token_data)
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing token {token_address}: {str(e)}")
+                    continue
             
-            async with self.session.get(
-                f"{settings.BIRDEYE_API_URL}/tokens/list",
-                headers=headers
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return self._process_birdeye_data(data)
-                else:
-                    logger.error(f"Birdeye API error: {response.status}")
-                    return []
-
+            logger.info(f"🚀 QuickNode: Retrieved {len(market_data)} tokens")
+            return market_data
+            
         except Exception as e:
-            logger.error(f"Error fetching Birdeye data: {str(e)}")
+            logger.error(f"❌ QuickNode market data error: {str(e)}")
             return []
 
-    async def _fetch_dexscreener_data(self) -> List[Dict]:
-        """Fetch data from DexScreener API"""
+    async def _get_market_data_helius(self) -> List[Dict]:
+        """Get market data using Helius backup"""
         try:
-            async with self.session.get(
-                f"{settings.DEXSCREENER_API_URL}/tokens/solana"
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return self._process_dexscreener_data(data)
-                else:
-                    logger.error(f"DexScreener API error: {response.status}")
-                    return []
-
+            # Get new tokens from Helius
+            tokens = await self.helius_service.get_new_tokens(limit=5)
+            
+            market_data = []
+            for token_data in tokens:
+                try:
+                    # Get additional data from Helius
+                    price_data = await self.helius_service.get_token_price(token_data.get("address"))
+                    
+                    # Format data
+                    formatted_data = {
+                        "address": token_data.get("address"),
+                        "symbol": token_data.get("symbol", "UNKNOWN"),
+                        "name": token_data.get("name", "Unknown Token"),
+                        "price": price_data.get("price", 0),
+                        "price_usd": price_data.get("price", 0) * 100,  # Assuming SOL = $100
+                        "liquidity": 0,  # Not available from Helius
+                        "volume_24h": 0,  # Not available from Helius
+                        "holders": token_data.get("holders", 0),
+                        "market_cap": 0,  # Calculate if supply available
+                        "verified": token_data.get("verified", False),
+                        "source": "helius_backup",
+                        "timestamp": time.time()
+                    }
+                    
+                    market_data.append(formatted_data)
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing Helius token: {str(e)}")
+                    continue
+            
+            logger.info(f"🔄 Helius: Retrieved {len(market_data)} tokens")
+            return market_data
+            
         except Exception as e:
-            logger.error(f"Error fetching DexScreener data: {str(e)}")
-            return []
-
-    def _process_birdeye_data(self, data: Dict) -> List[Dict]:
-        """Process raw Birdeye data"""
-        try:
-            tokens = []
-            for token in data.get('tokens', []):
-                tokens.append({
-                    'address': token['address'],
-                    'symbol': token['symbol'],
-                    'price': float(token['price']),
-                    'volume_24h': float(token['volume24h']),
-                    'liquidity': float(token['liquidity']),
-                    'market_cap': float(token['marketCap']),
-                    'created_at': int(token['createdAt'])
-                })
-            return tokens
-        except Exception as e:
-            logger.error(f"Error processing Birdeye data: {str(e)}")
-            return []
-
-    def _process_dexscreener_data(self, data: Dict) -> List[Dict]:
-        """Process raw DexScreener data"""
-        try:
-            tokens = []
-            for pair in data.get('pairs', []):
-                token = pair['baseToken']
-                tokens.append({
-                    'address': token['address'],
-                    'symbol': token['symbol'],
-                    'price': float(pair['priceUsd']),
-                    'volume_24h': float(pair['volume24h']),
-                    'liquidity': float(pair['liquidity']['usd']),
-                    'market_cap': float(pair['marketCap']),
-                    'created_at': int(pair['createdAt'])
-                })
-            return tokens
-        except Exception as e:
-            logger.error(f"Error processing DexScreener data: {str(e)}")
+            logger.error(f"❌ Helius market data error: {str(e)}")
             return [] 
