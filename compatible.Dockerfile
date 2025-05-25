@@ -52,7 +52,7 @@ USER appuser
 
 # Set environment variables for Enhanced Ant Bot
 ENV SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-ENV SIMULATION_MODE=False
+ENV SIMULATION_MODE=True
 ENV INITIAL_CAPITAL=0.1
 ENV USE_MOCK_GROK=true
 

@@ -124,9 +124,16 @@ class EnhancedAntBotRunner:
         self.wallet_manager = WalletManager()
         await self.wallet_manager.initialize()
         
+        # Portfolio manager
+        logger.info("📊 Initializing Portfolio Manager...")
+        from src.core.portfolio_manager import PortfolioManager
+        self.portfolio_manager = PortfolioManager()
+        await self.portfolio_manager.initialize(self.initial_capital)
+        
         # Portfolio risk manager
         logger.info("🛡️ Initializing Portfolio Risk Manager...")
-        self.portfolio_risk_manager = PortfolioRiskManager()
+        self.portfolio_risk_manager = PortfolioRiskManager(self.portfolio_manager)
+        await self.portfolio_risk_manager.initialize()
         
         logger.info("✅ API services initialized")
     
