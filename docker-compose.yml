@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   enhanced-ant-bot:
     build:
@@ -25,9 +23,6 @@ services:
         reservations:
           cpus: '1'
           memory: 1G
-    ports:
-      - "8000:8000"
-      - "8001:8001"
     healthcheck:
       test: ["CMD", "python", "-c", "from src.core.quicknode_service import QuickNodeService; print('Health OK')"]
       interval: 30s
@@ -46,7 +41,7 @@ services:
       # API Keys (from .env file)
       - QUICKNODE_ENDPOINT_URL=${QUICKNODE_ENDPOINT_URL}
       - HELIUS_API_KEY=${HELIUS_API_KEY}
-      - JUPITER_API_KEY=${JUPITER_API_KEY}
+      - JUPITER_API_KEY=${JUPITER_API_KEY:-}
       - GROK_API_KEY=${GROK_API_KEY:-}
       
       # Solana Configuration
@@ -55,8 +50,8 @@ services:
       
       # Wallet Configuration
       - PRIVATE_KEY=${PRIVATE_KEY}
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
-      - WALLET_ADDRESS=${WALLET_ADDRESS}
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY:-}
+      - WALLET_ADDRESS=${WALLET_ADDRESS:-}
       
       # System Configuration
       - LOG_LEVEL=INFO
