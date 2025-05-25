@@ -1,0 +1,1790 @@
+[
+  {
+    "trackedWalletAddress": "23qHACEzwQWAX6pj5pf7MP9Ec9SodcRJ7qRECM3skyZJ",
+    "name": "Scammer 3.1",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "26kZ9rg8Y5pd4j1tdT4cbT8BQRu5uDbXkaVs3L5QasHy",
+    "name": "ORANGIE NOV",
+    "emoji": "🍊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "27f89anBgqQnEbfftN8NsZPvY3n6Hvw7F4LajgjRgrWv",
+    "name": "Insider GOOD",
+    "emoji": "🟢",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "28ipXVfkdmu1PDowCHbcSfzkpH9edZmSiVoDhY5xGVfR",
+    "name": "mim",
+    "emoji": "👩‍🦳",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2AtFkEamLgK9ByuFX5XmG7WHZ9CVLFC6pxhWpfYkL1KZ",
+    "name": "Al4n",
+    "emoji": "4️⃣",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2bfnXiF9Gxc2U4qoxXYtPDuUkmZWsuLLqTf9P3fVEpHi",
+    "name": "MR.THANKYOU",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2byqB8Pypvq6s8W126yJc9SxToTiWTfNFuDU3ZTq9CLT",
+    "name": "Trench",
+    "emoji": "🏌🏻‍♀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2CXbN6nuTTb4vCrtYM89SfQHMMKGPAW4mvFe6Ht4Yo6z",
+    "name": "MoneyMaykah",
+    "emoji": "🐵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2Dk2je4iif7yttyGMLbjc8JrqUSMw2wqLPuHxVsJZ2Bg",
+    "name": "Noodles13",
+    "emoji": "🦄",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2huXTbjeBhtMZ1ugNwUGucYBRasRaaiypymUX6P1Kwjx",
+    "name": "Grandfnf4",
+    "emoji": "👩🏼‍🦼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2JGC1DPBo4YMEw4Au3TDUFbvgBRubFfwPzfp1Yygh3Z2",
+    "name": "turtle temp wallet",
+    "emoji": "😰",
+    "alertsOn": true
+  },
+  {
+    "trackedWalletAddress": "2m5498hY3hpSvm1pVyZwwyU6bpQGFGu3PADSoEoZFXQB",
+    "name": "SOLSHOTTA 2?",
+    "emoji": "🎯",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2NrrLM4TM4G5Qz3VXhQXMLFfA6KU76kS61iteBRkbmCR",
+    "name": "INSYDERCRYPTO",
+    "emoji": "🔍",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2PBRmZuPxeLAAmyHLCLQgikB5HGP1Y7mLzg6KpNNVJ16",
+    "name": "GME",
+    "emoji": "🧚🏾‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2PPEZXmP3qDhMV66kZs9fKmMpXtUyGUsicEhVu4rj8p9",
+    "name": "Trust Whale",
+    "emoji": "🥦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2vkYVxq7HqrB2dzUH4VQ28wGAzv5c6ySt5uqPss5rGTJ",
+    "name": "Blob5",
+    "emoji": "🧑🏾‍🦼‍➡",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2YJbcB9G8wePrpVBcT31o8JEed6L3abgyCjt5qkJMymV",
+    "name": "Al4n",
+    "emoji": "⏰️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "2YrKxjg1WKPqd19ivu6fWkfCG7VFZPyCAGYefd9zAnC7",
+    "name": "Noodles9",
+    "emoji": "💊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "385NmPu9ETQgqZKT8zRNb786x4B5VPicooWd1Czq5Vby",
+    "name": "TRUMP6,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3b7HqD1YAFgXeqqYmSaMU6tMr2DLMWZXZb5NgajCjpre",
+    "name": "3SOL STRAT",
+    "emoji": "💰",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3daLWaPMpiw42nVGFS6pCBXECR7hEz4ThAEFvvcsggts",
+    "name": "Noodles11",
+    "emoji": "🤦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3DefQXJYVFyNHfYcrXqadG1NbpCYZdDZ4dnDeTDX8cJw",
+    "name": "richard",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3dNTS4e2pwtQsTLgdKNm3p6vVijAfM6c57EajDY4zrpt",
+    "name": "LITECOIN INSIDER?",
+    "emoji": "👥",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3h65MmPZksoKKyEpEjnWU2Yk2iYT5oZDNitGy5cTaxoE",
+    "name": "Noodles17",
+    "emoji": "🕵🏻‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3i2rUDjGozkbQ7QaLsrFLPKy7ytFJaQE8bfYmbi1rWvs",
+    "name": "Twinga",
+    "emoji": "🐨",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3jN1M8gWLk2ryTGnscrcwRK1Gy4Ttzq5QizWT8uizZsT",
+    "name": "Ne0n",
+    "emoji": "🎟️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3kebnKw7cPdSkLRfiMEALyZJGZ4wdiSRvmoN4rD1yPzV",
+    "name": "Bastille",
+    "emoji": "🖇",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3kXhcEUW8fEeASzJwanqQwpScS2vF7fkZYzNUNh4t1rC",
+    "name": "Insider",
+    "emoji": "😼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3pkY4S76Jw1UDS8Qgz4wD3DxrTxz7QfyC8yTbXJoZcMT",
+    "name": "Kai",
+    "emoji": "🦘",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3rSZJHysEk2ueFVovRLtZ8LGnQBMZGg96H2Q4jErspAF",
+    "name": "STAQI",
+    "emoji": "📊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3tc4BVAdzjr1JpeZu6NAjLHyp4kK3iic7TexMBYGJ4Xk",
+    "name": "Insentos",
+    "emoji": "🤸🏽‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3Ve46xYmZTKExr3FmCLYMA5Xt12DkDKgK7AeNUhcc5cc",
+    "name": "SYDNEY✊",
+    "emoji": "🏙️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3Vsx9RN9jvnKwdMkHxn6Z2cehtffgghk4Kd4MStHT1P6",
+    "name": "idk,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "3wi8waD5A64D7PLutUYJdhMcrYvDBTqeh3CRFgv1hFtY",
+    "name": ",",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "45yBcpnzFTqLYQJtjxsa1DdZkgrTYponCg6yLQ6LQPu6",
+    "name": "maestro",
+    "emoji": "🫵🏾",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "48tnDo3bgKJW1iDhdMGSJq54N9Uv5pNixqGcF1yVC9JJ",
+    "name": "Realist",
+    "emoji": "🐐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "48ttB1jRxxRZKR44BPL4rMSEMDmuZmHPXf7yirQMATg5",
+    "name": "marcell inside?",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4aDdi3EiDPMbeZ3e5BvbFMt4vfJaoahaHxZuwKQRtFc1",
+    "name": "NACH NEW",
+    "emoji": "⭐️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4bdY7XB6ZtpTFtLwN1zmJEV9Qdo4KvqYqWzaT8jkbjvb",
+    "name": "500kPnut",
+    "emoji": "💵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4Be9CvxqHW6BYiRAxW9Q3xu1ycTMWaL5z8NX4HR3ha7t",
+    "name": "MITCH",
+    "emoji": "🧑‍💼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4bKTFx7TKDfFFk5H4M9S1aTuV2aLuDBofHVvMEGcegKG",
+    "name": "good trader 5",
+    "emoji": "🌏️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4Bq5yvgoiZDsukGERb7aM52jDmbVPCpoihbztscZ5PeM",
+    "name": "ShockedJS",
+    "emoji": "⚡️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+    "name": "Mr.Frog",
+    "emoji": "🐸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4EsY8HQB4Ak65diFrSHjwWhKSGC8sKmnzyusM993gk2w",
+    "name": "Blob3",
+    "emoji": "🦵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4hSXPtxZgXFpo6Vxq9yqxNjcBoqWN3VoaPJWonUtupzD",
+    "name": "90% WINRATE",
+    "emoji": "🎯",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4i5sPP9EgUGSXVjPGvBABHwkH4ydSY2AUUPswECW65ct",
+    "name": "rugger",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4M8QVddY7Ld8eAaHoYcWKPxQcwxVuZsXMFKsm8921Uzd",
+    "name": "Kimichi",
+    "emoji": "🥵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4mNSHeknNwJ7cfjKwarqt6aNvj5yf8mzfLEKEJjroXpJ",
+    "name": "Nick",
+    "emoji": "🌟",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4PhdccRaRMHGR8RAJk6CGmZjNoke6jsM6N9pJ7yCF1mr",
+    "name": "deepfates",
+    "emoji": "🔮",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4qoYxUTpfA8Haeh7egTDpLjEfscx8PwBTchkA4wL2nNC",
+    "name": "Smart 2",
+    "emoji": "🪂",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4SbDMrX8Zfj7qZtRKTBSQEavPkc7BP1kiJfT2f3dn8RL",
+    "name": "Jake",
+    "emoji": "🤷🏽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4XMPyWFsYdNcCN4FG8geyytyTeUNacn4QundBzMqbGGT",
+    "name": "Stxtics",
+    "emoji": "😰",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4Ye7cGB5FPMDph2jGrG1Nf6CTqsuoLH72JqFmFfZ9QaQ",
+    "name": ",",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "4zq1iLpmepj2Rj7W6A3XQMRQA1HyjYqVpZiBzM6aPyH7",
+    "name": "orang",
+    "emoji": "🍊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "525LueqAyZJueCoiisfWy6nyh4MTvmF4X9jSqi6efXJT",
+    "name": "Joji",
+    "emoji": "🐕️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "581XaxPQ7jGqqFGh3RQhK8wESBrEvFCAry7EDq2NzacH",
+    "name": "GOAT",
+    "emoji": "👰🏾‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5afSYA7JRyTvpbiypNjTMj6SsYAopXjvZwSPpx6ZzdiU",
+    "name": "Blob7",
+    "emoji": "🍄‍",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5B52w1ZW9tuwUduueP5J7HXz5AcGfruGoX6YoAudvyxG",
+    "name": "YENNI",
+    "emoji": "👩",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5BWnxin7MiQvAGXSEEjwPfsVevoD7MBqtdfXJEZPQRPY",
+    "name": "Wolf Public",
+    "emoji": "🐩",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5CGEXBgHHhqJ7GHYooedLV4nSpAjphnhePyMccvjYgT1",
+    "name": "BERTIE DEV",
+    "emoji": "👨‍💻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5FJ5G93kJ5qPmfSGAswJqVtQXVGi8QUA8SVcUzDATQpW",
+    "name": "TRUMP4,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5fWkLJfoDsRAaXhPJcJY19qNtDDQ5h6q1SPzsAPRrUNG",
+    "name": "TRUMP5,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5J1U5B9D7joDoQjdvjGPiWPp3hB6ZKHPAYvtWGXbJC3V",
+    "name": "oscar trojan",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5mtbmPwj2SMkxPP9c93s9oD9bmMdByTqepNarM9Y7u7e",
+    "name": "Gm3",
+    "emoji": "🫱🏼‍🫲🏿",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5PA7XYpE4p78fWvH1HiSD1SQiRKGUWgbWc6jxzWiDpYT",
+    "name": "Connoreo",
+    "emoji": "⏯️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",
+    "name": "RAYDIUM",
+    "emoji": "💦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5qvLmTd6yKMn7T7DP6RPPcASBH231Rtvjta1Pzao48PR",
+    "name": "Devistiny",
+    "emoji": "👹",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5TMR5GFPTzkNhprnty2ocXEFLoLur1uchg4NkEr5WEf4",
+    "name": "Noodles8",
+    "emoji": "👨🏻‍🦼‍➡️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5TuiERc4X7EgZTxNmj8PHgzUAfNHZRLYHKp4DuiWevXv",
+    "name": "rev",
+    "emoji": "😅",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5VKQYfVE3nwc926RFL5kpS5x8Etx9NgWVdExK4Kj8w1a",
+    "name": "Scammer 2.1",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "5YkZmuaLhrPjFv4vtYE2mcR6J4JEXG1EARGh8YYFo8s4",
+    "name": "500k pnl",
+    "emoji": "💦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "62FZUSWPMX9pofoV1uWHMdzFJRjwMa1LHgh2zhdEB7Zj",
+    "name": "Blossom",
+    "emoji": "🌸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "636N7frU8bUwYfyUAtvMQQsXhTFRuSWjxnEZihr5axGV",
+    "name": "Staqi",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "678HPdYtXFDNW6m1nCzLwwGX9FvePT41s8y7mRYGHNJC",
+    "name": "cheffin 1-1000sol",
+    "emoji": "👨‍🍳",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "68TWGYLqKqDPtt8cWQ3bvSi3WsmF7oJj7R9g3F8fce2j",
+    "name": "700k pnl",
+    "emoji": "⚖️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "694X5Cuvx6xs4y2aDBu5U1RkZS4RTbcUCZ8qLbH7bVPc",
+    "name": "NYM?",
+    "emoji": "👩🏿‍🦲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6BF9ZNNSPw7pU61HpqtwTP9z21o1piJvjAUzmekXmFKV",
+    "name": "el insider 1",
+    "emoji": "🐽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6BJ8YTiiDdSxy7RNLHd4hurmvUjreRFoxLGKYftAGb4x",
+    "name": "Sink",
+    "emoji": "🦸🏼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6LChaYRYtEYjLEHhzo4HdEmgNwu2aia8CM8VhR9wn6n7",
+    "name": "Assasin",
+    "emoji": "🩸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6m5sW6EAPAHncxnzapi1ZVJNRb9RZHQ3Bj7FD84X9rAF",
+    "name": "js",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6vuPmJyQmtJ1rajh1FXhTFnoccgLu14HxzRKi8wsqnHS",
+    "name": "ese",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6XEfkpHJXfu7jd7ZLG1Ngnou1vg7ZTNcM9fjVG5paCCW",
+    "name": "lunaei",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "6yDVFRXrzVrMa8ULYdbaJ8kLm3X6EM3wgFgDQ2MV1MQG",
+    "name": "OG Noodles",
+    "emoji": "🥞",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "71CPXu3TvH3iUKaY1bNkAAow24k6tjH473SsKprQBABC",
+    "name": "发誓要做💎手的王小二,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "72e6QM7gn9MH5u1YpgQbduexm4WAon1cnsSXPqKnLQec",
+    "name": ",",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "73LnJ7G9ffBDjEBGgJDdgvLUhD5APLonKrNiHsKDCw5B",
+    "name": "wadles",
+    "emoji": "🧠",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "76fx1SGT35mqUfG5dcmpWS2gzLBr5AGrvMDEq144XPkJ",
+    "name": "Noodles4",
+    "emoji": "💁🏿‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7A4x4kL8LZgKyNb8deE9xM5wH7jhLLFPJJatZqtfAjGr",
+    "name": ",",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7ABz8qEFZTHPkovMDsmQkm64DZWN5wRtU7LEtD2ShkQ6",
+    "name": "RED",
+    "emoji": "❤️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7Bffdhza5V7zBK7EyEQ5eFQ4fkxvutjMsiJjJUs9ZfkC",
+    "name": "DJT",
+    "emoji": "👩🏿‍🍼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7CNt57nWLNTuS6SFZjYrhE1CBhJeK19X9vjmfMxAnnzp",
+    "name": "el insider 2",
+    "emoji": "🐽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7DCYBoCuLWwYaQHhXxv6F6SV5ZAmnuhR1oucNYgVZWLa",
+    "name": "Blob1",
+    "emoji": "🙅🏻‍♂",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7DKdBojSuUwAAJFk1wFX56cggpSwYssVogTiVkriqkjv",
+    "name": "HIGH WINRATE",
+    "emoji": "💹",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7Dt5oUpxHWuKH8bCTXDLz2j3JyxA7jEmtzqCG6pnh96X",
+    "name": "Leens",
+    "emoji": "🥵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7iabBMwmSvS4CFPcjW2XYZY53bUCHzXjCFEFhxeYP4CY",
+    "name": "Leens 2",
+    "emoji": "🥵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7qqV3jfEPXBkwdaYccooC9b4PUYWkj4yLbQpMsyhuCcd",
+    "name": "Rizzy",
+    "emoji": "🍛",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7SDs3PjT2mswKQ7Zo4FTucn9gJdtuW4jaacPA65BseHS",
+    "name": "INSENTOS",
+    "emoji": "🤫",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "7VBTpiiEjkwRbRGHJFUz6o5fWuhPFtAmy8JGhNqwHNnn",
+    "name": "HOLDER 700K",
+    "emoji": "💎",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "81NpJHi2S1kqsGL9t9qXcpJQoDwJSSdfESFNsY5fspA9",
+    "name": "Scammer 3.0",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "831qmkeGhfL8YpcXuhrug6nHj1YdK3aXMDQUCo85Auh1",
+    "name": "meechie80%",
+    "emoji": "🤓",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "86AArCufuDZ1bUYjjdfAbDLM7HFdkeeMhTbsEeEHXQAR",
+    "name": "Grandfnf3",
+    "emoji": "🙋‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "86AEJExyjeNNgcp7GrAvCXTDicf5aGWgoERbXFiG1EdD",
+    "name": "℘υׁׅϐׁׅ֒ᥣׁׅ֪ꪱׁׅ᥊ׁׅ,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8deJ9xeUvXSJwicYptA9mHsU2rN2pDx37KWzkDkEXhU6",
+    "name": "cooker",
+    "emoji": "🍳",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8fSnLTnRViK83dDesivTsPx2wiRhwti9xoafeMGjEyLJ",
+    "name": "good trader 4 (500kpnl)",
+    "emoji": "💰️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8GfpB58jLJVbBtDhwDSbG3ARZ5p31LztFpo5Bc3VS2hd",
+    "name": "Bucke",
+    "emoji": "💂‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8iRuMD31AxPHHVGhDNbKHdRnuYriBMHCQbNHVfGy4PTz",
+    "name": "TJR",
+    "emoji": "💉",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8kxuu4Ad63CPPrtJdhFdaTkhZNfNEY4bX51vcUt3SUnE",
+    "name": "Oscar",
+    "emoji": "💤",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8MaVa9kdt3NW4Q5HyNAm1X5LbR8PQRVDc1W8NMVK88D5",
+    "name": "Daumen",
+    "emoji": "💐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8RTDA7rQadKhCGyWdzxqhD5pm3mXg9MjmAGxn8BZ1S6C",
+    "name": "Smart10",
+    "emoji": "😃",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8rvAsDKeAcEjEkiZMug9k8v1y8mW6gQQiMobd89Uy7qR",
+    "name": "Casino",
+    "emoji": "🎲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8rVKhLKEK92HrBjWa9n9ynfZQ1DfcXpW8ejBwGGL2VZe",
+    "name": "Scammer 2.4",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8uDfUvwik5PxdUPsQ6J7anyhChXLx8hQYNoRsusox9XB",
+    "name": "good trader 6",
+    "emoji": "🤑",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "8zFZHuSRuDpuAR7J6FzwyF3vKNx4CVW3DFHJerQhc7Zd",
+    "name": "POW",
+    "emoji": "💥",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "91jYvzhvCK9mYycVHFeiRaYvHxuzw59VUdC3QPCn4Thf",
+    "name": "safz",
+    "emoji": "🛡️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "96sErVjEN7LNJ6Uvj63bdRWZxNuBngj56fnT9biHLKBf",
+    "name": "Orange",
+    "emoji": "🟠",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "981G4w1e6zSiy6gBtYLGdFjF7rmFgAXXgA3mgKwPzwyS",
+    "name": "pullup",
+    "emoji": "🏊🏾‍♂",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "98T65wcMEjoNLDTJszBHGZEX75QRe8QaANXokv4yw3Mp",
+    "name": "Leck",
+    "emoji": "🥬",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "99i9uVA7Q56bY22ajKKUfTZTgTeP5yCtVGsrG9J4pDYQ",
+    "name": "Zrool",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9aShzTP6vxdHic4Sjycnbjyma5t8AphMLNHxRFTfFHte",
+    "name": "Scammer IMP",
+    "emoji": "👻",
+    "alertsOn": true
+  },
+  {
+    "trackedWalletAddress": "9E7FsmrFHgkSTXc2Dx9FMkzMHoeFspziruFdNTBSeAG7",
+    "name": "Good Trader 2",
+    "emoji": "🧦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9ecRdqNCBxwReiY2pxtnLeayeBzE1CrSSmKKJJGdmsaJ",
+    "name": "Lowkeyy",
+    "emoji": "⌨️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9Fbu5z3jLSVPGKSpFJ2LZgaPYKey43fREimG5ZrNyR8w",
+    "name": "INSIDER1",
+    "emoji": "🕵️‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9FNz4MjPUmnJqTf6yEDbL1D4SsHVh7uA8zRHhR5K138r",
+    "name": "Danny",
+    "emoji": "🧙🏻‍♂",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9fR8gerfvGSycFGbK2VY1PFrPuU9jS6QM47S974yTUHC",
+    "name": "yog",
+    "emoji": "🧑🏻‍🎤",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9ha3rJRznYVzNkoJ5xyov3ZBjthrC8e8WNdjn48FQyDd",
+    "name": "Dragon",
+    "emoji": "🐉",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9jyqFiLnruggwNn4EQwBNFXwpbLM9hrA4hV59ytyAVVz",
+    "name": "NACH",
+    "emoji": "💛",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9K18MstUaXmSFSBoa9qDTqWTnYhTZqdgEhuKRTVRgh6g",
+    "name": "Sabby",
+    "emoji": "😎",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9nJ72hhtwyGHoUbEN3xfGuiLnrX3SnLYX52hkoahn2YH",
+    "name": "Faze Lacy",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9R2UJG1Wyoo5V376TKkHcp98hrKEQhmGMmx8jVtRLJoz",
+    "name": "gkitad",
+    "emoji": "🤏",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9ru9BSVFSUqSRQFwdjjnkzQGf9yUdpRTjpjXPKc4BvxX",
+    "name": "ferb2",
+    "emoji": "👓",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9UWZFoiCHeYRLmzmDJhdMrP7wgrTw7DMSpPiT2eHgJHe",
+    "name": "3M PNL",
+    "emoji": "💲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9wYucdoBb1CV7DcxG1cdKGn6XPHi3QBjyvhb1WejG7Hw",
+    "name": "Brtrikz",
+    "emoji": "🥶",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "9YgRrhnZdP9SWszUVmskkNfjZLuEfuYmpU4rd3YN7jPU",
+    "name": "binance insider",
+    "emoji": "🐀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AAhnidQyZbh2ej1Ubqc3DAP7oKM72akPzxtYpaZpUe8r",
+    "name": "BWS",
+    "emoji": "🥈",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AbcX4XBm7DJ3i9p29i6sU8WLmiW4FWY5tiwB9D6UBbcE",
+    "name": "404",
+    "emoji": "4️⃣",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AJ6MGExeK7FXmeKkKPmALjcdXVStXYokYNv9uVfDRtvo",
+    "name": "UNION",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AonDkSa2EZ19U365YrY3bKLDbLf7cU1herGFTGxXYrcm",
+    "name": "mrpunk",
+    "emoji": "🤘",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AQTXbUNNvGiekPD4NLQ8Tr2PUY2G4UsCqLm4YFAkv5mo",
+    "name": "Saved wallet",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "ARSdp5MFL1bjgWddK8dkF3QdttHvy5ZdVjJ6T8BHJimo",
+    "name": "FishFish",
+    "emoji": "🧑🏼‍⚕️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "As7HjL7dzzvbRbaD3WCun47robib2kmAKRXMvjHkSMB5",
+    "name": "Otta",
+    "emoji": "🦦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AUJ6gJFtq7vZ2B51DM2PScVDyfafCiTdDa8he6sW4MuZ",
+    "name": "good",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "AVAZvHLR2PcWpDf8BXY4rVxNHYRBytycHkcB5z5QNXYm",
+    "name": "ANSEM?",
+    "emoji": "🧐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Avc4fcAvrXRNnoEjwRVgM61EjwKX6smdPspGQjeRWLV1",
+    "name": "Pnut Insider",
+    "emoji": "📈",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "B3wagQZiZU2hKa5pUCj6rrdhWsX3Q6WfTTnki9PjwzMh",
+    "name": "Beast",
+    "emoji": "🔼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "batmo6N9m7mHww3MEdrN3aHzfaZuyF4wk1b2xoMpkYq",
+    "name": "omtad",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+    "name": "Dv",
+    "emoji": "📀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc",
+    "name": "kreo",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BD7oWkEQsUwE8sj4UT7jtrGjHC8Gq1iRqXY7U6DTbJpf",
+    "name": "GH0STEE",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BeTvN1ucBnCj4Ef688i51KHn2oq35CWDvD2J5aLFp17t",
+    "name": "?,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "bfSfxctFHJP5FmaSqyycQeRXHUUhDr2vbdnRCYh86GR",
+    "name": "Joji",
+    "emoji": "🃏",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BGeRfMRbur291PwwkJdeiWvpk65ceFLtR8ZRg1Y6N5Km",
+    "name": "Scalper",
+    "emoji": "🏴‍☠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BHCm58VsiSq9p3hqjprLAs6wtjXjtuGnz6vj1i3Upe7X",
+    "name": "1M PnL",
+    "emoji": "💰",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BHREKFkPQgAtDs8Vb1UfLkUpjG6ScidTjHaCWFuG2AtX",
+    "name": "risk100 top tra",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BieeZkdnBAgNYknzo3RH2vku7FcPkFZMZmRJANh2TpW",
+    "name": "400K PNL",
+    "emoji": "💸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BiqkWhrJ4dfpE6TeNY34tA4GssG23SBH8CU8mqB7xZ6t",
+    "name": "Orangie NEW",
+    "emoji": "🍊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BJSBUg3K3iAvfGhPdbd2oZ9wJuoJmCYtwQwjxNMdKGcP",
+    "name": "test",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BkpbQwJDwpUmCCbY81R2uFejdso6L2Qm1nwkd4DDki64",
+    "name": "Henn",
+    "emoji": "🐔",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BnkkegyKeQCZ7DRkc7kEXdJQwkcukYk2TzXHv97gcKsg",
+    "name": "el insider 3",
+    "emoji": "🐽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BpycpQ7STrD8d73kjui5nzJmp7EBAgSmFfV8zeqMMX5z",
+    "name": "StickTest",
+    "emoji": "🦹🏿",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Bqcnecs7uv1cakup5daGToD3mUAiErHouGKvtk3VCmp2",
+    "name": "Wolf Challenge",
+    "emoji": "🐺",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BrNoqdHUCcv9yTncnZeSjSov8kqhpmzv1nAiPbq1M95H",
+    "name": "profit 1,5M PNL",
+    "emoji": "🦞",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BTf4A2exGK9BCVDNzy65b9dUzXgMqB4weVkvTMFQsadd",
+    "name": "kevin",
+    "emoji": "🐶",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BUMkYpP7RRFJRHkMpxwN8q62mj1C9SaJsi2nqDBzURwQ",
+    "name": "alb?u",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "BYhH8QatT4Aue5TxLCiYeHBcZ2ufr6KCwdQPQnedVewy",
+    "name": "Tristan TATE",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CbJZ12JNgoV9XKwD6bwJMZr2vWUMysetVhaSBtRXBPzP",
+    "name": "omtad",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CBTGgLF7BHxtLmAWaGgJBZPK3AMyHQJ58UEVQ72Drvkn",
+    "name": "Trax",
+    "emoji": "🚜",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CCUcjek5p6DLoH2YNtjizxYhAnStXAQAGVxhp1cYJF7w",
+    "name": "elcharto",
+    "emoji": "🐽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CfyPKSXiFRLnq8cKrefgHKEFjFunwFMDZootqdbeZdfE",
+    "name": "IGGY AZZALEA",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CkxVhktjqYuhsVfNQzqEZkwQ2gMU1wEFPM3FSSVXGjM9",
+    "name": "FaZe Banks",
+    "emoji": "💸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CmgPfZHXQ1j3HUTcr6ByoqbfMF19VqFbym34AawHDoTL",
+    "name": "Teige",
+    "emoji": "🤎",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CoKM6WXmDhYXM8LRrxV2tZGagjmP6MrZqDScZSUMN9AB",
+    "name": "Scammer 2.2",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CpoC3hUDGDnEdSZF7egZTddgnKUeXVnoPJTNDUaM98GC",
+    "name": "Orangie NEW",
+    "emoji": "🍊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CPydqKcEEeKTR6wt3L15G8S5Ea4bxjS2vvjiW9vw1UwK",
+    "name": "Qwerky",
+    "emoji": "👩🏻‍❤️‍👩🏾",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CRVidEDtEUTYZisCxBZkpELzhQc9eauMLR3FWg74tReL",
+    "name": "FRANK",
+    "emoji": "🤵",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CvNiezB8hofusHCKqu8irJ6t2FKY7VjzpSckofMzk5mB",
+    "name": "DALI",
+    "emoji": "🐄",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CwKtxWpDtsf9Ag3DHWnt3re4wJiaRwQiTA4LEdasu6YA",
+    "name": "oscar",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CWvdyvKHEu8Z6QqGraJT3sLPyp9bJfFhoXcxUYRKC8ou",
+    "name": "POW",
+    "emoji": "⛹🏿‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Cy7hf1nqP2oaWiZ1JERWNN1VNxDZtFTLLAqcHLLygviD",
+    "name": "noodles12",
+    "emoji": "👮🏾‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+    "name": "cented",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "CYWHDsprQJZu2e6umFAVCAHRK4z4KJWYNhSGWtTEsBve",
+    "name": ",",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "D18EmaqFyXJ35GA9XP41qecF72JsyJNo6ZtrTDfi5xGH",
+    "name": "Glitch",
+    "emoji": "🚣🏼‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "D2wBctC1K2mEtA17i8ZfdEubkiksiAH2j8F7ri3ec71V",
+    "name": "Dior",
+    "emoji": "🍇",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "D3Z7weHeLGWA7eg1qwVB66NCs8YLxiDTBVE6Eb1tTmwg",
+    "name": "ANDREW TATE",
+    "emoji": "💪",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "dAtmoUVjiihyMf6ah35wMVDmRgrVWusDWQaiKFXFsEV",
+    "name": "omtad",
+    "emoji": "🇴🇲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DbtzCzny4jPrVtkeuFv4ipYqbwMmV5YcWYvwodJ5uadW",
+    "name": "oscar",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj",
+    "name": "Euris",
+    "emoji": "👾",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DGPYpCdiVg2shab2TnNiZ2RnsjBQSmhgN71hJyWC5cYn",
+    "name": "Qwrty",
+    "emoji": "🐾",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DK7DRME2xe5ftRc94r6SF4MccVBbphrbUt5DiPFi4qvj",
+    "name": "Scammer 2.3",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DKgvpfttzmJqZXdavDwTxwSVkajibjzJnN2FA99dyciK",
+    "name": "Rowdy",
+    "emoji": "⛰️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DKwybycDSWidrHfpMjaahUsT1Yid3kig86ncXPAGe7AU",
+    "name": "YOGURT1",
+    "emoji": "🥛",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DN8yBqchiqzmnJb15g6VgZnEhcdzuuJkLhyChxD3e87s",
+    "name": "minecraft test dev",
+    "emoji": "🎮",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DnF8Yn2Fdjpbm5WxeUsM3r2bigX8QJ2rAeWVmF468PBn",
+    "name": "Scammer 2.7",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+    "name": "GAKE",
+    "emoji": "🍰",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Doh8wnH1yMs9VdL53iSMJHLG1hUwaznj5nd9iFUbFeAf",
+    "name": "Scammer 2.8",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DpNVrtA3ERfKzX4F8Pi2CVykdJJjoNxyY5QgoytAwD26",
+    "name": "gorilla",
+    "emoji": "🦍",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DQHHpjr7ukrg5F9ugwP4P9U7Xzjti45JE1QcwhpMz8rQ",
+    "name": "noodles14",
+    "emoji": "🦸🏽‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DrwHXMZqsPhfqZw8GpqNvTYq9Vgh3ch3u9AqSVBN13yG",
+    "name": "Luci",
+    "emoji": "🤚🏾",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DSVc1Rd69sLcXBoZAsvkzK4jGFyJKP77K3J2CaFVNAFP",
+    "name": "pre",
+    "emoji": "🌌",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DtChGQTAyZEFdkWTHuKRjEZYJT2KiS56ocoAC5U1FMjR",
+    "name": "Scammer 2.9",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "dVs7zZksjFuq73xbtUC62brFXYYuxCuPSG4wZeGiHck",
+    "name": "Apperal",
+    "emoji": "👕",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "dY9sUsh4kXocVTzw8F6UagFg6KPe5QizhuZTrDYSX1C",
+    "name": "TRUMP2,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt",
+    "name": "TheDoc",
+    "emoji": "🩺",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "DzDN9HKpM2syPHz9bLxLzx5ee7MvHcW5CgpYRKcy5T4V",
+    "name": "Insider 8",
+    "emoji": "🙀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EABXkKHLdH8Cb8YjJ2Zcj4ybnY4xUDbXELs9cy6rMQi8",
+    "name": "TRAX",
+    "emoji": "🥐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EB9rURAEFFHHvcuTig6R2jfaPMzWWwmRnzeoPnigGer",
+    "name": "mort",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "eBDK8Xekwym9TZcZdDdpeRLFPfWz8Cnt59mVRyjSNvr",
+    "name": "Scammer 2.6",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "ECCKBDWX3MkEcf3bULbLBb9FvrEQLsmPMFTKFpvjzqgP",
+    "name": "Kenzo",
+    "emoji": "🐯",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EdDCRfDDeiiDXdntrP59abH4DXHFNU48zpMPYisDMjA7",
+    "name": "MEZOTERIC",
+    "emoji": "🔮",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EDoonKrsParDnA4yJKJ3iDNEaFVfcaxSULqzQyNkwa61",
+    "name": "Noodles2",
+    "emoji": "🏃🏻‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EF58UCMLL7pWM9BSgZbc3Jfa6Gc16Yu5T37sVDxoRRhb",
+    "name": "RIPETH SECONDARY?",
+    "emoji": "🔄",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EhQ7iJNjXFiajR5zwJmXoKo5faQc2X2JHtFx7zWJKTaV",
+    "name": "TJR Trading",
+    "emoji": "📸",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EhRp3PVPqCe2ms3Cjgxg9LSXygxCkJfehPZnVPGienpg",
+    "name": "qt",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "ELSyW68qyAToytdaMkyQhgGL9FErGimoPA27AgingJtE",
+    "name": "Fletch",
+    "emoji": "🚅",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Es1hok7yv7bfDXSUSGmbJ6pXRq8dUJUY3ZWAVi3z6yfs",
+    "name": "Moby Top",
+    "emoji": "🚀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "ESEXzqZqBpuNqfwrAEVkajiKfDYv98UR9DMPMEPkEWo4",
+    "name": "Whale 1",
+    "emoji": "🏓",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EtTaTMBX9ErigazzzGmD8vq9mcwFoHrxchr2ewwzsefG",
+    "name": "Noodles3",
+    "emoji": "👢",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EY5udSh8BjxKq3zqKJVtNgRWr1jWkcJtCrHCvAoBLmRW",
+    "name": "YELO",
+    "emoji": "🌞",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "EzLu595m6CRxPybAUjSser9FmjDvjS3d3vyX4CPiu8Xn",
+    "name": "Good Trader 7",
+    "emoji": "👙",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "F2SuErm4MviWJ2HzKXk2nuzBC6xe883CFWUDCPz6cyWm",
+    "name": "earl",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "F5jWYuiDLTiaLYa54D88YbpXgEsA6NKHzWy4SN4bMYjt",
+    "name": "mercy",
+    "emoji": "🍉",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "F72vY99ihQsYwqEDCfz7igKXA5me6vN2zqVsVUTpw6qL",
+    "name": "Jalen",
+    "emoji": "🍐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FbvUU5qvD9JsU9jp3KDweCpZiVZHLoQBQ1PPCAAbd6FB",
+    "name": "Profitierr",
+    "emoji": "🐶",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FdvYZ99wuATUdd6fuSqyAMJRoGLrcHivnuWHxgst475p",
+    "name": "LUCEtrader",
+    "emoji": "💡",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Fi2hrxExy6TJnKcbPtQpo6iZzX9SUVbB9mDw6d29NgCn",
+    "name": "QUANT DEV",
+    "emoji": "🛠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FpCgGwrowtdTM8hhHtP3o2shRJqThpnodEk3JG1bkPfx",
+    "name": "quant",
+    "emoji": "📊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FqL2yC57E833Qnc3TfEJw45gCQcxwPxrQvpAu4Cg2Tjr",
+    "name": "good trader1",
+    "emoji": "📈",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FrNpLY7k6ktsp9em8c2fThYJe5yncE9iC4ArFXWLBs4g",
+    "name": "El Insider 5",
+    "emoji": "🐽",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FTeomDCHCcVWWz6p3WtYfTWFM78ZvXKxutTnGWrEK3sb",
+    "name": "3toes",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FUCtc9NkQXWKFDJyA4Xjkvm1CdYNEnvTZkXpThNexnij",
+    "name": "pnut insider?",
+    "emoji": "📜",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FvTBarKFhrnhL9Q55bSJnMmAdXisayUb5u96eLejhMF9",
+    "name": "SCOOTER",
+    "emoji": "🛴",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FVxeFYgyT4GC6D7gaLkMSu2qtSJfw2N4RVPZowi2A64Y",
+    "name": "Grandfnf2",
+    "emoji": "💰",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Fxj1j5ohVoRos1yQnvx6bsvYCt493VGpyLbMiq4eLff3",
+    "name": "SOLSHOTTA",
+    "emoji": "🎯",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FXobn8QbTmzHeHu5GPWjDR31jh8HCW7TsqrczF8v7cKA",
+    "name": "Justice Top",
+    "emoji": "🤠",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FXz4iy2B6mXhhowfUdV9grHFdHk4C9gizpEhsTZaumys",
+    "name": "Scammer 2.0",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "FY6kUtzzrvenQmzq4sjiMqyB1Pjo8Qzaqd6sTELJid7D",
+    "name": "test2",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "G1pRtSyKuWSjTqRDcazzKBDzqEF96i1xSURpiXj3yFcc",
+    "name": "GIBBY/MOODENG",
+    "emoji": "🎭",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "G2VzymsKt3zNAn4CKBndYcS67w6Kny5sDEp7Y2W1aTf6",
+    "name": "Terp",
+    "emoji": "🎲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "G3g1CKqKWSVEVURZDNMazDBv7YAhMNTjhJBVRTiKZygk",
+    "name": "splashy",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "G4Ba44ReFgxTDX4zvrVm6QowmkKEVPuPsT7BGotbyrWx",
+    "name": "ez",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "G5nxEXuFMfV74DSnsrSatqCW32F34XUnBeq3PfDS7w5E",
+    "name": "Profit",
+    "emoji": "🧧",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Gf9XgdmvNHt8fUTFsWAccNbKeyDXsgJyZN8iFJKg5Pbd",
+    "name": "0xuezhang|985.eth",
+    "emoji": "💇🏻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GfXQesPe3Zuwg8JhAt6Cg8euJDTVx751enp9EQQmhzPH",
+    "name": "Spuno",
+    "emoji": "🥄",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Ghffv35rVtBRJ7HqMt4YPRfggaQYe1LXuNGcwchTeAXq",
+    "name": "Santy",
+    "emoji": "🎅",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GJA1HEbxGnqBhBifH9uQauzXSB53to5rhDrzmKxhSU65",
+    "name": "latuche",
+    "emoji": "💼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GKT2j5gPqY2ZKfhaGB5cn5bTHLSKTUrULe8wG1QwmLpt",
+    "name": "Cozy",
+    "emoji": "🧑🏿‍🦽‍➡️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GmM5UFm8xu6TnZD7avwYcQ1zq25hD5yvHfYyAksHu9vB",
+    "name": "TOP PNUT",
+    "emoji": "🥇",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GPowjEv4Hm84z2nbE7xsFwwBFDNouvqo8SbhzvKXg5xo",
+    "name": "xander",
+    "emoji": "👦",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GrdLTbWMoLT7iKG46cKKdyDVB6SE1m2BhUE2mU6kvpvZ",
+    "name": "Saved wallet",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Grx451o9TBJp9dfVbMgzictW2TUbMFmaNhTu62DnMCMC",
+    "name": "FOMO,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GTvBQnRvAPweU2qmYg8MDLND2PAAyYFKe35aKQGMRDaL",
+    "name": "Polar",
+    "emoji": "🥶",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GwDybiKoLkqtJbf7r52mmgbN9UpGT7yM9dH1QhxMfXSD",
+    "name": "callers",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GxNa3Fza4e3GSDqccT978EuheTwu7af3DaB6JkqPtjU5",
+    "name": "mafia",
+    "emoji": "🧬",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "GzNus5Ka6kjJrqKCJRHmEVLiAS3HJ9RrBp1mdnxqGXTb",
+    "name": "goatse",
+    "emoji": "🐐",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HABhDh9zrzf8mA4SBo1yro8M6AirH2hZdLNPpuvMH6iA",
+    "name": "Bugha",
+    "emoji": "🦗",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HbCxe8yWQJWnK3f3FX4oohgm87FZuPYD4Ydszqxgkwft",
+    "name": "Noodles15",
+    "emoji": "✡",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Hbod3y29PUnpUxGT8zfWAB994JESwhSc5wasFqUgg2tD",
+    "name": "Litecoin2?",
+    "emoji": "👥",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HD5fsofvcEaSimExUkPQxYPec3nT8g2tP2tw8oGPrpBT",
+    "name": "Ant",
+    "emoji": "🐜",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HDQxSKsEageazs7chBjkav8SPvYtmR33dt4M2eLcUF9T",
+    "name": "TRUMP3,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HdxkiXqeN6qpK2YbG51W23QSWj3Yygc1eEk2zwmKJExp",
+    "name": "tobi",
+    "emoji": "👩🏼‍🦲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HeEkai8pfxz9rcMNniebWXCjhsdH1QypM2RmEZZ9PZZK",
+    "name": "septic",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HkFt55P3PhRWHXoTFeuvkKEE4ab26xZ1bk6UmXV88Pwz",
+    "name": "TERP NEW",
+    "emoji": "🐢",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HLv6yCEpgjQV9PcKsvJpem8ESyULTyh9HjHn9CtqSek1",
+    "name": "Lyxe",
+    "emoji": "🛡️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh",
+    "name": "Orangie",
+    "emoji": "🍊",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "Hnnw2hAgPgGiFKouRWvM3fSk3HnYgRv4Xq1PjUEBEuWM",
+    "name": "Gm5",
+    "emoji": "😴",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HPqi5YVBkxSboumonwVD431Xkv1ae2pim96zkGyTdDRC",
+    "name": "Von",
+    "emoji": "🦈",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HQEPriPrMARxj3sYpQLq5przbHt9w645YZj19R7TtLj4",
+    "name": "ditch",
+    "emoji": "🎲",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HRdSabSdbNsrzMXvAAMn9SDXTBt8YbtZiUhm64MDkh8c",
+    "name": "Noodle1",
+    "emoji": "☑",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HrTZPWV4ZPebBiwyzoTBajCD49kQqVwf4dwsLuYG8CXX",
+    "name": "Killz",
+    "emoji": "🔪",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HTCWL88r6vkCGB3bgdowjd7S6G1XGjfRHVo71KVHpH7E",
+    "name": "Scammer 3.2",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HtucFepgUkMpHdrYsxMqjBNN6qVBdjmFaLZneNXopuJm",
+    "name": "frostyjayys",
+    "emoji": "❄️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HUhNKGLXXqfpGmYG7ZbUanB1J9HqXBqsUzFb9ygVYJQo",
+    "name": "caller??",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HUpPyLU8KWisCAr3mzWy2FKT6uuxQ2qGgJQxyTpDoes5",
+    "name": "0xSun",
+    "emoji": "🧍‍♀️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HV2M21ugqag314qWnjqpnaJYU3kN6oqwFujuPGawrWzF",
+    "name": "Scammer 2.5",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HWTVoxH2HaknzqanZXRxPa2L5tUkVixiLn5ZxTMtWU9N",
+    "name": "DUMBASS",
+    "emoji": "⛔️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HxeTT8h1Ywzag5ss4HMaqEBdsVZCDtohtFnRwTuZeigg",
+    "name": "leck",
+    "emoji": "🐼",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HXkaN7TAQYXsybY1UHLrn18cVa9jgM3mbReasbAoSjTv",
+    "name": "Gm6",
+    "emoji": "🏃🏼‍♂️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HXkP2HJ3436u1urLnLsupqjtX1647bA2TtcHNWiDt49U",
+    "name": "pnut Trader",
+    "emoji": "🥜",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HydraNtEmp8GCfWayGDB7dpR9SyH4eBAha2MTFa3xMx2",
+    "name": "Insider 5",
+    "emoji": "🏧",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "HyYNVYmnFmi87NsQqWzLJhUTPBKQUfgfhdbBa554nMFF",
+    "name": "fart",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+    "name": "west",
+    "emoji": "🎹",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "kQdJVZvix2BPCz2i46ErUPk2a74Uf37QZL5jsRdAD8y",
+    "name": "KryptoKing",
+    "emoji": "🤴",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "m7Kaas3Kd8FHLnCioSjCoSuVDReZ6FDNBVM6HTNYuF7",
+    "name": "FERB",
+    "emoji": "👓",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "NFJKkZ7yeoAvfHLWNiqAw6CYKWnVAVAQu5PE3AC3qYt",
+    "name": "SOLSHOOTA",
+    "emoji": "🔫",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "niggerd597QYedtvjQDVHZTCCGyJrwHNm2i49dkm5zS",
+    "name": "Bot",
+    "emoji": "🤖",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "omTadjE3aDzfMzRYvUt323hkuxhn1crt91mFf3Ebshq",
+    "name": "omtad",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "pigkea5w3wnxFvsitH8WScRV8jPKN2HaiCtvYoQk3kB",
+    "name": "omtad",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "qNGhUruCGJpXJdsnV74USHErcbm3CrXRsnP8D6Z34Hh",
+    "name": "dan",
+    "emoji": "👻",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "QVxRBmHi4GYQQFs9v5rz9B69e9DpoU1P7CtogFPTs4c",
+    "name": "TEST DEV",
+    "emoji": "🔧",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "rApidy7a3AjUvtxFq32wejNXEUmvCY8R8rQUomcbBD3",
+    "name": "Rapid",
+    "emoji": "🏇",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "RFSqPtn1JfavGiUD4HJsZyYXvZsycxf31hnYfbyG6iB",
+    "name": "alvin/patty",
+    "emoji": "🐿️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "RH6epK9UW5vA5rm23FcLi4rPuTJjwya6UQJeG1tigv3",
+    "name": "Grandfnf7",
+    "emoji": "🗞️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "rKwPeaDrHqpmwFx4qbYttSTsUWqtAE4gsFr6MVKbTo5",
+    "name": "Dad,",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "RPDqchcAPGzaVBDXWipNpk4ZJAqEGsuuumkUiKsTZee",
+    "name": "Scammer 3.3",
+    "emoji": "⚠️",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "suqh5sHtr8HyJ7q8scBimULPkPpA557prMG47xCHQfK",
+    "name": "CUPSEY ",
+    "emoji": "🏅",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "TaPirMo4r8ijjikM98h1uazub7yMsX74AEH9Ga89cvt",
+    "name": "omtad",
+    "emoji": "😈",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "ve94tFcRnLnwMGf7e5mUXMyAkzzcS4qkzSKZGsQV4kk",
+    "name": "+1M PNL 65%",
+    "emoji": "💹",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "WniwuJMPtfvrJVzJ9rHJ29oKopTS9MvxvoaofM26uhs",
+    "name": "absol",
+    "emoji": "😀",
+    "alertsOn": false
+  },
+  {
+    "trackedWalletAddress": "XDgpjPubjN5soLAFmAMjD2uVR1XZxUKgNpMU6Eo97H7",
+    "name": "Cented",
+    "emoji": "👽️",
+    "alertsOn": false
+  }
+]

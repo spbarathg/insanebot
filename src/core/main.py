@@ -147,7 +147,7 @@ except ImportError as e:
     
     class RiskScorer:
         async def initialize(self): return True
-        async def score_risk(self, *args, **kwargs): return {"risk_score": 0.5}
+        async def calculate_risk_score(self, *args, **kwargs): return {"risk_score": 0.5}
 
 # Import execution engine with error handling
 try:
@@ -164,13 +164,32 @@ except ImportError as e:
     EXECUTION_ENGINE_AVAILABLE = False
     logger.warning(f"⚠️ Execution Engine import failed: {str(e)} - will use basic execution")
     
-    # Create placeholder class
+    # Create placeholder classes
     class ExecutionEngine:
         def __init__(self, jupiter_service, helius_service): 
             self.jupiter_service = jupiter_service
             self.helius_service = helius_service
         async def initialize(self): return True
         async def execute_trade(self, *args, **kwargs): return {"success": False, "message": "Advanced execution not available"}
+    
+    class OrderType:
+        MARKET = "market"
+    
+    class ExecutionStrategy:
+        SMART = "smart"
+        STEALTH = "stealth"
+        AGGRESSIVE = "aggressive"
+    
+    class ExecutionParams:
+        def __init__(self, max_slippage=0.01, max_price_impact=0.02, execution_timeout=60.0, 
+                     split_threshold=500.0, max_order_chunks=8, mev_protection=True, gas_optimization=True):
+            self.max_slippage = max_slippage
+            self.max_price_impact = max_price_impact
+            self.execution_timeout = execution_timeout
+            self.split_threshold = split_threshold
+            self.max_order_chunks = max_order_chunks
+            self.mev_protection = mev_protection
+            self.gas_optimization = gas_optimization
 
 # Configure logging
 logger.add("logs/portfolio.log", rotation="5 MB", level="INFO", 
@@ -1041,7 +1060,7 @@ class MemeCoinBot:
             logger.bind(ML=True).debug(f"⚠️ Running risk assessment for {metadata.get('symbol', 'UNKNOWN')}...")
             risk_score = None
             try:
-                risk_score = await self.risk_scorer.score_risk(
+                risk_score = await self.risk_scorer.calculate_risk_score(
                     token_address, token_data, token_data["price_history"], holders_data
                 )
                 if risk_score:
@@ -1219,7 +1238,7 @@ class MemeCoinBot:
             sol_price = 100.0  # Approximate SOL price in USD
             
             # Determine execution strategy based on market conditions and ML analysis
-            execution_strategy = "SMART"  # Default to smart strategy (simplified since execution engine is disabled)
+            execution_strategy = ExecutionStrategy.SMART  # Default to smart strategy (simplified since execution engine is disabled)
             
             # Get ML analysis for execution optimization
             ml_signal = self.market_data_cache.get(f"{token_address}_ml_signal")
@@ -1227,29 +1246,29 @@ class MemeCoinBot:
             
             # Adjust execution strategy based on ML insights and validation results
             if validation_result.security_level == SecurityLevel.HIGH:
-                execution_strategy = "STEALTH"  # High risk = stealth
+                execution_strategy = ExecutionStrategy.STEALTH  # High risk = stealth
             elif risk_score:
                 if risk_score.risk_score > 0.7:
-                    execution_strategy = "STEALTH"  # High risk = stealth
+                    execution_strategy = ExecutionStrategy.STEALTH  # High risk = stealth
                 elif risk_score.risk_score < 0.3:
-                    execution_strategy = "AGGRESSIVE"  # Low risk = aggressive
+                    execution_strategy = ExecutionStrategy.AGGRESSIVE  # Low risk = aggressive
             
             # Set execution parameters based on risk and market conditions (simplified)
-            execution_params = {
-                "max_slippage": sanitized_params["slippage"] / 100,  # Convert percentage to decimal
-                "max_price_impact": sanitized_params["max_price_impact"] / 100 if sanitized_params["max_price_impact"] else 0.02,
-                "execution_timeout": 60.0,  # 60 seconds timeout
-                "split_threshold": 500.0,  # Split orders >$500
-                "max_order_chunks": 8,
-                "mev_protection": True,
-                "gas_optimization": True
-            }
+            execution_params = ExecutionParams(
+                max_slippage=sanitized_params["slippage"] / 100,  # Convert percentage to decimal
+                max_price_impact=sanitized_params["max_price_impact"] / 100 if sanitized_params["max_price_impact"] else 0.02,
+                execution_timeout=60.0,  # 60 seconds timeout
+                split_threshold=500.0,  # Split orders >$500
+                max_order_chunks=8,
+                mev_protection=True,
+                gas_optimization=True
+            )
             
             # Additional security check for high-risk validation results
-            if validation_result.security_level in [SecurityLevel.HIGH, SecurityLevel.CRITICAL]:
-                execution_params["max_slippage"] *= 0.7  # Even tighter slippage
-                execution_params["split_threshold"] *= 0.3  # Smaller chunks
-                execution_params["mev_protection"] = True  # Force MEV protection
+            if validation_result.security_level == SecurityLevel.HIGH:
+                execution_params.max_slippage *= 0.7  # Even tighter slippage
+                execution_params.split_threshold *= 0.3  # Smaller chunks
+                execution_params.mev_protection = True  # Force MEV protection
             
             if action == "buy":
                 logger.info(f"🚀 Executing VALIDATED ADVANCED BUY: {amount} SOL of {token_symbol}")
