@@ -657,35 +657,155 @@ class FoundingAntQueen(BaseAnt):
     async def update_system_metrics(self):
         """Update system-wide metrics"""
         try:
-            total_ants = 1  # Founding Queen
             total_capital = self.capital.current_balance
             total_trades = 0
-            system_profit = 0.0
+            total_profit = 0.0
+            total_ants = 1  # Founding Queen
             
-            # Aggregate Queen metrics
+            # Aggregate metrics from all Queens
             for queen in self.queens.values():
-                total_ants += 1  # Queen
                 total_capital += queen.capital.current_balance
+                total_trades += queen.performance.total_trades
+                total_profit += queen.performance.total_profit
+                total_ants += 1  # Queen
                 
-                # Aggregate Princess metrics
+                # Add Princess metrics
                 for princess in queen.princesses.values():
-                    total_ants += 1  # Princess
                     total_capital += princess.capital.current_balance
                     total_trades += princess.performance.total_trades
-                    system_profit += princess.performance.total_profit
+                    total_profit += princess.performance.total_profit
+                    total_ants += 1  # Princess
             
             self.system_metrics.update({
                 "total_ants": total_ants,
                 "total_capital": total_capital,
                 "total_trades": total_trades,
-                "system_profit": system_profit,
-                "uptime": time.time() - self.system_metrics["system_start_time"],
-                "avg_profit_per_trade": system_profit / total_trades if total_trades > 0 else 0
+                "system_profit": total_profit,
+                "runtime_hours": (time.time() - self.system_metrics["system_start_time"]) / 3600
             })
             
         except Exception as e:
-            logger.error(f"System metrics update error: {str(e)}")
+            logger.error(f"Error updating system metrics: {str(e)}")
     
+    async def process_operations(self):
+        """Process all Founding Queen operations"""
+        try:
+            # Update system metrics
+            await self.update_system_metrics()
+            
+            # Check if we need to create more Queens
+            if self.should_split() and len(self.queens) < self.config["max_children"]:
+                await self.create_queen()
+            
+            # Check for underperforming Queens that should be merged
+            queens_to_merge = []
+            for queen_id, queen in self.queens.items():
+                if queen.should_merge():
+                    queens_to_merge.append(queen_id)
+            
+            # Process Queen merging (simplified - just reclaim capital)
+            for queen_id in queens_to_merge:
+                await self.merge_queen(queen_id)
+            
+            self.update_activity()
+            
+        except Exception as e:
+            logger.error(f"Error processing Founding Queen operations: {str(e)}")
+    
+    async def merge_queen(self, queen_id: str) -> bool:
+        """Merge an underperforming Queen and redistribute assets"""
+        try:
+            if queen_id not in self.queens:
+                return False
+            
+            queen = self.queens[queen_id]
+            
+            # Retire all Princesses first
+            princess_ids = list(queen.princesses.keys())
+            for princess_id in princess_ids:
+                await queen.retire_princess(princess_id)
+            
+            # Reclaim Queen capital
+            reclaimed_capital = queen.capital.current_balance
+            self.capital.update_balance(self.capital.current_balance + reclaimed_capital)
+            
+            # Remove Queen
+            del self.queens[queen_id]
+            self.children.remove(queen_id)
+            
+            logger.info(f"Founding Queen merged Queen {queen_id}: {reclaimed_capital:.4f} SOL reclaimed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error merging Queen {queen_id}: {str(e)}")
+            return False
+    
+    async def apply_ai_insights(self, insights: Dict[str, Any]):
+        """Apply AI insights to the system"""
+        try:
+            # Process insights for system-level decisions
+            if "system_recommendations" in insights:
+                recommendations = insights["system_recommendations"]
+                
+                # Handle expansion recommendations
+                if recommendations.get("expand_queens", False):
+                    await self.create_queen()
+                
+                # Handle capital reallocation
+                if "capital_reallocation" in recommendations:
+                    await self._reallocate_capital(recommendations["capital_reallocation"])
+            
+            # Distribute insights to Queens
+            for queen in self.queens.values():
+                if hasattr(queen, 'apply_ai_insights'):
+                    await queen.apply_ai_insights(insights)
+            
+        except Exception as e:
+            logger.error(f"Error applying AI insights: {str(e)}")
+    
+    async def _reallocate_capital(self, reallocation_plan: Dict[str, float]):
+        """Reallocate capital based on AI recommendations"""
+        try:
+            for queen_id, target_capital in reallocation_plan.items():
+                if queen_id in self.queens:
+                    queen = self.queens[queen_id]
+                    current_capital = queen.capital.current_balance
+                    
+                    if target_capital > current_capital:
+                        # Allocate more capital
+                        additional = target_capital - current_capital
+                        if self.capital.allocate_capital(additional):
+                            queen.capital.update_balance(target_capital)
+                    elif target_capital < current_capital:
+                        # Reclaim excess capital
+                        excess = current_capital - target_capital
+                        queen.capital.current_balance = target_capital
+                        queen.capital.available_capital = max(0, target_capital - queen.capital.allocated_capital)
+                        self.capital.update_balance(self.capital.current_balance + excess)
+            
+        except Exception as e:
+            logger.error(f"Error reallocating capital: {str(e)}")
+    
+    async def save_state(self):
+        """Save system state for persistence"""
+        try:
+            state = {
+                "founding_queen": self.get_status_summary(),
+                "queens": {qid: queen.get_queen_status() for qid, queen in self.queens.items()},
+                "system_metrics": self.system_metrics,
+                "timestamp": time.time()
+            }
+            
+            # Save to file (simplified implementation)
+            import json
+            with open("ant_system_state.json", "w") as f:
+                json.dump(state, f, indent=2)
+            
+            logger.info("System state saved successfully")
+            
+        except Exception as e:
+            logger.error(f"Error saving system state: {str(e)}")
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status"""
         status = self.get_status_summary()

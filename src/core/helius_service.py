@@ -466,7 +466,22 @@ class HeliusService:
             
             params = {"limit": limit}
             response = await self._make_api_request(f"tokens/{token_address}/holders", params=params)
-            return response.get("holders", [])
+            
+            # Fix: Handle None response properly
+            if response is None:
+                logger.debug(f"No holder data available for token {token_address}")
+                return []
+            
+            # Fix: Handle different response formats
+            if isinstance(response, dict):
+                holders = response.get("holders", [])
+            elif isinstance(response, list):
+                holders = response
+            else:
+                logger.warning(f"Unexpected response format for holders: {type(response)}")
+                return []
+            
+            return holders if holders else []
             
         except Exception as e:
             logger.error(f"Failed to get token holders for {token_address}: {str(e)}")

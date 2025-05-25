@@ -639,8 +639,8 @@ class CrossDEXScanner:
                 return None  # No arbitrage opportunity
             
             # STEP 4: Validate price deviation isn't suspicious
-            price_deviation = abs(sell_price - buy_price) / buy_price
-            if price_deviation > self.max_price_deviation:
+            price_deviation = self._calculate_safe_price_deviation(buy_price, sell_price)
+            if price_deviation > self.max_price_deviation or price_deviation == float('inf'):
                 logger.debug(f"Price deviation too high: {price_deviation:.2%} (max: {self.max_price_deviation:.2%})")
                 return None
             
@@ -943,4 +943,59 @@ class CrossDEXScanner:
         logger.info("Closing CrossDEXScanner...")
         # Clear active opportunities
         self.active_opportunities.clear()
-        logger.info("CrossDEXScanner closed") 
+        logger.info("CrossDEXScanner closed")
+    
+    def _calculate_safe_price_deviation(self, price1: float, price2: float) -> float:
+        """Calculate price deviation with safety checks for extreme values."""
+        try:
+            if price1 <= 0 or price2 <= 0:
+                logger.debug(f"Invalid prices for deviation: {price1}, {price2}")
+                return float('inf')  # Invalid prices
+            
+            # Avoid division by very small numbers
+            min_price = min(price1, price2)
+            if min_price < 1e-10:  # Extremely small price
+                logger.debug(f"Extremely small price detected: {min_price}")
+                return float('inf')
+            
+            # Calculate percentage difference
+            deviation = abs(price1 - price2) / min_price
+            
+            # Cap extreme deviations for logging
+            if deviation > 10:  # More than 1000% deviation is suspicious
+                logger.debug(f"Extreme price deviation detected: {deviation:.2%} (prices: {price1}, {price2})")
+                return float('inf')
+            
+            return deviation
+            
+        except Exception as e:
+            logger.error(f"Error calculating price deviation: {str(e)}")
+            return float('inf')
+    
+    def _validate_arbitrage_opportunity(self, opportunity_data: Dict) -> bool:
+        """Validate that an arbitrage opportunity is realistic."""
+        try:
+            profit_pct = opportunity_data.get('profit_percentage', 0)
+            buy_price = opportunity_data.get('buy_price', 0)
+            sell_price = opportunity_data.get('sell_price', 0)
+            
+            # Basic validation
+            if profit_pct <= 0 or buy_price <= 0 or sell_price <= 0:
+                return False
+            
+            # Deviation check
+            deviation = self._calculate_safe_price_deviation(buy_price, sell_price)
+            if deviation > 0.5:  # More than 50% deviation is suspicious
+                logger.debug(f"Rejecting opportunity with high deviation: {deviation:.2%}")
+                return False
+            
+            # Profit threshold (reasonable range)
+            if profit_pct < 0.1 or profit_pct > 20:  # Between 0.1% and 20%
+                logger.debug(f"Rejecting opportunity with unrealistic profit: {profit_pct:.2f}%")
+                return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error validating arbitrage opportunity: {str(e)}")
+            return False 

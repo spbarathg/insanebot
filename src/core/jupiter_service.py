@@ -11,6 +11,56 @@ from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, field
 from loguru import logger
 
+class JupiterRateLimiter:
+    """Enhanced rate limiting for Jupiter API"""
+    
+    def __init__(self):
+        self.last_request_time = 0
+        self.min_interval = 0.1  # Minimum 100ms between requests
+        self.backoff_factor = 1.5
+        self.max_backoff = 30
+        self.current_backoff = 1
+        self._request_count = 0
+        self._window_start = time.time()
+        self._max_requests_per_window = 50  # Conservative limit
+        self._window_duration = 60  # 1 minute window
+    
+    async def wait_if_needed(self):
+        """Wait if we need to respect rate limits"""
+        current_time = time.time()
+        
+        # Check request window
+        if current_time - self._window_start > self._window_duration:
+            self._window_start = current_time
+            self._request_count = 0
+        
+        # Check if we're hitting request limits
+        if self._request_count >= self._max_requests_per_window:
+            wait_time = self._window_duration - (current_time - self._window_start)
+            if wait_time > 0:
+                logger.info(f"Rate limit window exceeded, waiting {wait_time:.1f}s")
+                await asyncio.sleep(wait_time)
+                self._window_start = time.time()
+                self._request_count = 0
+        
+        # Minimum interval between requests
+        time_since_last = current_time - self.last_request_time
+        if time_since_last < self.min_interval:
+            wait_time = self.min_interval - time_since_last
+            await asyncio.sleep(wait_time)
+        
+        self.last_request_time = time.time()
+        self._request_count += 1
+    
+    async def handle_rate_limit(self, response_status: int):
+        """Handle rate limit response with exponential backoff"""
+        if response_status == 429:
+            logger.warning(f"Rate limited, backing off for {self.current_backoff}s")
+            await asyncio.sleep(self.current_backoff)
+            self.current_backoff = min(self.current_backoff * self.backoff_factor, self.max_backoff)
+        else:
+            self.current_backoff = 1  # Reset on success
+
 @dataclass
 class SwapQuote:
     """Represents a swap quote from Jupiter."""
@@ -66,6 +116,9 @@ class JupiterService:
         self.max_retries = 3
         self.timeout = 30
         
+        # Enhanced rate limiting
+        self.rate_limiter = JupiterRateLimiter()
+        
         # Real-time cache for performance optimization
         self._quote_cache = {}
         self._cache_ttl = 5  # 5 seconds cache for quotes (very short for real-time data)
@@ -73,8 +126,11 @@ class JupiterService:
         logger.info("✅ Jupiter Service initialized - REAL API MODE ONLY")
     
     async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
-        """Make API request to Jupiter with real data only."""
+        """Make API request to Jupiter with enhanced rate limiting."""
         try:
+            # Apply rate limiting before making request
+            await self.rate_limiter.wait_if_needed()
+            
             if not self.session:
                 import aiohttp
                 timeout = aiohttp.ClientTimeout(total=self.timeout)
@@ -93,6 +149,7 @@ class JupiterService:
                                 if 'application/json' in content_type:
                                     data = await response.json()
                                     logger.debug(f"Jupiter API success: {endpoint}")
+                                    await self.rate_limiter.handle_rate_limit(200)  # Reset backoff on success
                                     return data
                                 else:
                                     logger.warning(f"Jupiter API returned non-JSON content: {content_type}")
@@ -100,9 +157,7 @@ class JupiterService:
                                     logger.debug(f"Response content: {text_response[:200]}...")
                                     return None
                             elif response.status == 429:  # Rate limited
-                                wait_time = 2 ** attempt
-                                logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
-                                await asyncio.sleep(wait_time)
+                                await self.rate_limiter.handle_rate_limit(429)
                                 continue
                             elif response.status == 404:
                                 logger.debug(f"Jupiter API endpoint not found: {endpoint}")
@@ -118,14 +173,13 @@ class JupiterService:
                                 if 'application/json' in content_type:
                                     data = await response.json()
                                     logger.debug(f"Jupiter API POST success: {endpoint}")
+                                    await self.rate_limiter.handle_rate_limit(200)  # Reset backoff on success
                                     return data
                                 else:
                                     logger.warning(f"Jupiter API returned non-JSON content: {content_type}")
                                     return None
                             elif response.status == 429:  # Rate limited
-                                wait_time = 2 ** attempt
-                                logger.warning(f"Jupiter API rate limited, waiting {wait_time}s")
-                                await asyncio.sleep(wait_time)
+                                await self.rate_limiter.handle_rate_limit(429)
                                 continue
                             else:
                                 logger.warning(f"Jupiter API POST error {response.status} for {endpoint}")
