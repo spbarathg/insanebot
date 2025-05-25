@@ -7,7 +7,6 @@ services:
       dockerfile: compatible.Dockerfile
     container_name: solana-trading-bot
     restart: unless-stopped
-    env_file: .env
     volumes:
       - ./data:/app/data:rw
       - ./logs:/app/logs:rw
