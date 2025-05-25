@@ -390,7 +390,7 @@ class LocalLLM:
                 action = "hold"
                 # Make hold signals more dynamic based on market conditions
                 price_change = 0
-                if len(price_history) >= 2:
+                if len(price_history) >= 2 and price_history[-2] != 0:
                     price_change = (price_history[-1] - price_history[-2]) / price_history[-2]
                 
                 # Adjust confidence based on trend strength and fundamentals
@@ -534,10 +534,17 @@ class LocalLLM:
             # Price history volatility risk
             price_history = self._get_token_price_history(token_address)
             if len(price_history) > 5:
-                # Calculate price volatility
-                returns = [price_history[i] / price_history[i-1] - 1 for i in range(1, len(price_history))]
-                volatility = np.std(returns) if len(returns) > 0 else 0
-                volatility_risk = min(volatility * 10, 1.0)
+                # Calculate price volatility - safely handle division by zero
+                returns = []
+                for i in range(1, len(price_history)):
+                    if price_history[i-1] != 0:  # Prevent division by zero
+                        returns.append(price_history[i] / price_history[i-1] - 1)
+                
+                if len(returns) > 0:
+                    volatility = np.std(returns)
+                    volatility_risk = min(volatility * 10, 1.0)
+                else:
+                    volatility_risk = 0.5  # Default if no valid returns
             else:
                 volatility_risk = 0.5  # Default if not enough history
             

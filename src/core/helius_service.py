@@ -259,33 +259,43 @@ class HeliusService:
             try:
                 import aiohttp
                 async with aiohttp.ClientSession() as session:
-                    # Get token price via Jupiter API
-                    jupiter_url = f"https://price.jup.ag/v4/price"
-                    params = {"ids": token_address}
+                    # Try multiple Jupiter API endpoints for DNS failover
+                    jupiter_endpoints = [
+                        "https://price.jup.ag/v4/price",
+                        "https://quote-api.jup.ag/v6/price", 
+                        "https://api.jup.ag/price/v1"  # Alternative endpoint
+                    ]
                     
-                    async with session.get(jupiter_url, params=params, timeout=aiohttp.ClientTimeout(total=5.0)) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            token_data = data.get("data", {}).get(token_address)
-                            if token_data:
-                                price_data = {
-                                    "address": token_address,
-                                    "price_usd": token_data.get("price", 0),
-                                    "price_change_1h": 0,  # Jupiter doesn't provide change data
-                                    "price_change_24h": 0,
-                                    "volume_24h": 0,
-                                    "market_cap": 0,
-                                    "liquidity": 0,
-                                    "timestamp": current_time
-                                }
-                                
-                                # Cache the result
-                                self._price_cache[cache_key] = {
-                                    'data': price_data,
-                                    'timestamp': current_time
-                                }
-                                
-                                return price_data
+                    for endpoint in jupiter_endpoints:
+                        try:
+                            params = {"ids": token_address}
+                            async with session.get(endpoint, params=params, timeout=aiohttp.ClientTimeout(total=3.0)) as response:
+                                if response.status == 200:
+                                    data = await response.json()
+                                    token_data = data.get("data", {}).get(token_address)
+                                    if token_data:
+                                        price_data = {
+                                            "address": token_address,
+                                            "price_usd": token_data.get("price", 0),
+                                            "price_change_1h": 0,  # Jupiter doesn't provide change data
+                                            "price_change_24h": 0,
+                                            "volume_24h": 0,
+                                            "market_cap": 0,
+                                            "liquidity": 0,
+                                            "timestamp": current_time
+                                        }
+                                        
+                                        # Cache the result
+                                        self._price_cache[cache_key] = {
+                                            'data': price_data,
+                                            'timestamp': current_time
+                                        }
+                                        
+                                        return price_data
+                        except Exception as endpoint_error:
+                            logger.debug(f"Jupiter endpoint {endpoint} failed: {str(endpoint_error)}")
+                            continue  # Try next endpoint
+                            
             except Exception as e:
                 logger.debug(f"Jupiter price API failed: {str(e)}")
             

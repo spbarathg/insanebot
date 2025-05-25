@@ -1064,14 +1064,12 @@ class MemeCoinBot:
                     token_address, token_data, token_data["price_history"], holders_data
                 )
                 if risk_score:
-                    logger.bind(ML=True).info(
-                        f"⚠️ Risk assessment for {metadata.get('symbol', 'UNKNOWN')}: "
-                        f"{risk_score.risk_category.upper()} risk "
-                        f"(Score: {risk_score.risk_score:.2f}, "
-                        f"Max position: {risk_score.recommended_position_size:.1%})"
-                    )
+                    logger.bind(ML=True).info(f"⚠️ Risk Score: {risk_score.overall_risk_score:.2f}/1.0")
+                    # Store risk score for later use
+                    self.market_data_cache[f"{token_address}_risk_score"] = risk_score
             except Exception as e:
-                logger.bind(ML=True).error(f"Error in risk assessment: {str(e)}")
+                logger.error(f"Error in risk assessment: {str(e)}")
+                risk_score = None
             
             # Phase 5: Generate ML Trading Signal
             ml_signal = self._generate_ml_signal(
@@ -1248,10 +1246,12 @@ class MemeCoinBot:
             if validation_result.security_level == SecurityLevel.HIGH:
                 execution_strategy = ExecutionStrategy.STEALTH  # High risk = stealth
             elif risk_score:
-                if risk_score.risk_score > 0.7:
+                if risk_score.overall_risk_score > 0.7:
                     execution_strategy = ExecutionStrategy.STEALTH  # High risk = stealth
-                elif risk_score.risk_score < 0.3:
+                elif risk_score.overall_risk_score < 0.3:
                     execution_strategy = ExecutionStrategy.AGGRESSIVE  # Low risk = aggressive
+                else:
+                    execution_strategy = ExecutionStrategy.SMART  # Medium risk = smart
             
             # Set execution parameters based on risk and market conditions (simplified)
             execution_params = ExecutionParams(
