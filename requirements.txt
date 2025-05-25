@@ -7,6 +7,9 @@ python-dotenv==1.0.0
 requests==2.31.0
 websockets>=11.0
 
+# System monitoring
+psutil>=5.9.0
+
 # Logging
 loguru>=0.7.0
 
