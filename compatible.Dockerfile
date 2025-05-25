@@ -4,7 +4,6 @@ FROM python:3.10-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=off \
-    POETRY_VERSION=1.4.2 \
     PATH="/app/.venv/bin:$PATH"
 
 # Install system dependencies
@@ -31,28 +30,35 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
 # Create necessary directories with proper permissions
-RUN mkdir -p /app/data /app/logs /app/config && \
+RUN mkdir -p /app/data /app/logs /app/config /app/models && \
     chown -R appuser:appuser /app
 
-# Copy application code
+# Copy Enhanced Ant Bot application code
 COPY src /app/src
+COPY config /app/config
 COPY scripts /app/scripts
+COPY enhanced_main_entry.py /app/
+COPY start_without_grok.py /app/
+COPY run_enhanced_ant_bot.py /app/
+COPY config.py /app/
 
 # Set permissions
-RUN chmod -R 755 /app/src && \
-    chmod -R 777 /app/data /app/logs /app/config
+RUN chmod -R 755 /app/src /app/config && \
+    chmod -R 777 /app/data /app/logs && \
+    chmod +x /app/enhanced_main_entry.py /app/start_without_grok.py /app/run_enhanced_ant_bot.py
 
 # Switch to non-root user
 USER appuser
 
-# Set environment variables for Solana
+# Set environment variables for Enhanced Ant Bot
 ENV SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-ENV SIMULATION_MODE=True
-ENV SIMULATION_CAPITAL=0.1
+ENV SIMULATION_MODE=False
+ENV INITIAL_CAPITAL=0.1
+ENV USE_MOCK_GROK=true
 
-# Run the application
-CMD ["python", "src/main.py"]
+# Run the Enhanced Ant Bot
+CMD ["python", "start_without_grok.py"]
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+# Health check - using simple script check since no web server by default
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD python -c "import sys; sys.path.append('.'); from src.core.quicknode_service import QuickNodeService; print('Health check passed')" || exit 1

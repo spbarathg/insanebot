@@ -1,17 +1,17 @@
 version: '3.8'
 
 services:
-  trading-bot:
+  enhanced-ant-bot:
     build:
       context: .
       dockerfile: compatible.Dockerfile
-    container_name: solana-trading-bot
+    container_name: enhanced-ant-bot
     restart: unless-stopped
     volumes:
       - ./data:/app/data:rw
       - ./logs:/app/logs:rw
       - ./config:/app/config:rw
-      - ./models:/app/models
+      - ./models:/app/models:rw
     depends_on:
       - prometheus
       - grafana
@@ -29,25 +29,46 @@ services:
       - "8000:8000"
       - "8001:8001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "from src.core.quicknode_service import QuickNodeService; print('Health OK')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 60s
     user: "1000:1000"
     env_file:
       - .env
     environment:
-      - SIMULATION_MODE=True
-      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-      - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      # Enhanced Ant Bot Configuration
+      - SIMULATION_MODE=False
+      - INITIAL_CAPITAL=0.1
+      - USE_MOCK_GROK=true
+      
+      # API Keys (from .env file)
+      - QUICKNODE_ENDPOINT_URL=${QUICKNODE_ENDPOINT_URL}
       - HELIUS_API_KEY=${HELIUS_API_KEY}
       - JUPITER_API_KEY=${JUPITER_API_KEY}
+      - GROK_API_KEY=${GROK_API_KEY:-}
+      
+      # Solana Configuration
+      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+      - NETWORK=mainnet-beta
+      
+      # Wallet Configuration
       - PRIVATE_KEY=${PRIVATE_KEY}
+      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY}
+      - WALLET_ADDRESS=${WALLET_ADDRESS}
+      
+      # System Configuration
       - LOG_LEVEL=INFO
-      - JUPITER_API_URL=https://quote-api.jup.ag/v6
       - PYTHONUNBUFFERED=1
+      - ENABLE_MONITORING=true
+      
+      # Trading Configuration
+      - MAX_CONCURRENT_TRADES=5
+      - MAX_POSITION_SIZE=0.1
+      - MIN_POSITION_SIZE=0.01
+      - STOP_LOSS_PERCENTAGE=0.05
+      - TAKE_PROFIT_PERCENTAGE=0.1
 
   prometheus:
     image: prom/prometheus:latest
