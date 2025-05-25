@@ -110,7 +110,7 @@ except ImportError as e:
         async def initialize(self): 
             return True
         
-        async def scan_for_opportunities(self, *args, **kwargs): 
+        async def scan_arbitrage_opportunities(self, *args, **kwargs): 
             return []
 
 # Import ML engine components with error handling
@@ -814,7 +814,7 @@ class MemeCoinBot:
                     
                     # Phase 2: Scan for arbitrage opportunities
                     logger.bind(ARBITRAGE=True).debug("🔍 Scanning for arbitrage opportunities...")
-                    arbitrage_opportunities = await self.arbitrage_scanner.scan_for_opportunities()
+                    arbitrage_opportunities = await self.arbitrage_scanner.scan_arbitrage_opportunities()
                     
                     if arbitrage_opportunities:
                         self.arbitrage_opportunities_found += len(arbitrage_opportunities)
