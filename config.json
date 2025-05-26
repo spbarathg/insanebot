@@ -23,7 +23,11 @@
             "medium": 0.05,
             "high": 0.02,
             "extreme": 0.01
-        }
+        },
+        "max_token_exposure": 0.2,
+        "max_portfolio_exposure": 0.8,
+        "max_exposure": 0.7,
+        "max_drawdown": 0.1
     },
     "technical_analysis": {
         "rsi_overbought": 70,
@@ -32,5 +36,11 @@
         "trend_weight": 0.6,
         "fundamentals_weight": 0.3,
         "technicals_weight": 0.7
+    },
+    "position_limits": {
+        "max_position_size": 0.1,
+        "min_position_size": 0.001,
+        "max_positions": 10,
+        "position_concentration": 0.3
     }
-} 
+}

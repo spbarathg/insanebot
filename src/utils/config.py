@@ -73,6 +73,23 @@ TOKEN_WATCHLIST_FILE = DATA_DIR / "token_watchlist.json"
 PORTFOLIO_FILE = DATA_DIR / "portfolio.json"
 TRAINING_DATA_FILE = DATA_DIR / "training_data.json"
 
+# Risk limits configuration
+RISK_LIMITS = {
+    "max_token_exposure": float(os.getenv("MAX_TOKEN_EXPOSURE", "0.2")),  # 20% of portfolio per token
+    "max_portfolio_exposure": float(os.getenv("MAX_PORTFOLIO_EXPOSURE", "0.8")),  # 80% total exposure
+    "max_exposure": float(os.getenv("MAX_EXPOSURE", "0.7")),  # 70% overall risk exposure
+    "daily_loss_limit": DAILY_LOSS_LIMIT,
+    "max_drawdown": float(os.getenv("MAX_DRAWDOWN", "0.1")),  # 10% max drawdown
+}
+
+# Position limits configuration
+POSITION_LIMITS = {
+    "max_position_size": MAX_POSITION_SIZE,
+    "min_position_size": MIN_POSITION_SIZE,
+    "max_positions": int(os.getenv("MAX_POSITIONS", "10")),  # Maximum number of positions
+    "position_concentration": float(os.getenv("POSITION_CONCENTRATION", "0.3")),  # 30% max in single position
+}
+
 # Initialize with default settings
 settings_dict = {
     # Directories
@@ -133,6 +150,12 @@ settings_dict = {
     "TOKEN_WATCHLIST_FILE": TOKEN_WATCHLIST_FILE,
     "PORTFOLIO_FILE": PORTFOLIO_FILE,
     "TRAINING_DATA_FILE": TRAINING_DATA_FILE,
+    
+    # Risk limits configuration
+    "RISK_LIMITS": RISK_LIMITS,
+    
+    # Position limits configuration
+    "POSITION_LIMITS": POSITION_LIMITS,
 }
 
 # Load custom settings from config file if it exists
