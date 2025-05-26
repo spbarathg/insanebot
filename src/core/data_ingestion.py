@@ -341,16 +341,28 @@ class DataIngestion:
             # Get trending tokens from Jupiter (for discovery)
             if self.jupiter_service:
                 tokens = await self.jupiter_service.get_random_tokens(count=10)
+                # Extract addresses from token objects if needed
+                if tokens and isinstance(tokens[0], dict):
+                    token_addresses = [token.get("address", token) for token in tokens if token.get("address")]
+                else:
+                    token_addresses = tokens
             else:
                 # Fallback token list
-                tokens = [
+                token_addresses = [
                     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
                     "So11111111111111111111111111111111111111112",   # SOL
                 ]
             
             # Get detailed data for each token using QuickNode
-            for token_address in tokens[:5]:  # Limit to 5 for performance
+            for token_address in token_addresses[:5]:  # Limit to 5 for performance
                 try:
+                    # Ensure token_address is a string, not a dict
+                    if isinstance(token_address, dict):
+                        token_address = token_address.get("address")
+                    
+                    if not token_address or not isinstance(token_address, str):
+                        continue
+                        
                     # Get metadata from QuickNode
                     metadata = await self.quicknode_service.get_token_metadata(token_address)
                     

@@ -3,6 +3,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 from loguru import logger
+import time
 
 class PortfolioManager:
     def __init__(self):
@@ -49,15 +50,20 @@ class PortfolioManager:
         except Exception as e:
             logger.error(f"Error saving portfolio: {e}")
 
-    async def initialize(self, initial_balance: float):
-        """Initialize portfolio with initial balance"""
+    def initialize(self, starting_balance_sol: float = 0.1):
+        """Initialize portfolio with starting balance"""
         try:
-            self.daily_stats['start_balance'] = initial_balance
-            self.daily_stats['current_balance'] = initial_balance
-            self._save_portfolio()
-            logger.info(f"Portfolio initialized with {initial_balance} SOL")
+            # Set starting balance if portfolio is empty
+            if not self.positions and self.daily_stats.get('current_balance', 0) == 0:
+                self.daily_stats['start_balance'] = starting_balance_sol
+                self.daily_stats['current_balance'] = starting_balance_sol
+                logger.info(f"Portfolio initialized with {starting_balance_sol} SOL")
+                self._save_portfolio()
+            
+            return True
         except Exception as e:
             logger.error(f"Error initializing portfolio: {e}")
+            return False
 
     async def add_position(self, token: str, amount: float, price: float):
         """Add new position to portfolio"""
@@ -307,10 +313,51 @@ class PortfolioManager:
             return {
                 'total_positions': len(self.positions),
                 'total_value': total_value,
+                'current_value': total_value,
                 'total_pnl': total_pnl,
+                'unrealized_profit': total_pnl,
+                'percent_return': (total_pnl / max(total_value, 0.1)) * 100,
+                'max_drawdown': self.daily_stats.get('max_drawdown', 0.0),
                 'daily_stats': self.daily_stats,
                 'positions': self.positions
             }
         except Exception as e:
             logger.error(f"Error getting portfolio summary: {e}")
-            return {} 
+            return {
+                'total_positions': 0,
+                'total_value': 0.0,
+                'current_value': 0.0,
+                'total_pnl': 0.0,
+                'unrealized_profit': 0.0,
+                'percent_return': 0.0,
+                'max_drawdown': 0.0,
+                'daily_stats': self.daily_stats,
+                'positions': {}
+            }
+
+    def get_holdings(self) -> List[Dict]:
+        """Get holdings in the format expected by risk manager"""
+        try:
+            holdings = []
+            current_time = time.time()
+            
+            for token_address, position in self.positions.items():
+                holding = {
+                    'token_address': token_address,
+                    'token_symbol': position.get('symbol', 'UNKNOWN'),
+                    'amount': position.get('amount', 0),
+                    'current_price': position.get('current_price', 0),
+                    'current_value_sol': position.get('amount', 0) * position.get('current_price', 0),
+                    'entry_price': position.get('entry_price', 0),
+                    'entry_time': position.get('entry_time', current_time),
+                    'pnl': position.get('pnl', 0),
+                    'unrealized_pl_sol': position.get('pnl', 0),
+                    'percent_change': position.get('pnl_percentage', 0)
+                }
+                holdings.append(holding)
+            
+            return holdings
+            
+        except Exception as e:
+            logger.error(f"Error getting holdings: {e}")
+            return [] 

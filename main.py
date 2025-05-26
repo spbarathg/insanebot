@@ -27,7 +27,7 @@ from src.services.quicknode_service import QuickNodeService
 from src.services.helius_service import HeliusService
 from src.services.jupiter_service import JupiterService
 from src.services.wallet_manager import WalletManager
-from src.core.portfolio_risk_manager import PortfolioRiskManager
+from src.core.portfolio_risk_manager_simple import PortfolioRiskManager
 
 # Configure logging
 logging.basicConfig(
@@ -128,7 +128,7 @@ class EnhancedAntBotRunner:
         logger.info("📊 Initializing Portfolio Manager...")
         from src.core.portfolio_manager import PortfolioManager
         self.portfolio_manager = PortfolioManager()
-        await self.portfolio_manager.initialize(self.initial_capital)
+        self.portfolio_manager.initialize(self.initial_capital)
         
         # Portfolio risk manager
         logger.info("🛡️ Initializing Portfolio Risk Manager...")
@@ -314,16 +314,30 @@ class EnhancedAntBotRunner:
             
             market_data = []
             for token in tokens[:3]:  # Limit to 3 for testing
-                # Get detailed data from QuickNode
-                metadata = await self.quicknode_service.get_token_metadata(token)
-                price_data = await self.quicknode_service.get_token_price_from_dex_pools(token)
-                
-                market_data.append({
-                    "token_address": token,
-                    "metadata": metadata,
-                    "price_data": price_data,
-                    "source": "quicknode_primary"
-                })
+                try:
+                    # Extract token address if it's a dict
+                    if isinstance(token, dict):
+                        token_address = token.get("address")
+                    else:
+                        token_address = token
+                    
+                    if not token_address or not isinstance(token_address, str):
+                        continue
+                    
+                    # Get detailed data from QuickNode
+                    metadata = await self.quicknode_service.get_token_metadata(token_address)
+                    price_data = await self.quicknode_service.get_token_price_from_dex_pools(token_address)
+                    
+                    market_data.append({
+                        "token_address": token_address,
+                        "metadata": metadata,
+                        "price_data": price_data,
+                        "source": "quicknode_primary"
+                    })
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing token {token}: {str(e)}")
+                    continue
             
             return market_data
             
