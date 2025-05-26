@@ -1,189 +1,128 @@
 #!/usr/bin/env python3
 """
-Final Structure Validation Script
-Tests that all imports work correctly after cleanup
+Final structure validation script - verifies all imports work correctly after cleanup.
 """
-
 import sys
-import os
+import importlib
 from pathlib import Path
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent.parent))
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
-def test_core_infrastructure():
-    """Test core infrastructure imports"""
-    print("🏛️ Testing Core Infrastructure...")
+def test_imports():
+    """Test that all critical imports work correctly"""
+    print("🔍 Testing core module imports...")
     
-    try:
-        from src.core.config_manager import ConfigManager
-        print("  ✅ ConfigManager")
-    except ImportError as e:
-        print(f"  ❌ ConfigManager: {e}")
-    
-    try:
-        from src.core.logger import SystemLogger
-        print("  ✅ SystemLogger")
-    except ImportError as e:
-        print(f"  ❌ SystemLogger: {e}")
-    
-    try:
-        from src.core.system_metrics import SystemMetrics
-        print("  ✅ SystemMetrics")
-    except ImportError as e:
-        print(f"  ❌ SystemMetrics: {e}")
-    
-    try:
-        from src.core.security_manager import SecurityManager
-        print("  ✅ SecurityManager")
-    except ImportError as e:
-        print(f"  ❌ SecurityManager: {e}")
-
-def test_services():
-    """Test services imports"""
-    print("\n🌐 Testing External Services...")
-    
-    try:
-        from src.services.quicknode_service import QuickNodeService
-        print("  ✅ QuickNodeService")
-    except ImportError as e:
-        print(f"  ❌ QuickNodeService: {e}")
-    
-    try:
-        from src.services.helius_service import HeliusService
-        print("  ✅ HeliusService")
-    except ImportError as e:
-        print(f"  ❌ HeliusService: {e}")
-    
-    try:
-        from src.services.jupiter_service import JupiterService
-        print("  ✅ JupiterService")
-    except ImportError as e:
-        print(f"  ❌ JupiterService: {e}")
-    
-    try:
-        from src.services.wallet_manager import WalletManager
-        print("  ✅ WalletManager")
-    except ImportError as e:
-        print(f"  ❌ WalletManager: {e}")
-
-def test_ant_colony():
-    """Test ant colony imports"""
-    print("\n🐜 Testing Ant Colony Architecture...")
-    
-    try:
-        from src.colony.founding_queen import FoundingQueen
-        print("  ✅ FoundingQueen")
-    except ImportError as e:
-        print(f"  ❌ FoundingQueen: {e}")
-    
-    try:
-        from src.colony.ant_queen import AntQueen
-        print("  ✅ AntQueen")
-    except ImportError as e:
-        print(f"  ❌ AntQueen: {e}")
-    
-    try:
-        from src.colony.worker_ant import WorkerAnt
-        print("  ✅ WorkerAnt")
-    except ImportError as e:
-        print(f"  ❌ WorkerAnt: {e}")
-    
-    try:
-        from src.colony.ant_princess import AntPrincess
-        print("  ✅ AntPrincess")
-    except ImportError as e:
-        print(f"  ❌ AntPrincess: {e}")
-
-def test_compounding_system():
-    """Test compounding system imports"""
-    print("\n📈 Testing 5-Layer Compounding System...")
-    
-    layers = [
-        "data_layer",
-        "worker_layer", 
-        "carwash_layer",
-        "monetary_layer",
-        "intelligence_layer"
+    # Test core modules
+    core_modules = [
+        'src.core.trade_execution',
+        'src.core.error_handler', 
+        'src.core.config_manager',
+        'src.core.market_data',
+        'src.core.portfolio_manager',
+        'src.core.data_ingestion',
+        'src.core.whale_tracker'
     ]
     
-    for layer in layers:
+    for module in core_modules:
         try:
-            module = __import__(f"src.compounding.{layer}", fromlist=[layer])
-            print(f"  ✅ {layer}")
-        except ImportError as e:
-            print(f"  ❌ {layer}: {e}")
-
-def test_flywheel_system():
-    """Test flywheel system imports"""
-    print("\n🔄 Testing Flywheel System...")
-    
-    components = [
-        "feedback_loops",
-        "architecture_iteration",
-        "performance_amplification"
+            importlib.import_module(module)
+            print(f"✅ {module}")
+        except Exception as e:
+            print(f"❌ {module}: {e}")
+            
+    # Test config modules
+    print("\n🔍 Testing config modules...")
+    config_modules = [
+        'config.core_config',
+        'config.ant_princess_config', 
+        'config.wallet_tracker_config'
     ]
     
-    for component in components:
+    for module in config_modules:
         try:
-            module = __import__(f"src.flywheel.{component}", fromlist=[component])
-            print(f"  ✅ {component}")
-        except ImportError as e:
-            print(f"  ❌ {component}: {e}")
+            importlib.import_module(module)
+            print(f"✅ {module}")
+        except Exception as e:
+            print(f"❌ {module}: {e}")
+            
+    # Test services
+    print("\n🔍 Testing service modules...")
+    service_modules = [
+        'src.services.quicknode_service',
+        'src.services.helius_service',
+        'src.services.jupiter_service',
+        'src.services.wallet_manager'
+    ]
+    
+    for module in service_modules:
+        try:
+            importlib.import_module(module)
+            print(f"✅ {module}")
+        except Exception as e:
+            print(f"❌ {module}: {e}")
+            
+    # Test monitoring
+    print("\n🔍 Testing monitoring modules...")
+    monitoring_modules = [
+        'src.monitoring.monitoring',
+        'src.monitoring.alerts'
+    ]
+    
+    for module in monitoring_modules:
+        try:
+            importlib.import_module(module)
+            print(f"✅ {module}")
+        except Exception as e:
+            print(f"❌ {module}: {e}")
 
 def test_main_entry_points():
     """Test main entry points"""
-    print("\n🚀 Testing Entry Points...")
+    print("\n🔍 Testing main entry points...")
     
-    try:
-        from src.ant_bot_system import AntBotSystem
-        print("  ✅ AntBotSystem")
-    except ImportError as e:
-        print(f"  ❌ AntBotSystem: {e}")
-    
-    try:
-        from src.core.enhanced_main import AntBotSystem as EnhancedAntBotSystem
-        print("  ✅ EnhancedAntBotSystem")
-    except ImportError as e:
-        print(f"  ❌ EnhancedAntBotSystem: {e}")
-
-def test_removed_files():
-    """Test that removed files are actually gone"""
-    print("\n🗑️ Verifying Removed Files...")
-    
-    removed_files = [
-        "src/core/config.py",
-        "src/utils/config.py",
-        "src/utils/logging_config.py",
-        "src/core/monitoring.py",
-        "src/core/metrics.py",
-        "main_simple.py",
-        "cli_simple.py",
-        "compatible.Dockerfile"
+    entry_points = [
+        'main',
+        'src.core.enhanced_main'
     ]
     
-    for file_path in removed_files:
-        if os.path.exists(file_path):
-            print(f"  ❌ {file_path} still exists!")
-        else:
-            print(f"  ✅ {file_path} removed")
+    for module in entry_points:
+        try:
+            importlib.import_module(module)
+            print(f"✅ {module}")
+        except Exception as e:
+            print(f"❌ {module}: {e}")
 
-def main():
-    """Run all validation tests"""
-    print("🔍 FINAL STRUCTURE VALIDATION")
-    print("=" * 50)
+def verify_deleted_references():
+    """Verify no references to deleted modules exist"""
+    print("\n🔍 Verifying no deleted module references...")
     
-    test_core_infrastructure()
-    test_services()
-    test_ant_colony()
-    test_compounding_system()
-    test_flywheel_system()
-    test_main_entry_points()
-    test_removed_files()
+    # These should not be importable anymore
+    deleted_modules = [
+        'src.utils.config',
+        'src.utils.logging_config',
+        'src.core.config',
+        'src.core.monitoring',
+        'src.core.metrics'
+    ]
     
-    print("\n" + "=" * 50)
-    print("✅ VALIDATION COMPLETE")
-    print("🎯 System ready for production deployment!")
+    for module in deleted_modules:
+        try:
+            importlib.import_module(module)
+            print(f"❌ ERROR: {module} still exists (should be deleted)")
+        except ImportError:
+            print(f"✅ {module} correctly not found")
+        except Exception as e:
+            print(f"⚠️ {module}: {e}")
 
 if __name__ == "__main__":
-    main() 
+    print("🚀 Final Structure Validation")
+    print("=" * 50)
+    
+    test_imports()
+    test_main_entry_points()
+    verify_deleted_references()
+    
+    print("\n" + "=" * 50)
+    print("✅ Final structure validation complete!")
+    print("🐜 Ant Bot Ultimate is ready for deployment!") 

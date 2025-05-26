@@ -17,6 +17,11 @@ from collections import defaultdict
 import yaml
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from config.core_config import (
+    CORE_CONFIG,
+    MARKET_CONFIG,
+    TRADING_CONFIG
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +138,8 @@ class ConfigManager:
         """Load base system configurations"""
         try:
             # Import existing configurations
-            from .config import (
-                CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG,
-                ANT_PRINCESS_CONFIG, ANT_QUEEN_CONFIG, AI_CONFIG
+            from config.ant_princess_config import (
+                ANT_PRINCESS_CONFIG, QUEEN_CONFIG as ANT_QUEEN_CONFIG, SYSTEM_CONSTANTS as AI_CONFIG
             )
             
             self.config_data.update({

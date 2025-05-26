@@ -26,7 +26,7 @@ import math
 
 from .grok_engine import GrokEngine
 from ..local_llm import LocalLLM
-from ..wallet_manager import WalletManager
+from ...services.wallet_manager import WalletManager
 from ..portfolio_risk_manager import PortfolioRiskManager
 
 logger = logging.getLogger(__name__)

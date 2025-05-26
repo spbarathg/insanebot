@@ -5,9 +5,8 @@ import logging
 import time
 import asyncio
 from typing import Dict, List, Optional, Any
-from ..utils.config import settings
-from .helius_service import HeliusService
-from .jupiter_service import JupiterService
+from src.services.helius_service import HeliusService
+from src.services.jupiter_service import JupiterService
 
 logger = logging.getLogger(__name__)
 

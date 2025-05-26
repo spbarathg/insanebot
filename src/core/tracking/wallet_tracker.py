@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 from datetime import datetime, timedelta
 import logging
-from config.wallet_tracker_config import WALLET_CONFIG
+from config.wallet_tracker_config import WALLET_TRACKER_CONFIG as WALLET_CONFIG
 
 logger = logging.getLogger(__name__)
 

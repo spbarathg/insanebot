@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from loguru import logger
 import aiohttp
 import websockets
-from src.utils.config import settings
+import os
 from solders.pubkey import Pubkey
 
 class DataIngestion:
@@ -35,7 +35,7 @@ class DataIngestion:
     def _load_whale_whitelist(self):
         """Load whitelist of high-win-rate whale wallets"""
         try:
-            with open(settings.WHALE_LOG_FILE, 'r') as f:
+            with open("whale.log", 'r') as f:
                 whale_data = json.load(f)
                 # Sort by win rate and take top 10
                 self.whale_whitelist = [
@@ -92,7 +92,7 @@ class DataIngestion:
             self.ws = await websockets.connect(
                 'wss://api.twitter.com/2/tweets/search/stream',
                 extra_headers={
-                    'Authorization': f'Bearer {settings.X_API_KEY}'
+                    'Authorization': f'Bearer {os.getenv("X_API_KEY", "")}'
                 }
             )
             # Start sentiment processing
@@ -187,7 +187,7 @@ class DataIngestion:
             async with self.session.post(
                 'https://api.grok.ai/v1/sentiment',
                 json={'text': text},
-                headers={'Authorization': f'Bearer {settings.GROK_API_KEY}'}
+                headers={'Authorization': f'Bearer {os.getenv("GROK_API_KEY", "")}'}
             ) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -202,7 +202,7 @@ class DataIngestion:
         try:
             async with self.session.get(
                 f'https://api.quicknode.com/v1/pump',
-                headers={'Authorization': f'Bearer {settings.QUICKNODE_API_KEY}'}
+                headers={'Authorization': f'Bearer {os.getenv("QUICKNODE_API_KEY", "")}'}
             ) as response:
                 if response.status == 200:
                     return await response.json()
@@ -275,7 +275,7 @@ class DataIngestion:
     async def _update_whale_whitelist(self):
         """Update whale whitelist based on performance"""
         try:
-            with open(settings.WHALE_LOG_FILE, 'r') as f:
+            with open("whale.log", 'r') as f:
                 whale_data = json.load(f)
 
             # Calculate win rates
@@ -295,7 +295,7 @@ class DataIngestion:
             ]
 
             # Save updated whitelist
-            with open(settings.WHALE_LOG_FILE, 'w') as f:
+            with open("whale.log", 'w') as f:
                 json.dump(whale_data, f)
 
         except Exception as e:
@@ -428,4 +428,13 @@ class DataIngestion:
             
         except Exception as e:
             logger.error(f"❌ Helius market data error: {str(e)}")
+            return []
+
+    def _load_whale_data(self):
+        """Load whale data from file"""
+        try:
+            whale_log_file = "whale.log"
+            with open(whale_log_file, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
             return [] 

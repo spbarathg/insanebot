@@ -1,24 +1,28 @@
 import json
+import logging
 from datetime import datetime
+from typing import Dict, List, Optional
 from loguru import logger
-from ..utils.config import settings
+
+logger = logging.getLogger(__name__)
 
 class AlertSystem:
     def __init__(self):
         self.alert_history = []
+        self.alert_log_file = "alert.log"
         self._load_alert_history()
 
     def _load_alert_history(self):
         """Load alert history from file"""
         try:
-            with open(settings.ALERT_LOG_FILE, 'r') as f:
+            with open(self.alert_log_file, 'r') as f:
                 self.alert_history = json.load(f)
         except FileNotFoundError:
             self.alert_history = []
 
     def _save_alert_history(self):
         """Save alert history to file"""
-        with open(settings.ALERT_LOG_FILE, 'w') as f:
+        with open(self.alert_log_file, 'w') as f:
             json.dump(self.alert_history, f)
 
     def alert(self, level: str, subject: str, message: str):
@@ -49,7 +53,7 @@ class AlertSystem:
         """Check system health and record alerts if needed"""
         try:
             # Check CPU usage
-            if metrics['cpu_percent'] > settings.CPU_WARNING_THRESHOLD:
+            if metrics['cpu_percent'] > 80.0:  # Default CPU warning threshold
                 self.alert(
                     'warning',
                     'High CPU Usage',
@@ -57,7 +61,7 @@ class AlertSystem:
                 )
 
             # Check memory usage
-            if metrics['memory_percent'] > settings.MEMORY_WARNING_THRESHOLD:
+            if metrics['memory_percent'] > 80.0:  # Default memory warning threshold
                 self.alert(
                     'warning',
                     'High Memory Usage',
@@ -65,7 +69,7 @@ class AlertSystem:
                 )
 
             # Check disk usage
-            if metrics['disk_percent'] > settings.DISK_WARNING_THRESHOLD:
+            if metrics['disk_percent'] > 90.0:  # Default disk warning threshold
                 self.alert(
                     'critical',
                     'Low Disk Space',
@@ -79,7 +83,7 @@ class AlertSystem:
         """Check trading health and record alerts if needed"""
         try:
             # Check win rate
-            if metrics['win_rate'] < settings.WIN_RATE_WARNING_THRESHOLD:
+            if metrics['win_rate'] < 40.0:  # Default win rate warning threshold
                 self.alert(
                     'warning',
                     'Low Win Rate',
@@ -87,7 +91,7 @@ class AlertSystem:
                 )
 
             # Check total profit
-            if metrics['total_profit'] < settings.PROFIT_WARNING_THRESHOLD:
+            if metrics['total_profit'] < -10.0:  # Default profit warning threshold
                 self.alert(
                     'error',
                     'Significant Loss',
@@ -95,7 +99,7 @@ class AlertSystem:
                 )
 
             # Check trade frequency
-            if metrics['total_trades'] < settings.MIN_TRADES_PER_HOUR:
+            if metrics['total_trades'] < 1:  # Default minimum trades per hour
                 self.alert(
                     'warning',
                     'Low Trade Frequency',

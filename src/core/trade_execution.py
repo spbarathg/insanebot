@@ -6,6 +6,7 @@ import logging
 import time
 import os
 import json
+import base58
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 from solders.keypair import Keypair
@@ -14,13 +15,12 @@ from solders.transaction import Transaction
 from solana.rpc.async_api import AsyncClient
 from solders.commitment_config import CommitmentLevel
 from solana.rpc.types import TxOpts
-from .config import TRADING_CONFIG
+from config.core_config import TRADING_CONFIG
 
 # Import settings
-from ..utils.config import settings
-from .jupiter_service import JupiterService
-from .helius_service import HeliusService
-from .wallet_manager import WalletManager
+from src.services.jupiter_service import JupiterService
+from src.services.helius_service import HeliusService
+from src.services.wallet_manager import WalletManager
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class TradeExecution:
             self.wallet = self.wallet_manager.get_keypair()
             
             # Initialize Solana client
-            self.solana_client = AsyncClient(settings.RPC_ENDPOINTS[0], commitment=CommitmentLevel.confirmed)
+            self.solana_client = AsyncClient("https://api.mainnet-beta.solana.com", commitment=CommitmentLevel.confirmed)
             
             # Initialize Jupiter
             await self.jupiter.initialize()
@@ -70,8 +70,9 @@ class TradeExecution:
     def _load_trade_history(self):
         """Load trade history from file."""
         try:
-            if os.path.exists(settings.TRADE_HISTORY_FILE):
-                with open(settings.TRADE_HISTORY_FILE, 'r') as f:
+            trade_history_file = "trade_history.json"
+            if os.path.exists(trade_history_file):
+                with open(trade_history_file, 'r') as f:
                     self.trade_history = json.load(f)
                 logger.info(f"Loaded {len(self.trade_history)} trades from history")
             else:
@@ -84,8 +85,9 @@ class TradeExecution:
     def _save_trade_history(self):
         """Save trade history to file."""
         try:
-            os.makedirs(os.path.dirname(settings.TRADE_HISTORY_FILE), exist_ok=True)
-            with open(settings.TRADE_HISTORY_FILE, 'w') as f:
+            trade_history_file = "trade_history.json"
+            os.makedirs(os.path.dirname(trade_history_file), exist_ok=True)
+            with open(trade_history_file, 'w') as f:
                 json.dump(self.trade_history, f, indent=2, default=str)
             logger.debug(f"Saved {len(self.trade_history)} trades to history")
         except Exception as e:
@@ -249,7 +251,7 @@ class TradeExecution:
                 decoded_tx,
                 opts={
                     'skip_preflight': True,
-                    'max_retries': settings.MAX_RPC_RETRIES,
+                    'max_retries': 3,  # Default max retries
                     'preflight_commitment': CommitmentLevel.confirmed
                 }
             )
@@ -299,8 +301,9 @@ class TradeExecution:
             
         # Check cooldown period
         current_time = time.time()
-        if current_time - self.last_trade_time < settings.TRADE_COOLDOWN:
-            logger.warning(f"Trade cooldown in effect, wait {settings.TRADE_COOLDOWN - (current_time - self.last_trade_time)} seconds")
+        trade_cooldown = 30  # Default 30 seconds cooldown
+        if current_time - self.last_trade_time < trade_cooldown:
+            logger.warning(f"Trade cooldown in effect, wait {trade_cooldown - (current_time - self.last_trade_time)} seconds")
             return False
             
         return True
@@ -322,21 +325,24 @@ class TradeExecution:
                 
             # Check minimum liquidity
             liquidity = liquidity_data.get('liquidity', 0)
-            if liquidity < settings.MIN_LIQUIDITY:
-                logger.warning(f"Insufficient liquidity for {token_address}: {liquidity} < {settings.MIN_LIQUIDITY}")
+            min_liquidity = 10000  # Default minimum liquidity
+            if liquidity < min_liquidity:
+                logger.warning(f"Insufficient liquidity for {token_address}: {liquidity} < {min_liquidity}")
                 return False
                 
             # Check token age for buys
             if is_buy:
                 token_age = time.time() - token_info.get('created_at', time.time())
-                if token_age < settings.MAX_TOKEN_AGE:
-                    logger.warning(f"Token too new for {token_address}: {token_age} < {settings.MAX_TOKEN_AGE}")
+                max_token_age = 86400  # Default 24 hours
+                if token_age < max_token_age:
+                    logger.warning(f"Token too new for {token_address}: {token_age} < {max_token_age}")
                     return False
                 
             # Check price impact
             price_impact = await self._calculate_price_impact(token_address, amount, is_buy)
-            if price_impact > settings.MAX_PRICE_IMPACT:
-                logger.warning(f"Price impact too high for {token_address}: {price_impact} > {settings.MAX_PRICE_IMPACT}")
+            max_price_impact = 0.05  # Default 5% max price impact
+            if price_impact > max_price_impact:
+                logger.warning(f"Price impact too high for {token_address}: {price_impact} > {max_price_impact}")
                 return False
                 
             return True

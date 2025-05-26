@@ -3,13 +3,19 @@ from typing import Dict, List, Optional
 from datetime import datetime
 import json
 from loguru import logger
-from ..utils.config import settings
 
 class PortfolioManager:
     def __init__(self):
         self.positions: Dict[str, Dict] = {}
-        self.risk_limits = settings.RISK_LIMITS
-        self.position_limits = settings.POSITION_LIMITS
+        self.risk_limits = {
+            'max_exposure': 0.8,  # Default max exposure
+            'max_token_exposure': 0.1,  # Default max token exposure
+            'max_portfolio_exposure': 1.0  # Default max portfolio exposure
+        }
+        self.position_limits = {
+            'max_position_size': 0.1,  # Default max position size
+            'min_adjustment': 0.01  # Default min adjustment
+        }
         self.daily_stats = {
             'trades': 0,
             'profit_loss': 0.0,
@@ -17,12 +23,13 @@ class PortfolioManager:
             'start_balance': 0.0,
             'current_balance': 0.0
         }
+        self.portfolio_file = "portfolio.json"
         self._load_portfolio()
 
     def _load_portfolio(self):
         """Load portfolio data from file"""
         try:
-            with open(settings.PORTFOLIO_FILE, 'r') as f:
+            with open(self.portfolio_file, 'r') as f:
                 data = json.load(f)
                 self.positions = data.get('positions', {})
                 self.daily_stats = data.get('daily_stats', self.daily_stats)
@@ -34,7 +41,7 @@ class PortfolioManager:
     def _save_portfolio(self):
         """Save portfolio data to file"""
         try:
-            with open(settings.PORTFOLIO_FILE, 'w') as f:
+            with open(self.portfolio_file, 'w') as f:
                 json.dump({
                     'positions': self.positions,
                     'daily_stats': self.daily_stats

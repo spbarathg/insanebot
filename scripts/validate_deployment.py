@@ -17,9 +17,6 @@ from pathlib import Path
 # Add parent directory to path for module imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Import project modules
-from src.utils.config import settings
-
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -165,11 +162,12 @@ class DeploymentValidator:
                 
                 elapsed = time.time() - start_time
                 if test_response.status_code == 200:
-                    if elapsed < settings.LLM_INFERENCE_TIMEOUT + 2:
-                        logger.info(f"✅ Timeout test passed: {elapsed:.2f}s (limit: {settings.LLM_INFERENCE_TIMEOUT}s)")
+                    llm_inference_timeout = 30  # Default 30 seconds timeout
+                    if elapsed < llm_inference_timeout + 2:
+                        logger.info(f"✅ Timeout test passed: {elapsed:.2f}s (limit: {llm_inference_timeout}s)")
                         self.results["failure_tests"]["LLM Timeout"] = f"PASS: {elapsed:.2f}s"
                     else:
-                        logger.warning(f"⚠️ Timeout test questionable: {elapsed:.2f}s (limit: {settings.LLM_INFERENCE_TIMEOUT}s)")
+                        logger.warning(f"⚠️ Timeout test questionable: {elapsed:.2f}s (limit: {llm_inference_timeout}s)")
                         self.results["failure_tests"]["LLM Timeout"] = f"WARNING: {elapsed:.2f}s"
                 else:
                     logger.error(f"❌ Timeout test failed: {test_response.status_code}")

@@ -4,7 +4,7 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Callable, Any, Dict, List, Optional
 from loguru import logger
-from .config import CORE_CONFIG
+from config.core_config import CORE_CONFIG
 from dataclasses import dataclass
 
 @dataclass

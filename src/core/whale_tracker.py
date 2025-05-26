@@ -7,11 +7,10 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from loguru import logger
 from solders.pubkey import Pubkey
-from ..utils.logging_config import (
-    whale_logger, handle_errors, log_performance,
-    log_async_performance, NetworkError
-)
-from ..utils.config import settings
+
+class NetworkError(Exception):
+    """Custom exception for network-related errors."""
+    pass
 
 class WhaleTracker:
     def __init__(self):
@@ -19,7 +18,7 @@ class WhaleTracker:
         self.whale_activities = {}  # Cache for whale activities
         self.whale_stats = {}  # Statistics for each whale
         self.last_analysis = 0
-        whale_logger.info("WhaleTracker initialized", extra={
+        logger.info("WhaleTracker initialized", extra={
             'total_whales': len(self.whales),
             'active_alerts': sum(1 for w in self.whales if w['alertsOn'])
         })
@@ -30,11 +29,9 @@ class WhaleTracker:
             with open('config/whales.json', 'r') as f:
                 return json.load(f)
         except Exception as e:
-            whale_logger.error(f"Error loading whale data: {str(e)}")
+            logger.error(f"Error loading whale data: {str(e)}")
             return []
 
-    @handle_errors(whale_logger)
-    @log_performance(whale_logger)
     async def track_whale_activity(self, wallet_address: str) -> Dict:
         """Track activity of a specific whale wallet"""
         try:
@@ -47,7 +44,7 @@ class WhaleTracker:
             # Update whale stats
             self._update_whale_stats(wallet_address, analysis)
             
-            whale_logger.info(f"Tracked whale activity", extra={
+            logger.info(f"Tracked whale activity", extra={
                 'wallet': wallet_address,
                 'analysis': analysis
             })
@@ -56,16 +53,17 @@ class WhaleTracker:
 
         except Exception as e:
             error_msg = f"Error tracking whale activity: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
-    @log_performance(whale_logger)
     async def analyze_whale_patterns(self) -> Dict:
         """Analyze patterns across all tracked whales"""
         try:
-            current_time = asyncio.get_event_loop().time()
-            if current_time - self.last_analysis < settings.WHALE_ANALYSIS_INTERVAL:
+            # Check if enough time has passed since last analysis
+            current_time = time.time()
+            whale_analysis_interval = 300  # Default 5 minutes
+            if current_time - self.last_analysis < whale_analysis_interval:
+                logger.debug(f"Skipping analysis, last run {current_time - self.last_analysis:.1f}s ago")
                 return self.whale_activities
 
             patterns = {
@@ -97,16 +95,14 @@ class WhaleTracker:
             self.whale_activities = patterns
             self.last_analysis = current_time
 
-            whale_logger.info("Whale patterns analyzed", extra={'patterns': patterns})
+            logger.info("Whale patterns analyzed", extra={'patterns': patterns})
             return patterns
 
         except Exception as e:
             error_msg = f"Error analyzing whale patterns: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
-    @log_performance(whale_logger)
     async def get_trading_signals(self) -> List[Dict]:
         """Get trading signals based on whale activities"""
         try:
@@ -132,16 +128,15 @@ class WhaleTracker:
                         }
                     }
                     signals.append(signal)
-                    whale_logger.info(f"Trading signal generated", extra={'signal': signal})
+                    logger.info(f"Trading signal generated", extra={'signal': signal})
 
             return signals
 
         except Exception as e:
             error_msg = f"Error getting trading signals: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     async def _get_wallet_transactions(self, wallet_address: str) -> List[Dict]:
         """Get recent transactions for a wallet"""
         try:
@@ -202,10 +197,9 @@ class WhaleTracker:
             
         except Exception as e:
             error_msg = f"Error getting wallet transactions: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _analyze_transactions(self, transactions: List[Dict]) -> Dict:
         """Analyze transactions to determine whale activity"""
         try:
@@ -231,15 +225,14 @@ class WhaleTracker:
                 'confidence': self._calculate_confidence(latest_tx)
             }
 
-            whale_logger.debug("Transactions analyzed", extra={'analysis': analysis})
+            logger.debug("Transactions analyzed", extra={'analysis': analysis})
             return analysis
 
         except Exception as e:
             error_msg = f"Error analyzing transactions: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _update_whale_stats(self, wallet_address: str, analysis: Dict) -> None:
         """Update statistics for a whale"""
         try:
@@ -262,17 +255,16 @@ class WhaleTracker:
                 
                 stats['success_rate'] = (stats['profitable_trades'] / stats['total_trades']) * 100
 
-            whale_logger.debug("Whale stats updated", extra={
+            logger.debug("Whale stats updated", extra={
                 'wallet': wallet_address,
                 'stats': stats
             })
 
         except Exception as e:
             error_msg = f"Error updating whale stats: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _update_patterns(self, patterns: Dict, whale: Dict, activity: Dict) -> None:
         """Update trading patterns based on whale activity"""
         try:
@@ -292,42 +284,45 @@ class WhaleTracker:
             # Update risk levels
             patterns['risk_levels'][wallet] = self._calculate_risk_level(activity)
 
-            whale_logger.debug("Patterns updated", extra={
+            logger.debug("Patterns updated", extra={
                 'wallet': wallet,
                 'patterns': patterns
             })
 
         except Exception as e:
             error_msg = f"Error updating patterns: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _is_strong_signal(self, activity: Dict) -> bool:
         """Determine if an activity represents a strong trading signal"""
         try:
             if not activity['is_active']:
                 return False
 
-            # Check confidence threshold
-            if activity['confidence'] < settings.WHALE_CONFIDENCE_THRESHOLD:
+            # Filter by confidence
+            whale_confidence_threshold = 0.7  # Default 70% confidence
+            if activity['confidence'] < whale_confidence_threshold:
+                return False
+                
+            # Filter by success rate
+            stats = self.whale_stats.get(activity['wallet'], {})
+            whale_success_rate_threshold = 0.6  # Default 60% success rate
+            if stats['success_rate'] < whale_success_rate_threshold:
                 return False
 
-            # Check if whale has good track record
-            wallet = activity['wallet']
-            if wallet in self.whale_stats:
-                stats = self.whale_stats[wallet]
-                if stats['success_rate'] < settings.WHALE_SUCCESS_RATE_THRESHOLD:
-                    return False
+            # Check if this is a large trade
+            whale_large_trade_threshold = 100000  # Default $100k threshold
+            if activity['amount'] > whale_large_trade_threshold:
+                return False
 
             return True
 
         except Exception as e:
             error_msg = f"Error checking signal strength: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _calculate_confidence(self, activity: Dict) -> float:
         """Calculate confidence score for a whale activity"""
         try:
@@ -339,7 +334,8 @@ class WhaleTracker:
                 confidence += stats['success_rate'] / 100
 
             # Adjust for trade size
-            if activity['amount'] > settings.WHALE_LARGE_TRADE_THRESHOLD:
+            whale_large_trade_threshold = 100000  # Default $100k threshold
+            if activity['amount'] > whale_large_trade_threshold:
                 confidence += 0.2
 
             # Adjust for recent activity
@@ -352,10 +348,9 @@ class WhaleTracker:
 
         except Exception as e:
             error_msg = f"Error calculating confidence: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg)
 
-    @handle_errors(whale_logger)
     def _calculate_risk_level(self, activity: Dict) -> str:
         """Calculate risk level for a whale activity"""
         try:
@@ -373,5 +368,5 @@ class WhaleTracker:
 
         except Exception as e:
             error_msg = f"Error calculating risk level: {str(e)}"
-            whale_logger.error(error_msg)
+            logger.error(error_msg)
             raise NetworkError(error_msg) 
