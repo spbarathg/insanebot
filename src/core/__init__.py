@@ -2,7 +2,7 @@
 Core trading bot components.
 """
 
-from .config import (
+from config.core_config import (
     CORE_CONFIG,
     MARKET_CONFIG,
     TRADING_CONFIG
