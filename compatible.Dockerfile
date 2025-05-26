@@ -41,6 +41,7 @@ COPY enhanced_main_entry.py /app/
 COPY start_without_grok.py /app/
 COPY run_enhanced_ant_bot.py /app/
 COPY config.py /app/
+COPY config.json /app/
 
 # Set permissions
 RUN chmod -R 755 /app/src /app/config && \

@@ -52,6 +52,8 @@ services:
       - PRIVATE_KEY=${PRIVATE_KEY}
       - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY:-}
       - WALLET_ADDRESS=${WALLET_ADDRESS:-}
+      - WALLET_PASSWORD=${WALLET_PASSWORD:-}
+      - WALLET_SALT=${WALLET_SALT:-}
       
       # System Configuration
       - LOG_LEVEL=INFO
