@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 from loguru import logger
 import aiohttp
 import websockets
-from config import settings
+from src.utils.config import settings
 from solders.pubkey import Pubkey
 
 class DataIngestion:

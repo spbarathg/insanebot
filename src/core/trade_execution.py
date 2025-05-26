@@ -7,11 +7,14 @@ import time
 import os
 import json
 from typing import Dict, List, Optional, Any
+from decimal import Decimal
 from solders.keypair import Keypair
 from solders.pubkey import Pubkey
 from solders.transaction import Transaction
 from solana.rpc.async_api import AsyncClient
-from solana.rpc.commitment import Confirmed
+from solders.commitment_config import CommitmentLevel
+from solana.rpc.types import TxOpts
+from .config import TRADING_CONFIG
 
 # Import settings
 from ..utils.config import settings
@@ -47,7 +50,7 @@ class TradeExecution:
             self.wallet = self.wallet_manager.get_keypair()
             
             # Initialize Solana client
-            self.solana_client = AsyncClient(settings.RPC_ENDPOINTS[0], commitment=Confirmed)
+            self.solana_client = AsyncClient(settings.RPC_ENDPOINTS[0], commitment=CommitmentLevel.confirmed)
             
             # Initialize Jupiter
             await self.jupiter.initialize()
@@ -247,7 +250,7 @@ class TradeExecution:
                 opts={
                     'skip_preflight': True,
                     'max_retries': settings.MAX_RPC_RETRIES,
-                    'preflight_commitment': Confirmed
+                    'preflight_commitment': CommitmentLevel.confirmed
                 }
             )
             

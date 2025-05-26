@@ -24,12 +24,17 @@ venv/
 .venv/
 .pytest_cache/
 
+# Test coverage
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
 # Environment variables
 .env
-.env.local
-.env.development
-.env.production
-.env.test
+.env.*
+!env.template
 config.local.json
 *.config.json
 secrets.json
@@ -39,10 +44,12 @@ secrets.json
 *.key
 keys/
 wallets/
+private_keys/
 
 # Logs
 logs/*
 !logs/.gitkeep
+*.log
 
 # IDE specific files
 .idea/
@@ -58,40 +65,37 @@ data/*
 !data/.gitkeep
 historical_data/
 backtest_results/
+simulation_results/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # Local development
-.coverage
-htmlcov/
 .tox/
 .nox/
-.hypothesis/
 .mypy_cache/
 .dmypy.json
-dmypy.json
+dmyp.json
 
 # OS specific
 .DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-$RECYCLE.BIN/
+$RECYCLE_BIN/
 
 # Project specific
-config.prod.json
+instances/
 *.cache
-simulation_results/
+temp/
 
 # Virtual environments
 venv/
 env/
 ENV/
-.env*
-!env.example
 
-# Models
+# Models and AI data
 models/*
 !models/.gitkeep
 
@@ -104,12 +108,15 @@ loki/data/
 .docker/
 docker-compose.override.yml
 
-# Temporary files
+# Temporary and backup files
 *.tmp
 *.bak
-*.log
-temp/
+*_backup.*
+*_temp.*
+*_fix.*
+quick_*.*
+ultimate_*.*
 
-# Notebooks
-*.ipynb
-pytest-report.xml 
+# Test artifacts
+pytest-report.xml
+test_results/ 

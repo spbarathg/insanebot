@@ -1,0 +1,8 @@
+# Security dependencies for Ant Bot SecurityManager
+cryptography>=41.0.0
+pyjwt>=2.8.0
+bcrypt>=4.0.1
+watchdog>=3.0.0
+prometheus-client>=0.17.0
+psutil>=5.9.0
+pyyaml>=6.0 

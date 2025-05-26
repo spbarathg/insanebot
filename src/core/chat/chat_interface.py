@@ -18,14 +18,24 @@ class ChatInterface:
         self._active_chats = {}
         
     async def initialize(self):
-        """Initialize the chat interface."""
-        await self.market_data.initialize()
-        await self.trade_execution.initialize()
-        
+        """Initialize the chat interface"""
+        try:
+            # Initialize market data if it has an initialize method
+            if hasattr(self.market_data, 'initialize'):
+                await self.market_data.initialize()
+            logger.info("Chat interface initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize chat interface: {str(e)}")
+
     async def close(self):
-        """Close the chat interface."""
-        await self.market_data.close()
-        await self.trade_execution.close()
+        """Close the chat interface and clean up resources"""
+        try:
+            # Close market data if it has a close method
+            if hasattr(self.market_data, 'close'):
+                await self.market_data.close()
+            logger.info("Chat interface closed")
+        except Exception as e:
+            logger.error(f"Error closing chat interface: {str(e)}")
         
     async def process_message(self, user_id: str, message: str) -> str:
         """Process a user message and generate a response."""

@@ -26,12 +26,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 from src.core.ai.ant_hierarchy import FoundingAntQueen, AntRole
 from src.core.ai.enhanced_ai_coordinator import AICoordinator
 from src.core.system_replicator import SystemReplicator
-from src.core.wallet_manager import WalletManager
+from src.services.wallet_manager import WalletManager
 from src.core.portfolio_risk_manager import PortfolioRiskManager
 from src.core.data_ingestion import DataIngestion
-from src.core.helius_service import HeliusService
-from src.core.jupiter_service import JupiterService
-from src.core.quicknode_service import QuickNodeService
+from src.services.helius_service import HeliusService
+from src.services.jupiter_service import JupiterService
+from src.services.quicknode_service import QuickNodeService
+from src.core.portfolio_manager import PortfolioManager
 
 logger = logging.getLogger(__name__)
 

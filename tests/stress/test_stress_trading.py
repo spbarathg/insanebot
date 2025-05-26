@@ -1,9 +1,9 @@
 import pytest
 import asyncio
 import time
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 from solders.keypair import Keypair
-from src.core.wallet import WalletManager
+from src.core.wallet_manager import WalletManager
 
 @pytest.mark.asyncio
 async def test_stress_transaction_sending():

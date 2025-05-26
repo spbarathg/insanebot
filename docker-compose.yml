@@ -2,7 +2,7 @@ services:
   enhanced-ant-bot:
     build:
       context: .
-      dockerfile: compatible.Dockerfile
+      dockerfile: Dockerfile
     container_name: enhanced-ant-bot
     restart: unless-stopped
     volumes:
@@ -15,6 +15,8 @@ services:
       - grafana
     networks:
       - trading-network
+    ports:
+      - "8001:8001"  # System metrics port
     deploy:
       resources:
         limits:
@@ -24,34 +26,29 @@ services:
           cpus: '1'
           memory: 1G
     healthcheck:
-      test: ["CMD", "python", "-c", "from src.core.quicknode_service import QuickNodeService; print('Health OK')"]
+      test: ["CMD", "python", "-c", "import sys; sys.path.append('.'); from src.core.system_metrics import SystemMetrics; print('Health check passed')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-    user: "1000:1000"
     env_file:
       - .env
     environment:
       # Enhanced Ant Bot Configuration
-      - SIMULATION_MODE=False
+      - SIMULATION_MODE=true
       - INITIAL_CAPITAL=0.1
-      - USE_MOCK_GROK=true
       
       # API Keys (from .env file)
-      - QUICKNODE_ENDPOINT_URL=${QUICKNODE_ENDPOINT_URL}
-      - HELIUS_API_KEY=${HELIUS_API_KEY}
+      - QUICKNODE_ENDPOINT_URL=${QUICKNODE_ENDPOINT_URL:-}
+      - HELIUS_API_KEY=${HELIUS_API_KEY:-}
       - JUPITER_API_KEY=${JUPITER_API_KEY:-}
       - GROK_API_KEY=${GROK_API_KEY:-}
       
       # Solana Configuration
-      - SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
       - NETWORK=mainnet-beta
       
       # Wallet Configuration
-      - PRIVATE_KEY=${PRIVATE_KEY}
-      - WALLET_PRIVATE_KEY=${WALLET_PRIVATE_KEY:-}
-      - WALLET_ADDRESS=${WALLET_ADDRESS:-}
+      - PRIVATE_KEY=${PRIVATE_KEY:-}
       - WALLET_PASSWORD=${WALLET_PASSWORD:-}
       - WALLET_SALT=${WALLET_SALT:-}
       
@@ -59,13 +56,7 @@ services:
       - LOG_LEVEL=INFO
       - PYTHONUNBUFFERED=1
       - ENABLE_MONITORING=true
-      
-      # Trading Configuration
-      - MAX_CONCURRENT_TRADES=5
-      - MAX_POSITION_SIZE=0.1
-      - MIN_POSITION_SIZE=0.01
-      - STOP_LOSS_PERCENTAGE=0.05
-      - TAKE_PROFIT_PERCENTAGE=0.1
+      - MASTER_KEY=${MASTER_KEY:-}
 
   prometheus:
     image: prom/prometheus:latest

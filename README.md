@@ -83,7 +83,27 @@ python src/main.py
 docker-compose up -d
 ```
 
-## 🔧 **Production Deployment**
+## 🚀 **Production Deployment**
+
+### **Pre-Deployment Checklist**
+
+#### **API Keys & Credentials**
+- [ ] **Jupiter API Key** - Get production key from https://docs.jup.ag/
+- [ ] **Helius API Key** - Premium tier from https://helius.xyz/
+- [ ] **Dedicated Trading Wallet** - Create new wallet for bot only
+- [ ] **Backup Seed Phrase** - Store securely offline
+
+#### **Wallet Setup & Funding**
+- [ ] **Create Trading Wallet** - Run wallet setup process
+- [ ] **Fund Initial Amount** - Start small (0.1-0.5 SOL recommended)
+- [ ] **Test Transactions** - Verify wallet access works
+- [ ] **Priority Fees** - Ensure sufficient SOL for fees
+
+#### **Environment Configuration**
+- [ ] **Update .env file** - Replace demo keys with real ones
+- [ ] **Set SIMULATION_MODE=false** - Enable live trading
+- [ ] **Verify RPC endpoint** - Use premium RPC for performance
+- [ ] **Backup configuration** - Save all config files
 
 ### **Docker Deployment**
 
@@ -98,8 +118,24 @@ docker-compose up -d
 docker-compose logs -f trading-bot
 ```
 
-### **Server Management**
+### **Manual Deployment**
 
+```bash
+# 1. Pull latest code
+git pull origin master
+
+# 2. Set up production environment
+cp env.template .env
+# Edit .env with your production settings
+
+# 3. Start the bot
+python main.py
+
+# 4. Monitor logs
+tail -f logs/main.log
+```
+
+### **Monitoring Deployment**
 ```bash
 # Check status
 docker-compose ps
@@ -107,10 +143,148 @@ docker-compose ps
 # Restart services
 docker-compose restart
 
-# Update configuration
+# Emergency stop
 docker-compose down
-# Edit .env file
-docker-compose up -d
+```
+
+## 🔧 **Performance Tuning**
+
+### **RPC Optimization**
+- Use high-performance RPC endpoint (QuickNode, Helius Premium)
+- Adjust `skip_preflight` and `max_retries` based on network
+- Monitor RPC latency and switch endpoints if needed
+
+### **Caching Configuration**
+- Enable caching for frequently accessed data
+- Use LRU cache with appropriate TTL settings
+- Regularly clean up expired cache entries
+
+### **Batch Processing**
+- Group transactions to reduce RPC calls
+- Use `asyncio.gather` for parallel processing
+- Monitor batch size based on network capacity
+
+### **Connection Management**
+- Reuse RPC connections to minimize overhead
+- Implement connection pooling for clients
+- Use circuit breakers to prevent cascading failures
+
+### **Resource Management**
+```bash
+# Monitor system resources
+docker stats
+
+# Check memory usage
+docker exec trading-bot ps aux
+
+# Monitor disk space
+df -h
+```
+
+## 🛠️ **Advanced Troubleshooting**
+
+### **Common Issues & Solutions**
+
+#### **Transaction Failures**
+```bash
+# Check transaction status
+python -c "
+from src.core.helius_service import HeliusService
+import asyncio
+async def check():
+    helius = HeliusService()
+    # Add transaction signature to check
+    status = await helius.get_transaction_status('SIGNATURE_HERE')
+    print(f'Status: {status}')
+asyncio.run(check())
+"
+```
+
+#### **Wallet Connection Issues**
+```bash
+# Verify wallet setup
+python -c "
+import os
+print('Private Key Set:', bool(os.getenv('SOLANA_PRIVATE_KEY')))
+print('Password Set:', bool(os.getenv('WALLET_PASSWORD')))
+print('Salt Set:', bool(os.getenv('WALLET_SALT')))
+"
+```
+
+#### **API Rate Limiting**
+```bash
+# Check API limits
+grep "rate limit" logs/main.log | tail -10
+
+# Monitor API usage
+grep "API call" logs/main.log | wc -l
+```
+
+#### **Network Connectivity Issues**
+```bash
+# Test RPC connectivity
+python -c "
+import asyncio
+import aiohttp
+async def test():
+    async with aiohttp.ClientSession() as session:
+        async with session.post('https://api.mainnet-beta.solana.com', 
+                               json={'jsonrpc': '2.0', 'id': 1, 'method': 'getHealth'}) as resp:
+            result = await resp.json()
+            print(f'RPC Health: {result}')
+asyncio.run(test())
+"
+```
+
+### **Performance Diagnostics**
+```bash
+# Trading performance metrics
+grep "Portfolio Value" logs/main.log | tail -20
+
+# Success/failure rates
+echo "Successful trades: $(grep 'execution successful' logs/trades.log | wc -l)"
+echo "Failed trades: $(grep 'execution failed' logs/trades.log | wc -l)"
+
+# Average execution time
+grep "execution_time" logs/trades.log | awk '{sum+=$NF; count++} END {print "Average:", sum/count, "ms"}'
+```
+
+### **Emergency Procedures**
+
+#### **Immediate Stop**
+```bash
+# Stop all trading immediately
+docker-compose down
+
+# Or send stop signal
+docker kill -s TERM trading-bot
+```
+
+#### **Emergency Token Sale**
+```bash
+# Manual emergency exit (if needed)
+python -c "
+import asyncio
+from src.core.wallet_manager import WalletManager
+async def emergency_exit():
+    wallet = WalletManager()
+    await wallet.initialize()
+    # This would implement emergency liquidation
+    print('Emergency procedures would be executed here')
+asyncio.run(emergency_exit())
+"
+```
+
+### **Log Analysis Tools**
+```bash
+# Find error patterns
+grep -E "(ERROR|CRITICAL)" logs/main.log | sort | uniq -c
+
+# Monitor real-time errors
+tail -f logs/main.log | grep --color=always "ERROR"
+
+# Check specific timeframe
+grep "2024-01-01" logs/main.log | grep "ERROR"
 ```
 
 ## 🧪 **Testing**
