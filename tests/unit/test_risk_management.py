@@ -11,7 +11,7 @@ from solders.pubkey import Pubkey
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from src.core.config import CORE_CONFIG, TRADING_CONFIG
+from config.core_config import CORE_CONFIG, TRADING_CONFIG
 from src.core.wallet_manager import WalletManager
 from src.core.risk_management import RiskManager, RiskViolationError
 

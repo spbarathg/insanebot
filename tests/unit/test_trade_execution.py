@@ -9,7 +9,7 @@ from solana.transaction import Transaction
 from solana.keypair import Keypair
 
 # Import directly from the project structure
-from src.core.config import TRADING_CONFIG, CORE_CONFIG
+from config.core_config import TRADING_CONFIG, CORE_CONFIG
 from src.core.trade_execution import TradeExecution
 
 @pytest.fixture

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from .ant_princess import AntPrincess
 from .grok_engine import GrokEngine
-from ..config import ANT_QUEEN_CONFIG, AI_CONFIG
+from config.ant_princess_config import QUEEN_CONFIG as ANT_QUEEN_CONFIG, SYSTEM_CONSTANTS as AI_CONFIG
 from .ai_metrics import ai_metrics
 
 logger = logging.getLogger(__name__)

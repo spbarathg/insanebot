@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 from datetime import datetime
 import logging
-from ..config import TRADING_CONFIG
+from ...config.core_config import TRADING_CONFIG
 
 logger = logging.getLogger(__name__)
 

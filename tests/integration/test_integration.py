@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 # Import all necessary components
-from src.core.config import CORE_CONFIG, TRADING_CONFIG, MARKET_CONFIG
+from config.core_config import CORE_CONFIG, TRADING_CONFIG, MARKET_CONFIG
 from src.core.wallet_manager import WalletManager
 from src.core.dex import RaydiumDEX
 from src.core.error_handler import ErrorHandler

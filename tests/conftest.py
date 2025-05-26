@@ -167,7 +167,7 @@ sys.modules['solana.instruction'] = mock_instruction
 sys.modules['solana.account'] = mock_account
 
 # Now import the project modules
-from src.core.config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG
+from config.core_config import CORE_CONFIG, MARKET_CONFIG, TRADING_CONFIG
 from src.core.wallet_manager import WalletManager
 from src.core.dex import RaydiumDEX
 from src.core.simulator import TradingSimulator

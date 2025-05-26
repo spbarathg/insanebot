@@ -15,7 +15,7 @@ class NetworkError(Exception):
     pass
 
 # Import the MarketData class using proper mocking
-from src.core.config import MARKET_CONFIG, CORE_CONFIG
+from config.core_config import MARKET_CONFIG, CORE_CONFIG
 from src.core.market_data import MarketData
 
 @pytest.fixture
