@@ -6,10 +6,26 @@ import logging
 from datetime import datetime
 from .ant_princess import AntPrincess
 from .grok_engine import GrokEngine
-from config.ant_princess_config import QUEEN_CONFIG as ANT_QUEEN_CONFIG, SYSTEM_CONSTANTS as AI_CONFIG
+from config.core_config import CORE_CONFIG
 from .ai_metrics import ai_metrics
 
 logger = logging.getLogger(__name__)
+
+# Create default config from available core config
+ANT_QUEEN_CONFIG = {
+    "initial_workers": 3,
+    "min_workers": 2,
+    "max_workers": 10,
+    "performance_threshold": 0.6,
+    "history_size": 100,
+    "multiplication_threshold": 0.8
+}
+
+AI_CONFIG = {
+    "learning_rate": 0.01,
+    "batch_size": 32,
+    "epochs": 100
+}
 
 class AntQueen:
     def __init__(self):

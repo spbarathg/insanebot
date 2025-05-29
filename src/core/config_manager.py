@@ -23,6 +23,47 @@ from config.core_config import (
     TRADING_CONFIG
 )
 
+# Import available configurations
+try:
+    from config.ant_princess_config import (
+        ANT_PRINCESS_CONFIG, QUEEN_CONFIG as ANT_QUEEN_CONFIG, SYSTEM_CONSTANTS as AI_CONFIG
+    )
+except ImportError:
+    # Fallback configurations if ant_princess_config is not available
+    ANT_PRINCESS_CONFIG = {
+        "market_weight": 0.6,
+        "sentiment_weight": 0.3,
+        "wallet_weight": 0.1,
+        "buy_threshold": 0.7,
+        "sell_threshold": -0.3,
+        "base_position_size": 0.01,
+        "max_position_size": 0.1,
+        "multiplication_thresholds": {
+            "performance_score": 0.8,
+            "experience_threshold": 10
+        }
+    }
+    
+    ANT_QUEEN_CONFIG = {
+        "initial_workers": 3,
+        "min_workers": 2,
+        "max_workers": 10,
+        "performance_threshold": 0.6,
+        "history_size": 100,
+        "multiplication_threshold": 0.8
+    }
+    
+    AI_CONFIG = {
+        "learning_rate": 0.01,
+        "batch_size": 32,
+        "epochs": 100,
+        "confidence_threshold": 0.7,
+        "ensemble_weights": {
+            "grok": 0.6,
+            "local_llm": 0.4
+        }
+    }
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -138,10 +179,6 @@ class ConfigManager:
         """Load base system configurations"""
         try:
             # Import existing configurations
-            from config.ant_princess_config import (
-                ANT_PRINCESS_CONFIG, QUEEN_CONFIG as ANT_QUEEN_CONFIG, SYSTEM_CONSTANTS as AI_CONFIG
-            )
-            
             self.config_data.update({
                 "core": CORE_CONFIG,
                 "market": MARKET_CONFIG,

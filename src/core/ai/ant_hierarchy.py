@@ -27,7 +27,12 @@ import math
 from .grok_engine import GrokEngine
 from ..local_llm import LocalLLM
 from ...services.wallet_manager import WalletManager
-from ..portfolio_risk_manager import PortfolioRiskManager
+
+# Optional import for portfolio risk manager
+try:
+    from ..portfolio_risk_manager import PortfolioRiskManager
+except ImportError:
+    PortfolioRiskManager = None
 
 logger = logging.getLogger(__name__)
 

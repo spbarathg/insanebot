@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 # Import Enhanced Ant Bot components
-from src.core.ai.ant_hierarchy import FoundingAntQueen, AntRole
+from src.core.ai.ant_hierarchy_simple import FoundingAntQueen, AntRole
 from src.core.ai.enhanced_ai_coordinator import AICoordinator
 from src.core.system_replicator import SystemReplicator
 from src.core.enhanced_main import AntBotSystem

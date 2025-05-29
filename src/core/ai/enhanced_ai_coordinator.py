@@ -1,19 +1,18 @@
 """
-Enhanced AI Coordination System for Ant Bot
+Enhanced AI Coordination System for Ant Bot - PROFIT-MAXIMIZED VERSION
 
-This module implements sophisticated AI collaboration with:
-- Clear role separation: Grok for sentiment/hype, Local LLM for technical decisions
-- Learning feedback loops that adapt based on trading outcomes
-- Dynamic prompt engineering based on performance
-- Multi-model ensemble decision making
-- Performance-based model weighting
+This module implements ultra-aggressive AI collaboration optimized for high-risk, high-reward trading:
+- Profit-first decision making with aggressive confidence scaling
+- Dynamic momentum detection for explosive opportunities
+- Enhanced risk-reward calculations for maximum profitability
+- Compound learning that increases aggression with success
 """
 
 import asyncio
 import json
 import logging
 import time
-import numpy as np
+import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -36,7 +35,8 @@ class PromptStrategy(Enum):
     """Different prompt engineering strategies"""
     CONSERVATIVE = "conservative"
     AGGRESSIVE = "aggressive"
-    BALANCED = "balanced"
+    ULTRA_AGGRESSIVE = "ultra_aggressive"  # New ultra-aggressive mode
+    PROFIT_MAXIMIZER = "profit_maximizer"  # Profit-focused mode
     ADAPTIVE = "adaptive"
 
 @dataclass
@@ -47,7 +47,10 @@ class AIDecision:
     decision: str
     reasoning: str
     risk_score: float
-    supporting_data: Dict[str, Any]
+    profit_potential: float = 0.0  # New: estimated profit potential
+    momentum_score: float = 0.0    # New: market momentum score
+    conviction_level: str = "MEDIUM"  # New: LOW, MEDIUM, HIGH, EXTREME
+    supporting_data: Dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
 @dataclass
@@ -58,8 +61,9 @@ class LearningFeedback:
     actual_outcome: Dict[str, Any]
     profit_loss: float
     success: bool
-    market_conditions: Dict[str, Any]
-    lesson_learned: str
+    profit_multiplier: float = 1.0  # New: how much profit exceeded expectations
+    market_conditions: Dict[str, Any] = field(default_factory=dict)
+    lesson_learned: str = ""
     timestamp: float = field(default_factory=time.time)
 
 @dataclass
@@ -72,7 +76,9 @@ class ModelPerformance:
     best_decision: float = 0.0
     worst_decision: float = 0.0
     average_confidence: float = 0.0
+    average_profit_multiplier: float = 1.0  # New: average profit multiplier
     recent_accuracy: List[bool] = field(default_factory=list)
+    profit_track_record: List[float] = field(default_factory=list)  # New: profit tracking
     
     @property
     def accuracy(self) -> float:
@@ -84,11 +90,22 @@ class ModelPerformance:
             return 0.0
         return sum(self.recent_accuracy) / len(self.recent_accuracy)
     
-    def update_performance(self, correct: bool, profit: float, confidence: float):
-        """Update performance metrics"""
+    @property
+    def profit_efficiency(self) -> float:
+        """Calculate profit efficiency score"""
+        if not self.profit_track_record:
+            return 1.0
+        positive_profits = [p for p in self.profit_track_record if p > 0]
+        if not positive_profits:
+            return 0.5
+        return min(3.0, sum(positive_profits) / len(positive_profits))  # Cap at 3x
+    
+    def update_performance(self, correct: bool, profit: float, confidence: float, profit_multiplier: float = 1.0):
+        """Update performance metrics with profit tracking"""
         self.total_decisions += 1
         self.total_profit += profit
         self.average_confidence = (self.average_confidence * (self.total_decisions - 1) + confidence) / self.total_decisions
+        self.average_profit_multiplier = (self.average_profit_multiplier * (self.total_decisions - 1) + profit_multiplier) / self.total_decisions
         
         if correct:
             self.correct_decisions += 1
@@ -102,76 +119,101 @@ class ModelPerformance:
         self.recent_accuracy.append(correct)
         if len(self.recent_accuracy) > 20:
             self.recent_accuracy.pop(0)
+        
+        # Update profit track record (keep last 50 trades)
+        self.profit_track_record.append(profit)
+        if len(self.profit_track_record) > 50:
+            self.profit_track_record.pop(0)
 
-class PromptEngineer:
-    """Dynamic prompt engineering based on performance feedback"""
+class AggressivePromptEngineer:
+    """Ultra-aggressive prompt engineering for maximum profitability"""
     
     def __init__(self):
         self.base_prompts = {
             AIModelRole.SENTIMENT_ANALYZER: {
-                PromptStrategy.CONSERVATIVE: "Analyze sentiment conservatively, focusing on verified information and established trends.",
-                PromptStrategy.AGGRESSIVE: "Identify high-potential opportunities with strong community sentiment and viral indicators.",
-                PromptStrategy.BALANCED: "Provide balanced sentiment analysis considering both hype and fundamentals.",
-                PromptStrategy.ADAPTIVE: "Adapt analysis style based on current market conditions and recent performance."
+                PromptStrategy.ULTRA_AGGRESSIVE: "HUNT FOR EXPLOSIVE OPPORTUNITIES: Identify tokens with viral potential, massive hype, and community excitement. Focus on 10x-100x moonshot candidates.",
+                PromptStrategy.PROFIT_MAXIMIZER: "MAXIMIZE PROFIT POTENTIAL: Analyze sentiment for maximum profit opportunities. Look for early stage hype, whale activity, and viral indicators that signal massive price movements.",
+                PromptStrategy.AGGRESSIVE: "Find high-potential opportunities with strong community sentiment and viral indicators. Target tokens with explosive growth potential.",
+                PromptStrategy.ADAPTIVE: "Adapt analysis based on market conditions and recent profit performance."
             },
             AIModelRole.TECHNICAL_ANALYST: {
-                PromptStrategy.CONSERVATIVE: "Focus on established technical patterns and strong support/resistance levels.",
-                PromptStrategy.AGGRESSIVE: "Identify breakout patterns and momentum signals for quick entries.",
-                PromptStrategy.BALANCED: "Combine multiple technical indicators for well-rounded analysis.",
-                PromptStrategy.ADAPTIVE: "Adjust technical analysis approach based on recent market behavior."
+                PromptStrategy.ULTRA_AGGRESSIVE: "IDENTIFY BREAKOUT MONSTERS: Find explosive breakout patterns, momentum acceleration, and technical setups for massive price pumps. Target 20%+ moves minimum.",
+                PromptStrategy.PROFIT_MAXIMIZER: "TECHNICAL PROFIT HUNTING: Analyze charts for maximum profit potential. Focus on breakouts, momentum signals, and patterns that historically generate 50%+ returns.",
+                PromptStrategy.AGGRESSIVE: "Identify aggressive breakout patterns and momentum signals for high-reward entries. Focus on explosive technical setups.",
+                PromptStrategy.ADAPTIVE: "Adjust technical analysis based on recent market behavior and profit outcomes."
             }
         }
-        self.current_strategy = PromptStrategy.BALANCED
+        self.current_strategy = PromptStrategy.PROFIT_MAXIMIZER  # Start with profit-maximizing mode
         self.performance_history = []
+        self.aggression_multiplier = 1.5  # Start with 1.5x aggression
     
-    def get_prompt(self, model_role: AIModelRole, market_data: Dict, performance_context: ModelPerformance) -> str:
-        """Generate dynamic prompt based on model role and performance"""
+    def get_aggressive_prompt(self, model_role: AIModelRole, market_data: Dict, performance_context: ModelPerformance, profit_target: float = 0.2) -> str:
+        """Generate ultra-aggressive prompts focused on profit maximization"""
         try:
             base_prompt = self.base_prompts[model_role][self.current_strategy]
             
-            # Add performance-based modifications
-            if performance_context.recent_accuracy_rate < 0.4:
-                # Poor recent performance - be more conservative
-                modification = " Be more cautious and focus on high-confidence signals only."
-            elif performance_context.recent_accuracy_rate > 0.7:
-                # Good performance - can be more aggressive
-                modification = " You've been performing well - trust your analysis and consider slightly more aggressive positions."
+            # Profit-based modifications
+            if performance_context.profit_efficiency > 2.0:
+                # Excellent profit performance - go even more aggressive
+                profit_modifier = f" Your recent profit performance is EXCEPTIONAL (efficiency: {performance_context.profit_efficiency:.2f}x). INCREASE AGGRESSION and target even bigger opportunities. You're in the zone - trust your instincts and go for MASSIVE gains."
+                self.aggression_multiplier = min(3.0, self.aggression_multiplier * 1.1)
+            elif performance_context.profit_efficiency > 1.5:
+                # Good performance - maintain aggression
+                profit_modifier = f" You're performing well (efficiency: {performance_context.profit_efficiency:.2f}x). Maintain aggressive stance and continue hunting for high-profit opportunities."
+            elif performance_context.profit_efficiency < 0.8:
+                # Poor performance - recalibrate but stay aggressive
+                profit_modifier = f" Recent performance needs improvement (efficiency: {performance_context.profit_efficiency:.2f}x). Recalibrate strategy but STAY AGGRESSIVE. Look for clearer, higher-conviction opportunities."
+                self.aggression_multiplier = max(1.0, self.aggression_multiplier * 0.95)
             else:
-                modification = " Maintain current analysis approach."
+                profit_modifier = " Maintain current aggressive approach while seeking higher-conviction opportunities."
             
-            # Add market context
+            # Market volatility enhancement
             volatility = market_data.get("volatility", 0.5)
-            if volatility > 0.8:
-                market_context = " Market is highly volatile - prioritize risk management."
-            elif volatility < 0.3:
-                market_context = " Market is stable - look for gradual trend opportunities."
+            if volatility > 0.7:
+                volatility_modifier = f" EXTREME VOLATILITY DETECTED ({volatility:.2f}) - This is PRIME TIME for massive gains. Increase position sizes and target explosive moves. High volatility = HIGH PROFIT POTENTIAL."
+            elif volatility > 0.5:
+                volatility_modifier = f" High volatility ({volatility:.2f}) provides excellent profit opportunities. Target momentum plays and breakouts."
             else:
-                market_context = " Market conditions are normal."
+                volatility_modifier = f" Lower volatility ({volatility:.2f}) - hunt for accumulation patterns and breakout setups that will explode when volatility returns."
             
-            return base_prompt + modification + market_context
+            # Profit target integration
+            target_modifier = f" TARGET MINIMUM {profit_target*100:.0f}% GAINS on this analysis. Don't settle for small moves - we're hunting for MASSIVE PROFITS."
+            
+            # Conviction level guidance
+            conviction_modifier = " Rate your conviction: EXTREME (90%+ confidence in massive gains), HIGH (70%+ confidence in significant gains), MEDIUM (50%+ confidence), LOW (uncertain). Only recommend EXTREME and HIGH conviction plays."
+            
+            return base_prompt + profit_modifier + volatility_modifier + target_modifier + conviction_modifier
             
         except Exception as e:
-            logger.error(f"Prompt generation error: {str(e)}")
-            return "Analyze the given market data and provide your assessment."
+            logger.error(f"Aggressive prompt generation error: {str(e)}")
+            return f"Analyze aggressively for maximum profit potential targeting {profit_target*100:.0f}%+ gains."
     
-    def update_strategy(self, overall_performance: float):
-        """Update prompt strategy based on overall performance"""
-        if overall_performance < 0.3:
-            self.current_strategy = PromptStrategy.CONSERVATIVE
-        elif overall_performance > 0.7:
-            self.current_strategy = PromptStrategy.AGGRESSIVE
+    def update_strategy_based_on_profits(self, recent_profit_performance: float, win_streak: int):
+        """Update strategy based on profit performance"""
+        if recent_profit_performance > 0.5 and win_streak > 3:
+            # Excellent performance - go ultra-aggressive
+            self.current_strategy = PromptStrategy.ULTRA_AGGRESSIVE
+            self.aggression_multiplier = min(3.0, self.aggression_multiplier * 1.2)
+        elif recent_profit_performance > 0.2:
+            # Good performance - stay profit-focused
+            self.current_strategy = PromptStrategy.PROFIT_MAXIMIZER
+        elif recent_profit_performance < -0.2:
+            # Poor performance - adaptive mode
+            self.current_strategy = PromptStrategy.ADAPTIVE
+            self.aggression_multiplier = max(1.0, self.aggression_multiplier * 0.9)
         else:
-            self.current_strategy = PromptStrategy.BALANCED
+            # Maintain aggressive approach
+            self.current_strategy = PromptStrategy.AGGRESSIVE
 
-class AICoordinator:
-    """Coordinates multiple AI models with learning and adaptation"""
+class ProfitMaximizedAICoordinator:
+    """AI Coordinator optimized for maximum profitability"""
     
     def __init__(self):
         self.grok_engine = None
         self.local_llm = None
-        self.prompt_engineer = PromptEngineer()
+        self.prompt_engineer = AggressivePromptEngineer()
         
-        # Performance tracking
+        # Performance tracking with profit focus
         self.model_performances = {
             AIModelRole.SENTIMENT_ANALYZER: ModelPerformance(AIModelRole.SENTIMENT_ANALYZER),
             AIModelRole.TECHNICAL_ANALYST: ModelPerformance(AIModelRole.TECHNICAL_ANALYST),
@@ -179,19 +221,29 @@ class AICoordinator:
             AIModelRole.DECISION_MAKER: ModelPerformance(AIModelRole.DECISION_MAKER)
         }
         
-        # Learning system
-        self.feedback_history: List[LearningFeedback] = []
-        self.learned_patterns = {}
+        # Profit-optimized model weights
         self.model_weights = {
-            AIModelRole.SENTIMENT_ANALYZER: 0.4,
-            AIModelRole.TECHNICAL_ANALYST: 0.6
+            AIModelRole.SENTIMENT_ANALYZER: 0.3,  # Reduced - sentiment can be manipulated
+            AIModelRole.TECHNICAL_ANALYST: 0.7   # Increased - technicals more reliable for entries
         }
         
-        # Decision history
+        # Profit tracking
+        self.profit_history = []
+        self.win_streak = 0
+        self.total_realized_profit = 0.0
+        self.best_trade_profit = 0.0
+        
+        # Learning system with profit focus
+        self.feedback_history: List[LearningFeedback] = []
+        self.learned_profit_patterns = {}
         self.decision_history: List[AIDecision] = []
         
+        # Aggression settings
+        self.base_confidence_multiplier = 1.3  # Start 30% more confident
+        self.profit_target_minimum = 0.15      # 15% minimum profit target
+        
     async def initialize(self) -> bool:
-        """Initialize AI coordinator with all models"""
+        """Initialize AI coordinator with profit-maximized settings"""
         try:
             self.grok_engine = GrokEngine()
             self.local_llm = LocalLLM()
@@ -199,455 +251,460 @@ class AICoordinator:
             await self.grok_engine.initialize()
             await self.local_llm.initialize()
             
-            # Load learned patterns if available
-            await self._load_learned_patterns()
+            logger.info("✅ PROFIT-MAXIMIZED AI Coordinator initialized successfully!")
+            logger.info(f"🎯 Base confidence multiplier: {self.base_confidence_multiplier}x")
+            logger.info(f"💰 Minimum profit target: {self.profit_target_minimum*100}%")
             
-            logger.info("AI Coordinator initialized successfully")
             return True
             
         except Exception as e:
-            logger.error(f"AI Coordinator initialization error: {str(e)}")
+            logger.error(f"❌ Failed to initialize AI coordinator: {str(e)}")
             return False
-    
-    async def analyze_comprehensive(self, token_address: str, market_data: Dict) -> Dict[str, Any]:
-        """Perform comprehensive analysis using all AI models"""
+
+    async def analyze_for_maximum_profit(self, token_address: str, market_data: Dict, portfolio_context: Dict = None) -> Dict[str, Any]:
+        """Analyze token with focus on maximum profit potential"""
         try:
-            # Step 1: Sentiment Analysis (Grok)
-            sentiment_decision = await self._get_sentiment_analysis(token_address, market_data)
+            logger.info(f"🎯 PROFIT-FOCUSED ANALYSIS: {token_address}")
             
-            # Step 2: Technical Analysis (Local LLM)
-            technical_decision = await self._get_technical_analysis(token_address, market_data)
+            # Enhanced market data with profit indicators
+            enhanced_market_data = self._enhance_market_data_for_profit(market_data, portfolio_context)
             
-            # Step 3: Risk Assessment (Combined)
-            risk_decision = await self._get_risk_assessment(token_address, market_data, sentiment_decision, technical_decision)
+            # Get sentiment analysis with profit focus
+            sentiment_analysis = await self._get_profit_focused_sentiment(token_address, enhanced_market_data)
             
-            # Step 4: Final Decision (Ensemble)
-            final_decision = await self._make_ensemble_decision(sentiment_decision, technical_decision, risk_decision, market_data)
+            # Get technical analysis with breakout focus
+            technical_analysis = await self._get_profit_focused_technical(token_address, enhanced_market_data)
+            
+            # Calculate profit potential
+            profit_assessment = await self._calculate_profit_potential(
+                token_address, enhanced_market_data, sentiment_analysis, technical_analysis
+            )
+            
+            # Make final profit-maximized decision
+            final_decision = await self._make_profit_maximized_decision(
+                sentiment_analysis, technical_analysis, profit_assessment, enhanced_market_data
+            )
+            
+            # Log decision with profit metrics
+            self._log_profit_decision(final_decision, profit_assessment)
             
             return {
-                "sentiment_analysis": sentiment_decision,
-                "technical_analysis": technical_decision,
-                "risk_assessment": risk_decision,
-                "final_decision": final_decision,
-                "confidence": final_decision.confidence,
-                "recommendation": final_decision.decision
+                'sentiment': sentiment_analysis,
+                'technical': technical_analysis,
+                'profit_assessment': profit_assessment,
+                'final_decision': final_decision,
+                'profit_target': profit_assessment.get('target_profit', self.profit_target_minimum),
+                'conviction_level': final_decision.get('conviction_level', 'MEDIUM'),
+                'recommended_position_size': self._calculate_position_size_from_conviction(final_decision),
+                'timestamp': time.time()
             }
             
         except Exception as e:
-            logger.error(f"Comprehensive analysis error: {str(e)}")
-            return {"error": str(e)}
-    
-    async def _get_sentiment_analysis(self, token_address: str, market_data: Dict) -> AIDecision:
-        """Get sentiment analysis from Grok AI"""
+            logger.error(f"Error in profit-maximized analysis: {str(e)}")
+            return self._get_safe_fallback_decision()
+
+    def _enhance_market_data_for_profit(self, market_data: Dict, portfolio_context: Dict = None) -> Dict:
+        """Enhance market data with profit-focused indicators"""
+        enhanced = market_data.copy()
+        
+        # Add profit indicators
+        price = market_data.get('price', 0)
+        volume = market_data.get('volume_24h', 0)
+        
+        # Calculate profit indicators
+        enhanced['profit_momentum'] = min(2.0, volume / max(price * 1000000, 1))  # Volume/price ratio
+        enhanced['volatility_opportunity'] = market_data.get('volatility', 0.5)
+        enhanced['breakout_potential'] = self._calculate_breakout_potential(market_data)
+        
+        # Portfolio context for aggressive sizing
+        if portfolio_context:
+            enhanced['portfolio_profit_streak'] = portfolio_context.get('win_streak', 0)
+            enhanced['compound_multiplier'] = portfolio_context.get('compound_multiplier', 1.0)
+            enhanced['portfolio_momentum'] = portfolio_context.get('total_return_percent', 0) / 100
+        
+        return enhanced
+
+    def _calculate_breakout_potential(self, market_data: Dict) -> float:
+        """Calculate breakout potential score"""
         try:
-            # Generate dynamic prompt
-            prompt = self.prompt_engineer.get_prompt(
-                AIModelRole.SENTIMENT_ANALYZER,
-                market_data,
-                self.model_performances[AIModelRole.SENTIMENT_ANALYZER]
+            volatility = market_data.get('volatility', 0.5)
+            volume = market_data.get('volume_24h', 0)
+            liquidity = market_data.get('liquidity', 0)
+            
+            # Higher volatility + volume = higher breakout potential
+            breakout_score = (volatility * 0.6) + (min(volume/1000000, 1.0) * 0.4)
+            
+            # Liquidity factor (enough to trade but not too much resistance)
+            if liquidity > 0:
+                liquidity_factor = min(1.0, 100000 / max(liquidity, 10000))
+                breakout_score *= (0.7 + 0.3 * liquidity_factor)
+            
+            return min(1.0, breakout_score)
+            
+        except Exception as e:
+            logger.error(f"Error calculating breakout potential: {e}")
+            return 0.5
+
+    async def _get_profit_focused_sentiment(self, token_address: str, market_data: Dict) -> AIDecision:
+        """Get sentiment analysis focused on profit potential"""
+        try:
+            performance = self.model_performances[AIModelRole.SENTIMENT_ANALYZER]
+            prompt = self.prompt_engineer.get_aggressive_prompt(
+                AIModelRole.SENTIMENT_ANALYZER, 
+                market_data, 
+                performance,
+                self.profit_target_minimum
             )
             
-            # Get Grok analysis with enhanced prompt
-            enhanced_market_data = market_data.copy()
-            enhanced_market_data["analysis_prompt"] = prompt
+            # Get sentiment from Grok with profit focus
+            sentiment_result = await self.grok_engine.analyze_sentiment_for_profit(
+                token_address, market_data, prompt
+            )
             
-            grok_result = await self.grok_engine.analyze_market(enhanced_market_data)
-            
-            if not grok_result or "error" in grok_result:
-                raise Exception("Grok analysis failed")
-            
-            # Extract sentiment metrics
-            sentiment_score = grok_result.get("confidence", 0.0)
-            hype_level = grok_result.get("hype_level", 0.0)
-            community_sentiment = grok_result.get("community_sentiment", 0.0)
-            
-            # Combine metrics for overall sentiment confidence
-            confidence = (sentiment_score * 0.5) + (hype_level * 0.3) + (community_sentiment * 0.2)
+            # Enhance confidence based on profit indicators
+            base_confidence = sentiment_result.get('confidence', 0.5)
+            profit_enhanced_confidence = self._enhance_confidence_for_profit(
+                base_confidence, market_data, 'sentiment'
+            )
             
             decision = AIDecision(
                 model_role=AIModelRole.SENTIMENT_ANALYZER,
-                confidence=confidence,
-                decision="bullish" if confidence > 0.6 else "bearish" if confidence < -0.6 else "neutral",
-                reasoning=grok_result.get("reasoning", "Sentiment analysis based on social media activity"),
-                risk_score=1.0 - abs(confidence),  # Higher confidence = lower risk
-                supporting_data={
-                    "sentiment_score": sentiment_score,
-                    "hype_level": hype_level,
-                    "community_sentiment": community_sentiment,
-                    "social_volume": grok_result.get("social_volume", 0),
-                    "trend_strength": grok_result.get("trend_strength", 0)
-                }
+                confidence=profit_enhanced_confidence,
+                decision=sentiment_result.get('decision', 'HOLD'),
+                reasoning=sentiment_result.get('reasoning', 'No clear sentiment signals'),
+                risk_score=sentiment_result.get('risk_score', 0.5),
+                profit_potential=sentiment_result.get('profit_potential', 0.1),
+                momentum_score=market_data.get('profit_momentum', 0.5),
+                conviction_level=self._determine_conviction_level(profit_enhanced_confidence),
+                supporting_data=sentiment_result
             )
             
-            self.decision_history.append(decision)
             return decision
             
         except Exception as e:
-            logger.error(f"Sentiment analysis error: {str(e)}")
-            return AIDecision(
-                model_role=AIModelRole.SENTIMENT_ANALYZER,
-                confidence=0.0,
-                decision="neutral",
-                reasoning=f"Analysis failed: {str(e)}",
-                risk_score=1.0,
-                supporting_data={}
-            )
-    
-    async def _get_technical_analysis(self, token_address: str, market_data: Dict) -> AIDecision:
-        """Get technical analysis from Local LLM"""
+            logger.error(f"Error in profit-focused sentiment analysis: {str(e)}")
+            return self._get_fallback_sentiment_decision()
+
+    async def _get_profit_focused_technical(self, token_address: str, market_data: Dict) -> AIDecision:
+        """Get technical analysis focused on profit opportunities"""
         try:
-            # Generate dynamic prompt
-            prompt = self.prompt_engineer.get_prompt(
-                AIModelRole.TECHNICAL_ANALYST,
-                market_data,
-                self.model_performances[AIModelRole.TECHNICAL_ANALYST]
+            performance = self.model_performances[AIModelRole.TECHNICAL_ANALYST]
+            prompt = self.prompt_engineer.get_aggressive_prompt(
+                AIModelRole.TECHNICAL_ANALYST, 
+                market_data, 
+                performance,
+                self.profit_target_minimum
             )
             
-            # Get Local LLM analysis with enhanced prompt
-            enhanced_market_data = market_data.copy()
-            enhanced_market_data["analysis_prompt"] = prompt
+            # Get technical analysis with profit focus
+            technical_result = await self.local_llm.analyze_technical_for_profit(
+                token_address, market_data, prompt
+            )
             
-            llm_result = await self.local_llm.analyze_market(enhanced_market_data)
-            
-            if not llm_result or "error" in llm_result:
-                raise Exception("Local LLM analysis failed")
-            
-            # Extract technical metrics
-            technical_score = llm_result.get("confidence", 0.0)
-            trend_strength = llm_result.get("trend_strength", 0.0)
-            momentum_score = llm_result.get("momentum_score", 0.0)
-            
-            # Combine metrics for overall technical confidence
-            confidence = (technical_score * 0.6) + (trend_strength * 0.25) + (momentum_score * 0.15)
+            # Enhance confidence based on breakout potential
+            base_confidence = technical_result.get('confidence', 0.5)
+            profit_enhanced_confidence = self._enhance_confidence_for_profit(
+                base_confidence, market_data, 'technical'
+            )
             
             decision = AIDecision(
                 model_role=AIModelRole.TECHNICAL_ANALYST,
-                confidence=confidence,
-                decision="buy" if confidence > 0.6 else "sell" if confidence < -0.6 else "hold",
-                reasoning=llm_result.get("reasoning", "Technical analysis based on price patterns and indicators"),
-                risk_score=llm_result.get("risk_level", 0.5),
-                supporting_data={
-                    "technical_score": technical_score,
-                    "trend_strength": trend_strength,
-                    "momentum_score": momentum_score,
-                    "support_resistance": llm_result.get("support_resistance", {}),
-                    "indicators": llm_result.get("indicators", {})
-                }
+                confidence=profit_enhanced_confidence,
+                decision=technical_result.get('decision', 'HOLD'),
+                reasoning=technical_result.get('reasoning', 'No clear technical signals'),
+                risk_score=technical_result.get('risk_score', 0.5),
+                profit_potential=technical_result.get('profit_potential', 0.1),
+                momentum_score=market_data.get('breakout_potential', 0.5),
+                conviction_level=self._determine_conviction_level(profit_enhanced_confidence),
+                supporting_data=technical_result
             )
             
-            self.decision_history.append(decision)
             return decision
             
         except Exception as e:
-            logger.error(f"Technical analysis error: {str(e)}")
-            return AIDecision(
-                model_role=AIModelRole.TECHNICAL_ANALYST,
-                confidence=0.0,
-                decision="hold",
-                reasoning=f"Analysis failed: {str(e)}",
-                risk_score=1.0,
-                supporting_data={}
-            )
-    
-    async def _get_risk_assessment(self, token_address: str, market_data: Dict, 
-                                 sentiment: AIDecision, technical: AIDecision) -> AIDecision:
-        """Perform combined risk assessment"""
+            logger.error(f"Error in profit-focused technical analysis: {str(e)}")
+            return self._get_fallback_technical_decision()
+
+    def _enhance_confidence_for_profit(self, base_confidence: float, market_data: Dict, analysis_type: str) -> float:
+        """Enhance confidence based on profit indicators"""
+        enhanced_confidence = base_confidence * self.base_confidence_multiplier
+        
+        # Portfolio momentum boost
+        portfolio_momentum = market_data.get('portfolio_momentum', 0)
+        if portfolio_momentum > 0.2:  # 20%+ portfolio gains
+            enhanced_confidence *= 1.2
+        elif portfolio_momentum > 0.1:  # 10%+ portfolio gains
+            enhanced_confidence *= 1.1
+        
+        # Win streak boost
+        win_streak = market_data.get('portfolio_profit_streak', 0)
+        if win_streak > 3:
+            enhanced_confidence *= (1 + win_streak * 0.05)  # 5% per win in streak
+        
+        # Volatility opportunity boost
+        if analysis_type == 'technical':
+            breakout_potential = market_data.get('breakout_potential', 0.5)
+            enhanced_confidence *= (0.8 + 0.4 * breakout_potential)
+        
+        # Market momentum boost
+        profit_momentum = market_data.get('profit_momentum', 0.5)
+        enhanced_confidence *= (0.9 + 0.2 * profit_momentum)
+        
+        # Cap at reasonable levels but allow aggressive confidence
+        return min(0.95, max(0.1, enhanced_confidence))
+
+    def _determine_conviction_level(self, confidence: float) -> str:
+        """Determine conviction level based on confidence"""
+        if confidence >= 0.85:
+            return "EXTREME"
+        elif confidence >= 0.70:
+            return "HIGH"
+        elif confidence >= 0.55:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    async def _calculate_profit_potential(self, token_address: str, market_data: Dict, 
+                                        sentiment: AIDecision, technical: AIDecision) -> Dict[str, Any]:
+        """Calculate comprehensive profit potential"""
         try:
-            # Combine risk indicators from both models
-            sentiment_risk = sentiment.risk_score
-            technical_risk = technical.risk_score
+            # Base profit calculation
+            sentiment_profit = sentiment.profit_potential
+            technical_profit = technical.profit_potential
             
-            # Market-based risk factors
-            liquidity = market_data.get("liquidity", 0)
-            volume = market_data.get("volume_24h", 0)
-            volatility = market_data.get("volatility", 0.5)
-            holder_count = market_data.get("holder_count", 0)
-            
-            # Calculate risk components
-            liquidity_risk = 1.0 if liquidity < 10000 else max(0.1, 1.0 - (liquidity / 100000))
-            volume_risk = 1.0 if volume < 1000 else max(0.1, 1.0 - (volume / 50000))
-            volatility_risk = min(1.0, volatility)
-            holder_risk = 1.0 if holder_count < 50 else max(0.1, 1.0 - (holder_count / 1000))
-            
-            # Combined risk score
-            overall_risk = np.mean([
-                sentiment_risk * 0.2,
-                technical_risk * 0.3,
-                liquidity_risk * 0.2,
-                volume_risk * 0.15,
-                volatility_risk * 0.1,
-                holder_risk * 0.05
-            ])
-            
-            # Risk-based decision
-            if overall_risk > 0.8:
-                risk_decision = "high_risk"
-                confidence = 0.9
-            elif overall_risk > 0.6:
-                risk_decision = "medium_risk"
-                confidence = 0.7
-            elif overall_risk > 0.3:
-                risk_decision = "low_risk"
-                confidence = 0.8
-            else:
-                risk_decision = "very_low_risk"
-                confidence = 0.95
-            
-            decision = AIDecision(
-                model_role=AIModelRole.RISK_ASSESSOR,
-                confidence=confidence,
-                decision=risk_decision,
-                reasoning=f"Combined risk assessment: liquidity={liquidity_risk:.2f}, volume={volume_risk:.2f}, volatility={volatility_risk:.2f}",
-                risk_score=overall_risk,
-                supporting_data={
-                    "sentiment_risk": sentiment_risk,
-                    "technical_risk": technical_risk,
-                    "liquidity_risk": liquidity_risk,
-                    "volume_risk": volume_risk,
-                    "volatility_risk": volatility_risk,
-                    "holder_risk": holder_risk,
-                    "overall_risk": overall_risk
-                }
+            # Weighted average based on model weights
+            base_profit_potential = (
+                sentiment_profit * self.model_weights[AIModelRole.SENTIMENT_ANALYZER] +
+                technical_profit * self.model_weights[AIModelRole.TECHNICAL_ANALYST]
             )
             
-            self.decision_history.append(decision)
-            return decision
+            # Market enhancement factors
+            volatility_multiplier = 1 + market_data.get('volatility_opportunity', 0.5)
+            momentum_multiplier = 1 + market_data.get('profit_momentum', 0.5) * 0.5
+            breakout_multiplier = 1 + market_data.get('breakout_potential', 0.5) * 0.3
+            
+            # Enhanced profit potential
+            enhanced_profit_potential = (base_profit_potential * volatility_multiplier * 
+                                       momentum_multiplier * breakout_multiplier)
+            
+            # Risk-adjusted profit (higher risk can mean higher reward)
+            avg_risk = (sentiment.risk_score + technical.risk_score) / 2
+            risk_reward_multiplier = 1 + (avg_risk * 0.5)  # Higher risk = higher potential reward
+            
+            final_profit_potential = enhanced_profit_potential * risk_reward_multiplier
+            
+            # Calculate target profit (minimum vs potential)
+            target_profit = max(self.profit_target_minimum, final_profit_potential * 0.8)
+            
+            return {
+                'base_potential': base_profit_potential,
+                'enhanced_potential': enhanced_profit_potential,
+                'final_potential': final_profit_potential,
+                'target_profit': target_profit,
+                'risk_reward_ratio': final_profit_potential / max(avg_risk, 0.1),
+                'volatility_factor': volatility_multiplier,
+                'momentum_factor': momentum_multiplier,
+                'breakout_factor': breakout_multiplier,
+                'profit_confidence': (sentiment.confidence + technical.confidence) / 2
+            }
             
         except Exception as e:
-            logger.error(f"Risk assessment error: {str(e)}")
-            return AIDecision(
-                model_role=AIModelRole.RISK_ASSESSOR,
-                confidence=0.5,
-                decision="high_risk",
-                reasoning=f"Risk assessment failed: {str(e)}",
-                risk_score=1.0,
-                supporting_data={}
-            )
-    
-    async def _make_ensemble_decision(self, sentiment: AIDecision, technical: AIDecision, 
-                                    risk: AIDecision, market_data: Dict) -> AIDecision:
-        """Make final ensemble decision combining all analyses"""
+            logger.error(f"Error calculating profit potential: {str(e)}")
+            return {
+                'base_potential': self.profit_target_minimum,
+                'enhanced_potential': self.profit_target_minimum,
+                'final_potential': self.profit_target_minimum,
+                'target_profit': self.profit_target_minimum,
+                'risk_reward_ratio': 1.0,
+                'profit_confidence': 0.5
+            }
+
+    async def _make_profit_maximized_decision(self, sentiment: AIDecision, technical: AIDecision, 
+                                            profit_assessment: Dict, market_data: Dict) -> Dict[str, Any]:
+        """Make final decision optimized for profit maximization"""
         try:
-            # Dynamic model weighting based on recent performance
+            # Calculate ensemble confidence with profit weighting
             sentiment_weight = self.model_weights[AIModelRole.SENTIMENT_ANALYZER]
             technical_weight = self.model_weights[AIModelRole.TECHNICAL_ANALYST]
             
-            # Adjust weights based on recent accuracy
-            sentiment_perf = self.model_performances[AIModelRole.SENTIMENT_ANALYZER]
-            technical_perf = self.model_performances[AIModelRole.TECHNICAL_ANALYST]
+            # Adjust weights based on profit performance
+            sentiment_performance = self.model_performances[AIModelRole.SENTIMENT_ANALYZER].profit_efficiency
+            technical_performance = self.model_performances[AIModelRole.TECHNICAL_ANALYST].profit_efficiency
             
-            if sentiment_perf.recent_accuracy_rate > technical_perf.recent_accuracy_rate:
+            # Boost weights for better performing models
+            if sentiment_performance > technical_performance:
                 sentiment_weight *= 1.2
-                technical_weight *= 0.8
-            elif technical_perf.recent_accuracy_rate > sentiment_perf.recent_accuracy_rate:
+                technical_weight *= 0.9
+            else:
+                sentiment_weight *= 0.9
                 technical_weight *= 1.2
-                sentiment_weight *= 0.8
             
             # Normalize weights
             total_weight = sentiment_weight + technical_weight
             sentiment_weight /= total_weight
             technical_weight /= total_weight
             
-            # Calculate weighted confidence
-            sentiment_score = sentiment.confidence if sentiment.decision == "bullish" else -sentiment.confidence
-            technical_score = technical.confidence if technical.decision == "buy" else -technical.confidence if technical.decision == "sell" else 0
+            # Ensemble confidence
+            ensemble_confidence = (sentiment.confidence * sentiment_weight + 
+                                 technical.confidence * technical_weight)
             
-            weighted_confidence = (sentiment_score * sentiment_weight) + (technical_score * technical_weight)
+            # Profit potential consideration
+            profit_potential = profit_assessment['final_potential']
+            profit_confidence = profit_assessment['profit_confidence']
             
-            # Risk adjustment
-            risk_multiplier = 1.0 - (risk.risk_score * 0.5)  # Reduce confidence for high risk
-            final_confidence = weighted_confidence * risk_multiplier
+            # Final confidence with profit boost
+            final_confidence = ensemble_confidence * (1 + profit_potential * 0.5)
+            final_confidence = min(0.95, final_confidence)
             
-            # Final decision logic
-            if final_confidence > 0.6 and risk.risk_score < 0.7:
-                decision = "buy"
-                action_confidence = abs(final_confidence)
-            elif final_confidence < -0.6 and risk.risk_score < 0.8:
-                decision = "sell"
-                action_confidence = abs(final_confidence)
+            # Decision logic with profit priority
+            if final_confidence >= 0.75 and profit_potential >= self.profit_target_minimum:
+                decision = "STRONG_BUY"
+            elif final_confidence >= 0.60 and profit_potential >= self.profit_target_minimum * 0.8:
+                decision = "BUY"
+            elif final_confidence >= 0.45 and profit_potential >= self.profit_target_minimum * 0.6:
+                decision = "WEAK_BUY"
             else:
-                decision = "hold"
-                action_confidence = 1.0 - abs(final_confidence)
+                decision = "HOLD"
             
-            # Position sizing based on confidence and risk
-            position_size_multiplier = action_confidence * (1.0 - risk.risk_score)
+            # Conviction level
+            conviction_level = self._determine_conviction_level(final_confidence)
             
-            ensemble_decision = AIDecision(
-                model_role=AIModelRole.DECISION_MAKER,
-                confidence=action_confidence,
-                decision=decision,
-                reasoning=f"Ensemble: sentiment={sentiment_score:.2f}({sentiment_weight:.1f}), technical={technical_score:.2f}({technical_weight:.1f}), risk={risk.risk_score:.2f}",
-                risk_score=risk.risk_score,
-                supporting_data={
-                    "weighted_confidence": weighted_confidence,
-                    "final_confidence": final_confidence,
-                    "position_size_multiplier": position_size_multiplier,
-                    "sentiment_weight": sentiment_weight,
-                    "technical_weight": technical_weight,
-                    "risk_adjustment": risk_multiplier,
-                    "component_decisions": {
-                        "sentiment": sentiment.decision,
-                        "technical": technical.decision,
-                        "risk": risk.decision
-                    }
-                }
-            )
+            # Risk assessment with profit consideration
+            avg_risk = (sentiment.risk_score + technical.risk_score) / 2
+            profit_adjusted_risk = avg_risk / max(profit_potential, 0.1)  # Lower effective risk for higher profit
             
-            self.decision_history.append(ensemble_decision)
-            return ensemble_decision
-            
-        except Exception as e:
-            logger.error(f"Ensemble decision error: {str(e)}")
-            return AIDecision(
-                model_role=AIModelRole.DECISION_MAKER,
-                confidence=0.0,
-                decision="hold",
-                reasoning=f"Ensemble decision failed: {str(e)}",
-                risk_score=1.0,
-                supporting_data={}
-            )
-    
-    async def learn_from_outcome(self, trade_id: str, original_decision: AIDecision, 
-                               trade_outcome: Dict[str, Any]) -> bool:
-        """Learn from trade outcomes and update model performance"""
-        try:
-            profit_loss = trade_outcome.get("profit", 0.0)
-            success = trade_outcome.get("success", False)
-            
-            # Create feedback record
-            feedback = LearningFeedback(
-                trade_id=trade_id,
-                original_decision=original_decision,
-                actual_outcome=trade_outcome,
-                profit_loss=profit_loss,
-                success=success,
-                market_conditions=trade_outcome.get("market_conditions", {}),
-                lesson_learned=self._extract_lesson(original_decision, trade_outcome)
-            )
-            
-            self.feedback_history.append(feedback)
-            
-            # Update model performance
-            model_perf = self.model_performances[original_decision.model_role]
-            model_perf.update_performance(success, profit_loss, original_decision.confidence)
-            
-            # Update model weights based on performance
-            await self._update_model_weights()
-            
-            # Update prompt strategy
-            overall_performance = sum(p.recent_accuracy_rate for p in self.model_performances.values()) / len(self.model_performances)
-            self.prompt_engineer.update_strategy(overall_performance)
-            
-            # Save learned patterns
-            await self._save_learned_patterns()
-            
-            logger.info(f"Learning feedback processed for trade {trade_id}: {'success' if success else 'failure'}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Learning feedback error: {str(e)}")
-            return False
-    
-    def _extract_lesson(self, decision: AIDecision, outcome: Dict[str, Any]) -> str:
-        """Extract lesson learned from trade outcome"""
-        try:
-            if outcome.get("success", False):
-                return f"High confidence {decision.decision} was correct - trust similar patterns"
-            else:
-                risk_score = decision.risk_score
-                confidence = decision.confidence
-                
-                if risk_score > 0.7:
-                    return "High risk trades should be avoided or position sizes reduced"
-                elif confidence < 0.5:
-                    return "Low confidence decisions should not be acted upon"
-                else:
-                    return f"Review {decision.model_role.value} analysis methodology"
-                    
-        except Exception as e:
-            return f"Failed to extract lesson: {str(e)}"
-    
-    async def _update_model_weights(self):
-        """Update model weights based on recent performance"""
-        try:
-            sentiment_perf = self.model_performances[AIModelRole.SENTIMENT_ANALYZER].recent_accuracy_rate
-            technical_perf = self.model_performances[AIModelRole.TECHNICAL_ANALYST].recent_accuracy_rate
-            
-            # Calculate new weights based on performance
-            total_perf = sentiment_perf + technical_perf
-            if total_perf > 0:
-                self.model_weights[AIModelRole.SENTIMENT_ANALYZER] = sentiment_perf / total_perf
-                self.model_weights[AIModelRole.TECHNICAL_ANALYST] = technical_perf / total_perf
-            
-            logger.debug(f"Updated model weights: sentiment={self.model_weights[AIModelRole.SENTIMENT_ANALYZER]:.2f}, technical={self.model_weights[AIModelRole.TECHNICAL_ANALYST]:.2f}")
-            
-        except Exception as e:
-            logger.error(f"Model weight update error: {str(e)}")
-    
-    async def _save_learned_patterns(self):
-        """Save learned patterns to disk"""
-        try:
-            patterns_data = {
-                "model_performances": {k.value: v.__dict__ for k, v in self.model_performances.items()},
-                "model_weights": {k.value: v for k, v in self.model_weights.items()},
-                "feedback_summary": [
-                    {
-                        "trade_id": f.trade_id,
-                        "success": f.success,
-                        "profit_loss": f.profit_loss,
-                        "lesson": f.lesson_learned,
-                        "timestamp": f.timestamp
-                    }
-                    for f in self.feedback_history[-100:]  # Keep last 100
-                ]
-            }
-            
-            os.makedirs("data/learned_patterns", exist_ok=True)
-            with open("data/learned_patterns/ai_patterns.json", "w") as f:
-                json.dump(patterns_data, f, indent=2)
-                
-        except Exception as e:
-            logger.error(f"Save patterns error: {str(e)}")
-    
-    async def _load_learned_patterns(self):
-        """Load learned patterns from disk"""
-        try:
-            patterns_file = "data/learned_patterns/ai_patterns.json"
-            if os.path.exists(patterns_file):
-                with open(patterns_file, "r") as f:
-                    patterns_data = json.load(f)
-                
-                # Restore model weights
-                if "model_weights" in patterns_data:
-                    for role_str, weight in patterns_data["model_weights"].items():
-                        role = AIModelRole(role_str)
-                        self.model_weights[role] = weight
-                
-                logger.info("Loaded learned patterns successfully")
-                
-        except Exception as e:
-            logger.error(f"Load patterns error: {str(e)}")
-    
-    def get_performance_summary(self) -> Dict[str, Any]:
-        """Get comprehensive performance summary"""
-        try:
             return {
-                "model_performances": {
-                    k.value: {
-                        "accuracy": v.accuracy,
-                        "recent_accuracy": v.recent_accuracy_rate,
-                        "total_decisions": v.total_decisions,
-                        "total_profit": v.total_profit,
-                        "average_confidence": v.average_confidence
-                    }
-                    for k, v in self.model_performances.items()
-                },
-                "model_weights": {k.value: v for k, v in self.model_weights.items()},
-                "current_strategy": self.prompt_engineer.current_strategy.value,
-                "total_feedback": len(self.feedback_history),
-                "recent_lessons": [f.lesson_learned for f in self.feedback_history[-5:]]
+                'decision': decision,
+                'confidence': final_confidence,
+                'conviction_level': conviction_level,
+                'profit_potential': profit_potential,
+                'target_profit': profit_assessment['target_profit'],
+                'risk_reward_ratio': profit_assessment['risk_reward_ratio'],
+                'effective_risk': profit_adjusted_risk,
+                'reasoning': f"PROFIT-FOCUSED: {sentiment.decision} (sentiment) + {technical.decision} (technical) = {decision} with {profit_potential*100:.1f}% profit potential",
+                'model_weights': {'sentiment': sentiment_weight, 'technical': technical_weight},
+                'profit_confidence': profit_confidence,
+                'market_factors': {
+                    'volatility_opportunity': market_data.get('volatility_opportunity', 0.5),
+                    'breakout_potential': market_data.get('breakout_potential', 0.5),
+                    'profit_momentum': market_data.get('profit_momentum', 0.5)
+                }
             }
             
         except Exception as e:
-            logger.error(f"Performance summary error: {str(e)}")
-            return {"error": str(e)} 
+            logger.error(f"Error making profit-maximized decision: {str(e)}")
+            return self._get_safe_fallback_decision()['final_decision']
+
+    def _calculate_position_size_from_conviction(self, decision: Dict) -> float:
+        """Calculate recommended position size based on conviction level"""
+        conviction = decision.get('conviction_level', 'MEDIUM')
+        confidence = decision.get('confidence', 0.5)
+        profit_potential = decision.get('profit_potential', 0.1)
+        
+        # Base position sizes by conviction
+        base_sizes = {
+            'EXTREME': 0.35,  # 35% for extreme conviction
+            'HIGH': 0.25,     # 25% for high conviction
+            'MEDIUM': 0.15,   # 15% for medium conviction
+            'LOW': 0.05       # 5% for low conviction
+        }
+        
+        base_size = base_sizes.get(conviction, 0.15)
+        
+        # Adjust for profit potential (higher profit = larger position)
+        profit_multiplier = 1 + min(profit_potential, 0.5)  # Up to 50% increase
+        
+        # Adjust for confidence
+        confidence_multiplier = 0.5 + confidence  # 0.5x to 1.5x based on confidence
+        
+        final_size = base_size * profit_multiplier * confidence_multiplier
+        return min(0.4, max(0.05, final_size))  # Cap between 5% and 40%
+
+    def _log_profit_decision(self, decision: Dict, profit_assessment: Dict):
+        """Log decision with profit metrics"""
+        try:
+            profit_potential = decision.get('profit_potential', 0)
+            conviction = decision.get('conviction_level', 'MEDIUM')
+            confidence = decision.get('confidence', 0)
+            
+            logger.info(f"🎯 PROFIT DECISION: {decision.get('decision', 'HOLD')}")
+            logger.info(f"   💰 Profit Potential: {profit_potential*100:.1f}%")
+            logger.info(f"   🔥 Conviction: {conviction} ({confidence*100:.1f}% confidence)")
+            logger.info(f"   📊 Risk/Reward: {decision.get('risk_reward_ratio', 1.0):.2f}")
+            logger.info(f"   📈 Target Profit: {decision.get('target_profit', 0)*100:.1f}%")
+            
+        except Exception as e:
+            logger.error(f"Error logging profit decision: {e}")
+
+    def _get_safe_fallback_decision(self) -> Dict[str, Any]:
+        """Get safe fallback decision when analysis fails"""
+        return {
+            'sentiment': AIDecision(
+                model_role=AIModelRole.SENTIMENT_ANALYZER,
+                confidence=0.3,
+                decision='HOLD',
+                reasoning='Analysis failed - fallback mode',
+                risk_score=0.8,
+                profit_potential=0.05
+            ),
+            'technical': AIDecision(
+                model_role=AIModelRole.TECHNICAL_ANALYST,
+                confidence=0.3,
+                decision='HOLD',
+                reasoning='Analysis failed - fallback mode',
+                risk_score=0.8,
+                profit_potential=0.05
+            ),
+            'final_decision': {
+                'decision': 'HOLD',
+                'confidence': 0.3,
+                'conviction_level': 'LOW',
+                'profit_potential': 0.05,
+                'reasoning': 'Fallback decision due to analysis error'
+            }
+        }
+
+    # Alias the new method to maintain compatibility
+    async def analyze_comprehensive(self, token_address: str, market_data: Dict) -> Dict[str, Any]:
+        """Alias for analyze_for_maximum_profit to maintain compatibility"""
+        return await self.analyze_for_maximum_profit(token_address, market_data)
+
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """Get performance summary with profit focus"""
+        try:
+            overall_profit = sum(perf.total_profit for perf in self.model_performances.values())
+            total_decisions = sum(perf.total_decisions for perf in self.model_performances.values())
+            
+            return {
+                'total_decisions': total_decisions,
+                'total_profit': overall_profit,
+                'average_profit_per_decision': overall_profit / max(total_decisions, 1),
+                'win_streak': self.win_streak,
+                'best_trade_profit': self.best_trade_profit,
+                'overall_accuracy': sum(perf.accuracy for perf in self.model_performances.values()) / len(self.model_performances),
+                'model_weights': self.model_weights,
+                'model_performance': {
+                    role.value: {
+                        'accuracy': perf.accuracy,
+                        'recent_accuracy_rate': perf.recent_accuracy_rate,
+                        'total_profit': perf.total_profit,
+                        'profit_efficiency': perf.profit_efficiency,
+                        'average_profit_multiplier': perf.average_profit_multiplier
+                    }
+                    for role, perf in self.model_performances.items()
+                },
+                'aggression_multiplier': self.prompt_engineer.aggression_multiplier,
+                'current_strategy': self.prompt_engineer.current_strategy.value
+            }
+        except Exception as e:
+            logger.error(f"Error getting performance summary: {e}")
+            return {
+                'total_decisions': 0,
+                'total_profit': 0.0,
+                'overall_accuracy': 0.5,
+                'model_weights': self.model_weights,
+                'model_performance': {}
+            }
+
+# Alias for backward compatibility
+AICoordinator = ProfitMaximizedAICoordinator 

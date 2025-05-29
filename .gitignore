@@ -120,3 +120,12 @@ ultimate_*.*
 # Test artifacts
 pytest-report.xml
 test_results/ 
+# Cleanup artifacts
+cleanup_codebase.py
+cleanup_summary.md
+# Production secrets
+*.env.production
+*.env.local
+# Additional cache
+.ruff_cache/
+.bandit/

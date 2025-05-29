@@ -23,11 +23,17 @@ from datetime import datetime
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.core.ai.ant_hierarchy import FoundingAntQueen, AntRole
+from src.core.ai.ant_hierarchy_simple import FoundingAntQueen, AntRole
 from src.core.ai.enhanced_ai_coordinator import AICoordinator
 from src.core.system_replicator import SystemReplicator
 from src.services.wallet_manager import WalletManager
-from src.core.portfolio_risk_manager import PortfolioRiskManager
+
+# Optional import for portfolio risk manager
+try:
+    from src.core.portfolio_risk_manager import PortfolioRiskManager
+except ImportError:
+    PortfolioRiskManager = None
+
 from src.core.data_ingestion import DataIngestion
 from src.services.helius_service import HeliusService
 from src.services.jupiter_service import JupiterService

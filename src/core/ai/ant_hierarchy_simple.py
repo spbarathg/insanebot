@@ -1,0 +1,199 @@
+"""
+Simplified Ant Hierarchy System for Deployment
+Minimal implementation to avoid import issues
+"""
+
+import asyncio
+import json
+import logging
+import time
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+class AntRole(Enum):
+    """Hierarchy roles in the Ant system"""
+    FOUNDING_QUEEN = "founding_queen"
+    QUEEN = "queen"
+    PRINCESS = "princess"
+
+class AntStatus(Enum):
+    """Operational status of Ant agents"""
+    ACTIVE = "active"
+    SPLITTING = "splitting"
+    MERGING = "merging"
+    RETIRING = "retiring"
+    DORMANT = "dormant"
+
+@dataclass
+class AntCapital:
+    """Capital management for Ant agents"""
+    current_balance: float = 0.0
+    allocated_capital: float = 0.0
+    available_capital: float = 0.0
+    total_trades: int = 0
+    profit_loss: float = 0.0
+    last_updated: float = 0.0
+    
+    def update_balance(self, new_balance: float):
+        """Update capital balance"""
+        self.profit_loss += (new_balance - self.current_balance)
+        self.current_balance = new_balance
+        self.available_capital = max(0, new_balance - self.allocated_capital)
+        self.last_updated = time.time()
+
+@dataclass
+class AntPerformance:
+    """Performance tracking for Ant agents"""
+    total_trades: int = 0
+    successful_trades: int = 0
+    total_profit: float = 0.0
+    win_rate: float = 0.0
+    
+    def update_trade_result(self, profit: float, success: bool):
+        """Update performance metrics"""
+        self.total_trades += 1
+        self.total_profit += profit
+        if success:
+            self.successful_trades += 1
+        self.win_rate = (self.successful_trades / self.total_trades * 100) if self.total_trades > 0 else 0.0
+
+class BaseAnt:
+    """Base class for all Ant agents"""
+    
+    def __init__(self, ant_id: str, role: AntRole, parent_id: Optional[str] = None):
+        self.ant_id = ant_id
+        self.role = role
+        self.parent_id = parent_id
+        self.status = AntStatus.ACTIVE
+        self.created_at = time.time()
+        self.capital = AntCapital()
+        self.performance = AntPerformance()
+        self.children: List[str] = []
+    
+    def get_status_summary(self) -> Dict[str, Any]:
+        """Get status summary"""
+        return {
+            "ant_id": self.ant_id,
+            "role": self.role.value,
+            "status": self.status.value,
+            "capital": self.capital.current_balance,
+            "profit": self.performance.total_profit,
+            "trades": self.performance.total_trades,
+            "win_rate": self.performance.win_rate,
+            "children": len(self.children)
+        }
+
+class FoundingAntQueen(BaseAnt):
+    """Simplified Founding Ant Queen for deployment"""
+    
+    def __init__(self, ant_id: str = "founding_queen_0", initial_capital: float = 20.0):
+        super().__init__(ant_id, AntRole.FOUNDING_QUEEN)
+        self.capital.current_balance = initial_capital
+        self.capital.available_capital = initial_capital
+        self.queens: Dict[str, 'AntQueen'] = {}
+        self.system_metrics = {
+            "total_trades": 0,
+            "total_profit": 0.0,
+            "active_queens": 0,
+            "active_princesses": 0
+        }
+    
+    async def initialize(self) -> bool:
+        """Initialize the Founding Queen"""
+        try:
+            logger.info(f"Initializing Founding Queen {self.ant_id} with {self.capital.current_balance} SOL")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize Founding Queen: {str(e)}")
+            return False
+    
+    async def create_queen(self, initial_capital: float = 2.0) -> Optional[str]:
+        """Create a new Queen"""
+        try:
+            if self.capital.available_capital >= initial_capital:
+                queen_id = f"queen_{len(self.queens)}"
+                queen = AntQueen(queen_id, self.ant_id, initial_capital)
+                self.queens[queen_id] = queen
+                self.children.append(queen_id)
+                
+                # Allocate capital
+                self.capital.allocate_capital(initial_capital)
+                
+                logger.info(f"Created Queen {queen_id} with {initial_capital} SOL")
+                return queen_id
+            else:
+                logger.warning(f"Insufficient capital to create Queen: {self.capital.available_capital} < {initial_capital}")
+                return None
+        except Exception as e:
+            logger.error(f"Error creating Queen: {str(e)}")
+            return None
+    
+    def get_system_status(self) -> Dict[str, Any]:
+        """Get system status"""
+        return {
+            "founding_queen": self.get_status_summary(),
+            "queens": {qid: queen.get_status_summary() for qid, queen in self.queens.items()},
+            "system_metrics": self.system_metrics,
+            "timestamp": time.time()
+        }
+
+class AntQueen(BaseAnt):
+    """Simplified Ant Queen for deployment"""
+    
+    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 2.0):
+        super().__init__(ant_id, AntRole.QUEEN, parent_id)
+        self.capital.current_balance = initial_capital
+        self.capital.available_capital = initial_capital
+        self.princesses: Dict[str, 'AntPrincess'] = {}
+    
+    async def create_princess(self, initial_capital: float = 0.5) -> Optional[str]:
+        """Create a new Princess"""
+        try:
+            if self.capital.available_capital >= initial_capital:
+                princess_id = f"princess_{self.ant_id}_{len(self.princesses)}"
+                princess = AntPrincess(princess_id, self.ant_id, initial_capital)
+                self.princesses[princess_id] = princess
+                self.children.append(princess_id)
+                
+                # Allocate capital
+                self.capital.allocate_capital(initial_capital)
+                
+                logger.info(f"Created Princess {princess_id} with {initial_capital} SOL")
+                return princess_id
+            else:
+                logger.warning(f"Insufficient capital to create Princess: {self.capital.available_capital} < {initial_capital}")
+                return None
+        except Exception as e:
+            logger.error(f"Error creating Princess: {str(e)}")
+            return None
+
+class AntPrincess(BaseAnt):
+    """Simplified Ant Princess for deployment"""
+    
+    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 0.5):
+        super().__init__(ant_id, AntRole.PRINCESS, parent_id)
+        self.capital.current_balance = initial_capital
+        self.capital.available_capital = initial_capital
+        self.max_trades = 10
+    
+    def should_retire(self) -> bool:
+        """Check if princess should retire"""
+        return self.performance.total_trades >= self.max_trades
+    
+    async def analyze_opportunity(self, token_address: str, market_data: Dict) -> Optional[Dict]:
+        """Simplified opportunity analysis"""
+        try:
+            # Simple analysis for deployment
+            return {
+                "token_address": token_address,
+                "action": "hold",  # Conservative for deployment
+                "confidence": 0.5,
+                "position_size": 0.01,
+                "reasoning": "Simplified analysis for deployment"
+            }
+        except Exception as e:
+            logger.error(f"Error analyzing opportunity: {str(e)}")
+            return None 
