@@ -200,9 +200,14 @@ class TradingBot24x7:
                 "overall": False
             }
             
-            # Check bot system
-            if self.bot_system and hasattr(self.bot_system, 'running'):
-                health_status["bot_system"] = True
+            # Check Enhanced Ant Bot system (production system)
+            if self.bot_system:
+                # Check if it's initialized and has the required components
+                if (hasattr(self.bot_system, 'founding_queen') and 
+                    self.bot_system.founding_queen and
+                    hasattr(self.bot_system, 'ai_coordinator') and
+                    self.bot_system.ai_coordinator):
+                    health_status["bot_system"] = True
             
             # Check wallet manager
             if self.wallet_manager:
@@ -216,7 +221,7 @@ class TradingBot24x7:
             if self.titan_shield:
                 health_status["titan_shield"] = True
             
-            # Overall health
+            # Overall health - require bot_system and wallet_manager at minimum
             health_status["overall"] = all([
                 health_status["bot_system"],
                 health_status["wallet_manager"]
