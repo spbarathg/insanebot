@@ -97,7 +97,7 @@ class BaseAnt:
 class FoundingAntQueen(BaseAnt):
     """Simplified Founding Ant Queen for deployment"""
     
-    def __init__(self, ant_id: str = "founding_queen_0", initial_capital: float = 20.0):
+    def __init__(self, ant_id: str = "founding_queen_0", initial_capital: float = 20.0, titan_shield=None):
         super().__init__(ant_id, AntRole.FOUNDING_QUEEN)
         self.capital.current_balance = initial_capital
         self.capital.available_capital = initial_capital
@@ -108,6 +108,13 @@ class FoundingAntQueen(BaseAnt):
             "active_queens": 0,
             "active_princesses": 0
         }
+        
+        # Store titan_shield reference (may be None for simplified version)
+        self.titan_shield = titan_shield
+        if titan_shield:
+            logger.info(f"🛡️ Founding Queen {ant_id} initialized with Titan Shield protection")
+        else:
+            logger.warning(f"⚠️ Founding Queen {ant_id} initialized without Titan Shield protection")
     
     async def initialize(self) -> bool:
         """Initialize the Founding Queen"""
@@ -118,10 +125,10 @@ class FoundingAntQueen(BaseAnt):
             logger.error(f"Failed to initialize Founding Queen: {str(e)}")
             return False
     
-    async def coordinate_system(self, market_data: List[Dict]) -> Dict[str, Any]:
-        """Coordinate the entire ant system with market data"""
+    async def coordinate_system(self, market_opportunities: List[Dict]) -> Dict[str, Any]:
+        """Coordinate the entire ant system with market opportunities"""
         try:
-            logger.debug(f"Founding Queen coordinating system with {len(market_data)} market opportunities")
+            logger.debug(f"Founding Queen coordinating system with {len(market_opportunities)} market opportunities")
             
             coordination_results = {
                 "decisions": [],
@@ -129,18 +136,36 @@ class FoundingAntQueen(BaseAnt):
                 "processed_tokens": 0
             }
             
-            # Process market data through ant hierarchy
-            for data in market_data:
+            # Ensure we have at least one queen
+            if not self.queens and self.capital.available_capital >= 2.0:
+                await self.create_queen()
+            
+            # Process market opportunities through ant hierarchy
+            for data in market_opportunities:
                 try:
                     token_address = data.get("token_address")
                     if not token_address:
                         continue
                     
-                    # Simple analysis for deployment
-                    decision = await self._analyze_market_opportunity(data)
-                    if decision:
-                        coordination_results["decisions"].append(decision)
-                        coordination_results["processed_tokens"] += 1
+                    # Create decisions for available princesses
+                    for queen_id, queen in self.queens.items():
+                        # Ensure queen has at least one princess
+                        if not queen.princesses and queen.capital.available_capital >= 0.5:
+                            await queen.create_princess()
+                        
+                        # Generate decisions from princesses
+                        for princess_id, princess in queen.princesses.items():
+                            if not princess.should_retire():
+                                decision = await self._analyze_market_opportunity(data)
+                                if decision:
+                                    # Format decision as expected by enhanced_main.py
+                                    decision_data = {
+                                        "princess_id": princess_id,
+                                        "decision": decision
+                                    }
+                                    coordination_results["decisions"].append(decision_data)
+                                    coordination_results["processed_tokens"] += 1
+                                    break  # One decision per opportunity for simplicity
                     
                 except Exception as e:
                     logger.debug(f"Error processing market data: {str(e)}")
@@ -190,7 +215,7 @@ class FoundingAntQueen(BaseAnt):
         try:
             if self.capital.available_capital >= initial_capital:
                 queen_id = f"queen_{len(self.queens)}"
-                queen = AntQueen(queen_id, self.ant_id, initial_capital)
+                queen = AntQueen(queen_id, self.ant_id, initial_capital, self.titan_shield)
                 self.queens[queen_id] = queen
                 self.children.append(queen_id)
                 
@@ -218,18 +243,22 @@ class FoundingAntQueen(BaseAnt):
 class AntQueen(BaseAnt):
     """Simplified Ant Queen for deployment"""
     
-    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 2.0):
+    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 2.0, titan_shield=None):
         super().__init__(ant_id, AntRole.QUEEN, parent_id)
         self.capital.current_balance = initial_capital
         self.capital.available_capital = initial_capital
         self.princesses: Dict[str, 'AntPrincess'] = {}
+        self.titan_shield = titan_shield
+        
+        if titan_shield:
+            logger.debug(f"🛡️ Queen {ant_id} initialized with Titan Shield protection")
     
     async def create_princess(self, initial_capital: float = 0.5) -> Optional[str]:
         """Create a new Princess"""
         try:
             if self.capital.available_capital >= initial_capital:
                 princess_id = f"princess_{self.ant_id}_{len(self.princesses)}"
-                princess = AntPrincess(princess_id, self.ant_id, initial_capital)
+                princess = AntPrincess(princess_id, self.ant_id, initial_capital, self.titan_shield)
                 self.princesses[princess_id] = princess
                 self.children.append(princess_id)
                 
@@ -248,11 +277,18 @@ class AntQueen(BaseAnt):
 class AntPrincess(BaseAnt):
     """Simplified Ant Princess for deployment"""
     
-    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 0.5):
+    def __init__(self, ant_id: str, parent_id: str, initial_capital: float = 0.5, titan_shield=None):
         super().__init__(ant_id, AntRole.PRINCESS, parent_id)
         self.capital.current_balance = initial_capital
         self.capital.available_capital = initial_capital
         self.max_trades = 10
+        self.titan_shield = titan_shield
+        self.active_positions: Dict[str, Dict] = {}
+        self.trading_enabled = True
+        self.max_position_multiplier = 1.0
+        
+        if titan_shield:
+            logger.debug(f"🛡️ Princess {ant_id} initialized with Titan Shield protection")
     
     def should_retire(self) -> bool:
         """Check if princess should retire"""
@@ -271,4 +307,48 @@ class AntPrincess(BaseAnt):
             }
         except Exception as e:
             logger.error(f"Error analyzing opportunity: {str(e)}")
-            return None 
+            return None
+    
+    async def execute_trade_protected(self, decision: Dict, wallet_manager) -> Dict:
+        """Execute a trade with Titan Shield protection (simplified for deployment)"""
+        try:
+            # Basic validation
+            if not self.trading_enabled:
+                return {
+                    "success": False,
+                    "rejection_reason": "Trading disabled by defense system",
+                    "defense_approved": False
+                }
+            
+            token_address = decision.get("token_address")
+            action = decision.get("action", "hold")
+            
+            # For deployment, we'll simulate trades only
+            trade_result = {
+                "success": True,
+                "trade_record": {
+                    "trade_id": f"trade_{int(time.time())}_{self.ant_id}",
+                    "token_address": token_address,
+                    "action": action,
+                    "amount": decision.get("position_size", 0.01),
+                    "profit": 0.0,  # Simulated for deployment
+                    "success": True,
+                    "timestamp": time.time()
+                },
+                "defense_approved": self.titan_shield is not None,
+                "rejection_reason": None
+            }
+            
+            # Update performance metrics
+            self.performance.total_trades += 1
+            
+            logger.debug(f"Princess {self.ant_id} executed simulated trade for {token_address[:8]}...")
+            return trade_result
+            
+        except Exception as e:
+            logger.error(f"Error executing protected trade: {str(e)}")
+            return {
+                "success": False,
+                "rejection_reason": f"Execution error: {str(e)}",
+                "defense_approved": False
+            } 

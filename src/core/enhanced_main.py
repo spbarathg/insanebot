@@ -237,7 +237,7 @@ class AntBotSystem:
                 await self.data_ingestion.stop()
                 
             if self.wallet_manager:
-                await self.wallet_manager.cleanup()
+                await self.wallet_manager.close()
                 
             # Cleanup external services
             for service in [self.quicknode_service, self.helius_service, self.jupiter_service]:
