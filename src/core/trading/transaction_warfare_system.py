@@ -363,6 +363,11 @@ class TransactionWarfareSystem:
         
         logger.info("⚔️ Transaction Warfare System initialized - Battle-ready")
     
+    async def initialize(self):
+        """Initialize the defense system (compatibility method)"""
+        # Defense system is ready to use after __init__
+        return True
+
     def add_rpc_endpoint(self, url: str, name: str, priority: int = 1, is_primary: bool = False):
         """Add RPC endpoint to the warfare arsenal"""
         endpoint = RPCEndpoint(url, name, priority)

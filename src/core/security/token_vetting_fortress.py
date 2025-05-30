@@ -380,6 +380,11 @@ class TokenVettingFortress:
         
         logger.info("🏰 Token Vetting Fortress initialized - 5-layer defense active")
     
+    async def initialize(self):
+        """Initialize the defense system (compatibility method)"""
+        # Defense system is ready to use after __init__
+        return True
+
     async def vet_token(self, token_address: str, market_data: Dict, 
                        holders_data: List[Dict] = None, 
                        pool_data: Dict = None) -> TokenVettingReport:

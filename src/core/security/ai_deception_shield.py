@@ -824,6 +824,11 @@ class AIDeceptionShield:
         
         logger.info("🛡️ AI Deception Shield initialized - Manipulation detection active")
     
+    async def initialize(self):
+        """Initialize the defense system (compatibility method)"""
+        # Defense system is ready to use after __init__
+        return True
+
     async def scan_for_threats(self, token_address: str, 
                              market_data: Dict,
                              social_data: Dict = None,

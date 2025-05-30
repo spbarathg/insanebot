@@ -453,6 +453,11 @@ class VolatilityAdaptiveArmor:
         
         logger.info("🛡️ Volatility-Adaptive Armor initialized - Dynamic protection active")
     
+    async def initialize(self):
+        """Initialize the defense system (compatibility method)"""
+        # Defense system is ready to use after __init__
+        return True
+
     def add_market_data(self, price: float, volume: float, bid: float, ask: float, 
                        order_book: Dict[str, List], timestamp: float = None):
         """Add new market data for analysis"""
