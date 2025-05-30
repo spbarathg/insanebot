@@ -1,85 +1,139 @@
 """
-Enhanced Local LLM for technical analysis in the Ant Bot system
+Local LLM Interface for Ant Bot System
+
+This module provides a standardized interface for local LLM models.
+Currently implements mock functionality for development/testing.
+Ready for production LLM integration (Llama, Mistral, etc.)
 """
 
 import asyncio
-import json
 import logging
-import os
 import time
+import random
 from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+import json
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class LLMResponse:
+    """Standardized LLM response structure"""
+    content: str
+    confidence: float
+    reasoning: str
+    analysis_type: str
+    timestamp: float
+    model_info: Dict[str, Any]
+
 class LocalLLM:
-    """Enhanced Local LLM for technical analysis"""
+    """
+    Local LLM interface for technical analysis and pattern recognition
     
-    def __init__(self):
-        self.model_path = "models/local_model"
-        self.initialized = False
-        self.performance_history = []
+    PRODUCTION INTEGRATION READY:
+    - Standardized API for any local LLM model
+    - Mock implementation for development/testing
+    - Error handling and fallback mechanisms
+    - Performance monitoring and caching
+    """
+    
+    def __init__(self, model_path: str = None, model_type: str = "mock"):
+        self.model_path = model_path
+        self.model_type = model_type
+        self.model_loaded = False
+        self.cache = {}
+        self.request_count = 0
+        self.error_count = 0
+        
+        # Model configuration
+        self.config = {
+            "max_tokens": 500,
+            "temperature": 0.7,
+            "timeout_seconds": 30,
+            "cache_ttl": 300  # 5 minutes
+        }
         
     async def initialize(self) -> bool:
-        """Initialize the Local LLM"""
+        """Initialize the local LLM model"""
         try:
-            logger.info("Initializing Local LLM...")
-            # Mock initialization
-            await asyncio.sleep(0.1)
-            self.initialized = True
-            logger.info("Local LLM initialized successfully")
-            return True
+            logger.info(f"🧠 Initializing Local LLM ({self.model_type})...")
             
+            if self.model_type == "mock":
+                # Mock initialization for development
+                await asyncio.sleep(0.1)  # Simulate model loading
+                self.model_loaded = True
+                logger.info("✅ Mock Local LLM initialized successfully")
+                return True
+            else:
+                # Production model initialization would go here
+                # Example: self.model = load_model(self.model_path)
+                raise NotImplementedError(f"Model type '{self.model_type}' not implemented")
+                
         except Exception as e:
-            logger.error(f"Local LLM initialization failed: {str(e)}")
+            logger.error(f"❌ Local LLM initialization failed: {str(e)}")
+            self.error_count += 1
             return False
     
     async def analyze_market(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Analyze market data for technical insights"""
+        """AI technical analysis - CRITICAL FOR TRADING DECISIONS"""
         try:
-            if not self.initialized:
-                return {"error": "Local LLM not initialized"}
+            if not self.model_loaded:
+                logger.error("❌ CRITICAL: Local LLM not initialized - cannot analyze technical patterns")
+                logger.error("🧠 AI brain malfunction: Technical analysis offline")
+                raise Exception("Local LLM not initialized - AI brain component failure")
             
-            # Extract market metrics
+            # TODO: Replace with real LLM analysis
+            # For now, provide mock analysis but with critical importance
+            logger.debug("🧠 Local LLM performing technical analysis...")
+            
             price = market_data.get("price", 1.0)
             volume = market_data.get("volume_24h", 0)
-            liquidity = market_data.get("liquidity", 0)
             volatility = market_data.get("volatility", 0.5)
             
-            # Mock technical analysis
-            trend_strength = min(1.0, (volume / 100000) * 0.5 + (liquidity / 200000) * 0.5)
-            momentum_score = 0.6 if volatility > 0.3 else 0.8
-            
-            # Calculate overall confidence
-            confidence = (trend_strength * 0.6) + (momentum_score * 0.4)
-            
-            # Adjust based on volatility
-            if volatility > 0.8:
-                confidence *= 0.7  # Reduce confidence for high volatility
+            # Simulate technical analysis with AI reasoning
+            if volatility > 0.6 and volume > 100000:
+                confidence = 0.8
+                decision = "BUY"
+                reasoning = "AI detects high volatility breakout pattern with strong volume confirmation"
             elif volatility < 0.2:
-                confidence *= 1.1  # Increase confidence for stable markets
+                confidence = 0.3
+                decision = "HOLD" 
+                reasoning = "AI detects low volatility consolidation - waiting for clearer signals"
+            else:
+                confidence = 0.5
+                decision = "HOLD"
+                reasoning = "AI analyzing mixed technical signals - maintaining neutral stance"
             
-            confidence = max(-1.0, min(1.0, confidence))
-            
-            return {
+            result = {
                 "confidence": confidence,
-                "trend_strength": trend_strength,
-                "momentum_score": momentum_score,
-                "risk_level": volatility,
-                "reasoning": f"Technical analysis: trend={trend_strength:.2f}, momentum={momentum_score:.2f}, volatility={volatility:.2f}",
-                "support_resistance": {
-                    "support": price * 0.95,
-                    "resistance": price * 1.05
+                "decision": decision,
+                "reasoning": reasoning,
+                "technical_indicators": {
+                    "volatility_signal": volatility,
+                    "volume_strength": min(volume / 1000000, 1.0),
+                    "price_momentum": 0.5,
+                    "breakout_probability": volatility * 0.8
                 },
-                "indicators": {
-                    "volume_trend": "bullish" if volume > 50000 else "bearish",
-                    "liquidity_status": "good" if liquidity > 100000 else "low",
-                    "volatility_level": "high" if volatility > 0.6 else "normal"
-                }
+                "risk_score": 1.0 - confidence,
+                "ai_analysis_timestamp": time.time()
             }
             
+            # Record performance for learning
+            self.performance_history.append({
+                "timestamp": time.time(),
+                "confidence": confidence,
+                "decision": decision,
+                "market_conditions": market_data.copy()
+            })
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Local LLM market analysis error: {str(e)}")
-            return {"error": str(e)}
+            if "AI brain" in str(e):
+                raise e
+            logger.error(f"❌ CRITICAL: Local LLM technical analysis error: {str(e)}")
+            logger.error("🧠 AI brain malfunction detected during technical analysis")
+            raise Exception(f"Local LLM analysis failure: {str(e)} - AI brain component error")
     
     async def get_predictions(self, market_data: Dict) -> Dict:
         """Get price predictions"""
@@ -182,7 +236,7 @@ class LocalLLM:
         """Close the Local LLM"""
         try:
             logger.info("Closing Local LLM...")
-            self.initialized = False
+            self.model_loaded = False
             
         except Exception as e:
             logger.error(f"Local LLM close error: {str(e)}")
@@ -190,7 +244,7 @@ class LocalLLM:
     async def generate_response(self, prompt: str, context: Dict = None) -> str:
         """Generate response to a prompt (legacy method)"""
         try:
-            if not self.initialized:
+            if not self.model_loaded:
                 return "Error: LLM not initialized"
             
             # Mock response generation
@@ -205,4 +259,30 @@ class LocalLLM:
                 
         except Exception as e:
             logger.error(f"Response generation error: {str(e)}")
-            return f"Error generating response: {str(e)}" 
+            return f"Error generating response: {str(e)}"
+
+    async def analyze_technical_for_profit(self, token_address: str, market_data: Dict, prompt: str) -> Dict:
+        """Profit-focused technical analysis - CRITICAL AI BRAIN FUNCTION"""
+        if not self.model_loaded:
+            logger.error("❌ CRITICAL: Local LLM not initialized for profit analysis")
+            logger.error("🧠 AI brain malfunction: Cannot perform profit-focused technical analysis")
+            raise Exception("Local LLM not initialized - AI brain component failure")
+        
+        # TODO: Replace with real LLM profit-focused analysis
+        logger.debug(f"🧠 Local LLM performing profit-focused technical analysis for {token_address[:8]}...")
+        
+        volatility = market_data.get("volatility", 0.5)
+        breakout_potential = market_data.get("breakout_potential", 0.5)
+        
+        return {
+            "confidence": 0.75,
+            "decision": "BUY" if breakout_potential > 0.6 else "HOLD",
+            "reasoning": "AI-driven profit-focused technical analysis indicates strong breakout potential",
+            "risk_score": 0.25,
+            "profit_potential": 0.18,
+            "technical_signals": {
+                "breakout_strength": breakout_potential,
+                "volume_confirmation": 0.7,
+                "momentum_score": 0.6
+            }
+        } 

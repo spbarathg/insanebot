@@ -300,8 +300,10 @@ class ProfitMaximizedAICoordinator:
             }
             
         except Exception as e:
-            logger.error(f"Error in profit-maximized analysis: {str(e)}")
-            return self._get_safe_fallback_decision()
+            logger.error(f"❌ CRITICAL: AI decision making completely failed: {str(e)}")
+            logger.error("🧠 AI brain malfunction detected - cannot make ANY trading decisions")
+            logger.error("🛑 ALL TRADING OPERATIONS HALTED - AI brain is required for safe operation")
+            raise Exception(f"AI decision making failure: {str(e)} - Bot cannot operate without functioning AI brain")
 
     def _enhance_market_data_for_profit(self, market_data: Dict, portfolio_context: Dict = None) -> Dict:
         """Enhance market data with profit-focused indicators"""
@@ -382,8 +384,9 @@ class ProfitMaximizedAICoordinator:
             return decision
             
         except Exception as e:
-            logger.error(f"Error in profit-focused sentiment analysis: {str(e)}")
-            return self._get_fallback_sentiment_decision()
+            logger.error(f"❌ CRITICAL: Sentiment analysis failed: {str(e)}")
+            logger.error("🧠 AI brain malfunction detected - cannot make trading decisions without sentiment analysis")
+            raise Exception(f"AI sentiment analysis failure: {str(e)} - Bot cannot operate without AI brain")
 
     async def _get_profit_focused_technical(self, token_address: str, market_data: Dict) -> AIDecision:
         """Get technical analysis focused on profit opportunities"""
@@ -422,8 +425,9 @@ class ProfitMaximizedAICoordinator:
             return decision
             
         except Exception as e:
-            logger.error(f"Error in profit-focused technical analysis: {str(e)}")
-            return self._get_fallback_technical_decision()
+            logger.error(f"❌ CRITICAL: Technical analysis failed: {str(e)}")
+            logger.error("🧠 AI brain malfunction detected - cannot make trading decisions without technical analysis")
+            raise Exception(f"AI technical analysis failure: {str(e)} - Bot cannot operate without AI brain")
 
     def _enhance_confidence_for_profit(self, base_confidence: float, market_data: Dict, analysis_type: str) -> float:
         """Enhance confidence based on profit indicators"""
@@ -592,8 +596,9 @@ class ProfitMaximizedAICoordinator:
             }
             
         except Exception as e:
-            logger.error(f"Error making profit-maximized decision: {str(e)}")
-            return self._get_safe_fallback_decision()['final_decision']
+            logger.error(f"❌ CRITICAL: Profit-maximized decision making failed: {str(e)}")
+            logger.error("🧠 AI brain cannot make trading decisions - all trading operations halted")
+            raise Exception(f"AI decision making failure: {str(e)} - Cannot trade without AI brain")
 
     def _calculate_position_size_from_conviction(self, decision: Dict) -> float:
         """Calculate recommended position size based on conviction level"""

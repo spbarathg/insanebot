@@ -35,10 +35,6 @@ python-jose>=3.3.0
 # Monitoring and logging
 prometheus-client>=0.12.0
 
-# Testing
-
-# Development
-
 # Data processing
 pandas>=1.3.0
 
@@ -57,7 +53,5 @@ httpx>=0.25.0
 
 # Database for production (optional but recommended)
 SQLAlchemy>=2.0.0
-
-# Redis for caching (optional)
 
 # Additional system dependencies

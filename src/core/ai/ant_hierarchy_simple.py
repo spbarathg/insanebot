@@ -43,6 +43,14 @@ class AntCapital:
         self.current_balance = new_balance
         self.available_capital = max(0, new_balance - self.allocated_capital)
         self.last_updated = time.time()
+    
+    def allocate_capital(self, amount: float):
+        """Allocate capital for trading"""
+        if amount <= self.available_capital:
+            self.allocated_capital += amount
+            self.available_capital -= amount
+            return True
+        return False
 
 @dataclass
 class AntPerformance:
@@ -109,6 +117,73 @@ class FoundingAntQueen(BaseAnt):
         except Exception as e:
             logger.error(f"Failed to initialize Founding Queen: {str(e)}")
             return False
+    
+    async def coordinate_system(self, market_data: List[Dict]) -> Dict[str, Any]:
+        """Coordinate the entire ant system with market data"""
+        try:
+            logger.debug(f"Founding Queen coordinating system with {len(market_data)} market opportunities")
+            
+            coordination_results = {
+                "decisions": [],
+                "metrics": self.system_metrics,
+                "processed_tokens": 0
+            }
+            
+            # Process market data through ant hierarchy
+            for data in market_data:
+                try:
+                    token_address = data.get("token_address")
+                    if not token_address:
+                        continue
+                    
+                    # Simple analysis for deployment
+                    decision = await self._analyze_market_opportunity(data)
+                    if decision:
+                        coordination_results["decisions"].append(decision)
+                        coordination_results["processed_tokens"] += 1
+                    
+                except Exception as e:
+                    logger.debug(f"Error processing market data: {str(e)}")
+                    continue
+            
+            # Update system metrics
+            self.system_metrics["active_queens"] = len(self.queens)
+            self.system_metrics["active_princesses"] = sum(len(queen.princesses) for queen in self.queens.values())
+            
+            logger.debug(f"Coordination complete: {len(coordination_results['decisions'])} decisions generated")
+            return coordination_results
+            
+        except Exception as e:
+            logger.error(f"Error in system coordination: {str(e)}")
+            return {"decisions": [], "metrics": self.system_metrics, "processed_tokens": 0}
+    
+    async def _analyze_market_opportunity(self, market_data: Dict) -> Optional[Dict]:
+        """Analyze market opportunity (simplified for deployment)"""
+        try:
+            token_address = market_data.get("token_address")
+            price_data = market_data.get("price_data", {})
+            
+            # Simple conservative analysis for deployment
+            decision = {
+                "token_address": token_address,
+                "action": "monitor",  # Conservative for deployment
+                "confidence": 0.3,
+                "position_size": 0.001,  # Very small for safety
+                "reasoning": "Conservative monitoring mode for deployment",
+                "source": "founding_queen_analysis",
+                "timestamp": time.time()
+            }
+            
+            # Only recommend trades with very high confidence in simulation mode
+            if price_data.get("price", 0) > 0:
+                logger.debug(f"Analyzed opportunity for {token_address[:8]}...")
+                return decision
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error analyzing market opportunity: {str(e)}")
+            return None
     
     async def create_queen(self, initial_capital: float = 2.0) -> Optional[str]:
         """Create a new Queen"""
