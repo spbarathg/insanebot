@@ -24,7 +24,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Core AI and hierarchy components
-from src.core.ai.ant_hierarchy_simple import FoundingAntQueen, AntRole
+from src.core.ai.ant_hierarchy import FoundingAntQueen, AntRole
 from src.core.ai.enhanced_ai_coordinator import AICoordinator
 
 # CRITICAL: Titan Shield Defense System

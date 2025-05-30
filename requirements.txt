@@ -54,4 +54,9 @@ httpx>=0.25.0
 # Database for production (optional but recommended)
 SQLAlchemy>=2.0.0
 
+# Production upgrade script dependencies (already included above)
+# python-dotenv - for environment configuration
+# pathlib - built-in Python module
+# shutil - built-in Python module
+
 # Additional system dependencies
