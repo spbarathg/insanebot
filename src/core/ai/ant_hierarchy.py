@@ -47,25 +47,25 @@ logger = logging.getLogger(__name__)
 
 # System constants - no more magic numbers
 class SystemConstants:
-    """Centralized system constants for maintainability"""
-    # Capital thresholds (SOL)
-    FOUNDING_QUEEN_SPLIT_THRESHOLD = 20.0
-    QUEEN_SPLIT_THRESHOLD = 2.0
-    FOUNDING_QUEEN_MERGE_THRESHOLD = 0.5
-    QUEEN_MERGE_THRESHOLD = 0.1
-    PRINCESS_INITIAL_CAPITAL = 0.5
+    """Centralized system constants for maintainability - MICRO-CAPITAL VERSION"""
+    # Capital thresholds (SOL) - Scaled for small capital amounts
+    FOUNDING_QUEEN_SPLIT_THRESHOLD = 0.1    # Reduced from 20.0 → 0.1 (200x smaller)
+    QUEEN_SPLIT_THRESHOLD = 0.05             # Reduced from 2.0 → 0.05 (40x smaller)  
+    FOUNDING_QUEEN_MERGE_THRESHOLD = 0.001   # Reduced from 0.5 → 0.001
+    QUEEN_MERGE_THRESHOLD = 0.001            # Reduced from 0.1 → 0.001
+    PRINCESS_INITIAL_CAPITAL = 0.01          # Reduced from 0.5 → 0.01 (50x smaller)
     
     # Trading limits
     PRINCESS_MIN_TRADES = 5
     PRINCESS_MAX_TRADES = 10
     MAX_POSITION_PERCENT = 80  # 80% of available capital
-    FALLBACK_POSITION_SIZE = 0.1  # 0.1 SOL fallback
+    FALLBACK_POSITION_SIZE = 0.001  # 0.001 SOL fallback (smaller for micro-capital)
     
     # Performance thresholds
     MIN_WIN_RATE_FOR_SPLIT = 50.0
     POOR_PERFORMANCE_WIN_RATE = 30.0
     HIGH_RISK_THRESHOLD = 0.8
-    PROFIT_THRESHOLD_FOR_RETIREMENT = 0.01
+    PROFIT_THRESHOLD_FOR_RETIREMENT = 0.0001  # Smaller profit threshold
     
     # System limits
     FOUNDING_QUEEN_MAX_CHILDREN = 10
@@ -1081,7 +1081,7 @@ class FoundingAntQueen(BaseAnt):
                    f"defense: {'✅ ACTIVE' if self.titan_shield else '❌ SYSTEM-WIDE DISABLED'}")
         
     async def initialize(self) -> bool:
-        """Initialize the Founding Queen and create initial Queen with validation"""
+        """Initialize the Founding Queen and create initial Queen with validation and micro-capital support"""
         try:
             logger.info(f"🐜 Initializing Founding Queen {self.ant_id}...")
             
@@ -1089,10 +1089,19 @@ class FoundingAntQueen(BaseAnt):
             if self.capital.current_balance <= 0:
                 raise ValueError(f"Cannot initialize with zero or negative capital: {self.capital.current_balance}")
             
-            # Create initial Queen with defense integration
-            initial_queen_id = await self.create_queen()
-            if not initial_queen_id:
-                raise Exception("Failed to create initial Queen - system cannot start")
+            # Micro-capital mode: If we have very little capital, start with just Princesses
+            if self.capital.current_balance < SystemConstants.QUEEN_SPLIT_THRESHOLD:
+                logger.info(f"💰 Micro-capital mode activated: {self.capital.current_balance} SOL < {SystemConstants.QUEEN_SPLIT_THRESHOLD} SOL")
+                logger.info("🐜 Starting with direct Princess management (no intermediate Queens)")
+                # Create direct Princesses under Founding Queen for micro-capital trading
+                await self._initialize_micro_capital_mode()
+            else:
+                # Standard mode: Create initial Queen with available capital
+                queen_capital = min(self.capital.available_capital * 0.8, SystemConstants.QUEEN_SPLIT_THRESHOLD)
+                initial_queen_id = await self.create_queen(queen_capital)
+                if not initial_queen_id:
+                    logger.warning("⚠️ Failed to create Queen, falling back to micro-capital mode")
+                    await self._initialize_micro_capital_mode()
             
             # Update system metrics
             await self.update_system_metrics()
@@ -1104,6 +1113,40 @@ class FoundingAntQueen(BaseAnt):
         except Exception as e:
             logger.error(f"❌ Founding Queen initialization critical failure: {str(e)}")
             return False
+    
+    async def _initialize_micro_capital_mode(self):
+        """Initialize micro-capital mode with direct Princess management"""
+        try:
+            # Create a Princess directly under Founding Queen for micro-capital trading
+            if self.capital.available_capital >= SystemConstants.PRINCESS_INITIAL_CAPITAL:
+                princess_capital = min(self.capital.available_capital * 0.5, SystemConstants.PRINCESS_INITIAL_CAPITAL)
+                princess_id = f"micro_princess_{int(time.time())}"
+                
+                # Create Princess directly (avoid circular import)
+                princess = AntPrincess(
+                    ant_id=princess_id,
+                    parent_id=self.ant_id,
+                    initial_capital=princess_capital,
+                    titan_shield=self.titan_shield
+                )
+                
+                # Allocate capital
+                if self.capital.allocate_capital(princess_capital):
+                    # Store Princess in a micro-princesses dict
+                    if not hasattr(self, 'micro_princesses'):
+                        self.micro_princesses = {}
+                    self.micro_princesses[princess_id] = princess
+                    self.children.append(princess_id)
+                    
+                    logger.info(f"🐜 Created micro-capital Princess {princess_id} with {princess_capital} SOL")
+                    logger.info("💡 Micro-capital mode: Trading directly without Queens")
+                else:
+                    logger.warning("⚠️ Insufficient capital even for micro-Princess")
+            else:
+                logger.warning(f"⚠️ Capital too low for any trading: {self.capital.available_capital} < {SystemConstants.PRINCESS_INITIAL_CAPITAL}")
+                
+        except Exception as e:
+            logger.error(f"❌ Micro-capital mode initialization failed: {str(e)}")
     
     async def create_queen(self, initial_capital: float = SystemConstants.QUEEN_SPLIT_THRESHOLD) -> Optional[str]:
         """Create a new Queen with allocated capital and proper defense integration"""
@@ -1165,7 +1208,7 @@ class FoundingAntQueen(BaseAnt):
             return None
     
     async def coordinate_system(self, market_opportunities: List[Dict]) -> Dict[str, Any]:
-        """Coordinate the entire Ant system with enhanced error handling"""
+        """Coordinate the entire Ant system with enhanced error handling and micro-capital support"""
         try:
             results = {
                 "decisions": [],
@@ -1180,37 +1223,63 @@ class FoundingAntQueen(BaseAnt):
                 results["metrics"] = self.system_metrics
                 return results
             
-            # Distribute opportunities across Queens with error isolation
-            if not self.queens:
-                logger.warning(f"Founding Queen {self.ant_id} has no active Queens")
-                return results
+            # Handle micro-capital mode (direct Princess management)
+            if hasattr(self, 'micro_princesses') and self.micro_princesses:
+                logger.debug(f"🐜 Coordinating {len(self.micro_princesses)} micro-capital Princesses")
+                for princess_id, princess in self.micro_princesses.items():
+                    try:
+                        # Give each Princess a subset of opportunities
+                        for opportunity in market_opportunities[:3]:  # Limit to avoid overwhelming
+                            decision = {
+                                "princess_id": princess_id,
+                                "decision": {
+                                    "action": "monitor",  # Conservative for micro-capital
+                                    "token_address": opportunity.get("token_address", "unknown"),
+                                    "confidence": 0.3,
+                                    "position_size": 0.001,  # Very small positions
+                                    "reasoning": "Micro-capital conservative analysis",
+                                    "timestamp": time.time()
+                                }
+                            }
+                            results["decisions"].append(decision)
+                    except Exception as e:
+                        error_msg = f"Micro-Princess {princess_id} coordination error: {str(e)}"
+                        logger.error(error_msg)
+                        results["errors"].append(error_msg)
+                        
+                results["system_actions"].append("Micro-capital mode coordination completed")
             
-            opportunities_per_queen = max(1, len(market_opportunities) // len(self.queens))
-            
-            for i, (queen_id, queen) in enumerate(self.queens.items()):
-                try:
-                    start_idx = i * opportunities_per_queen
-                    end_idx = start_idx + opportunities_per_queen if i < len(self.queens) - 1 else len(market_opportunities)
-                    queen_opportunities = market_opportunities[start_idx:end_idx]
-                    
-                    # Add timeout protection for Queen operations
-                    queen_task = asyncio.create_task(queen.manage_princesses(queen_opportunities))
-                    queen_results = await asyncio.wait_for(
-                        queen_task, 
-                        timeout=SystemConstants.AI_ANALYSIS_TIMEOUT * 2  # More time for Queen operations
-                    )
-                    results["decisions"].extend(queen_results)
-                    
-                except asyncio.TimeoutError:
-                    error_msg = f"Queen {queen_id} operation timeout"
-                    logger.error(error_msg)
-                    results["errors"].append(error_msg)
-                    continue
-                except Exception as e:
-                    error_msg = f"Queen {queen_id} operation error: {str(e)}"
-                    logger.error(error_msg)
-                    results["errors"].append(error_msg)
-                    continue
+            # Standard mode: Distribute opportunities across Queens
+            elif self.queens:
+                opportunities_per_queen = max(1, len(market_opportunities) // len(self.queens))
+                
+                for i, (queen_id, queen) in enumerate(self.queens.items()):
+                    try:
+                        start_idx = i * opportunities_per_queen
+                        end_idx = start_idx + opportunities_per_queen if i < len(self.queens) - 1 else len(market_opportunities)
+                        queen_opportunities = market_opportunities[start_idx:end_idx]
+                        
+                        # Add timeout protection for Queen operations
+                        queen_task = asyncio.create_task(queen.manage_princesses(queen_opportunities))
+                        queen_results = await asyncio.wait_for(
+                            queen_task, 
+                            timeout=SystemConstants.AI_ANALYSIS_TIMEOUT * 2  # More time for Queen operations
+                        )
+                        results["decisions"].extend(queen_results)
+                        
+                    except asyncio.TimeoutError:
+                        error_msg = f"Queen {queen_id} operation timeout"
+                        logger.error(error_msg)
+                        results["errors"].append(error_msg)
+                        continue
+                    except Exception as e:
+                        error_msg = f"Queen {queen_id} operation error: {str(e)}"
+                        logger.error(error_msg)
+                        results["errors"].append(error_msg)
+                        continue
+            else:
+                logger.warning(f"Founding Queen {self.ant_id} has no active Queens or Princesses")
+                results["system_actions"].append("No trading agents available")
             
             # Check for system-level actions with validation
             try:
@@ -1238,7 +1307,8 @@ class FoundingAntQueen(BaseAnt):
             self.update_activity()
             
             # Log coordination summary
-            logger.info(f"Founding Queen {self.ant_id} coordination: "
+            coordination_type = "micro-capital" if hasattr(self, 'micro_princesses') and self.micro_princesses else "standard"
+            logger.info(f"Founding Queen {self.ant_id} coordination ({coordination_type}): "
                        f"{len(results['decisions'])} decisions, "
                        f"{len(results['system_actions'])} actions, "
                        f"{len(results['errors'])} errors")
