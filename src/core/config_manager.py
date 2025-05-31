@@ -317,13 +317,14 @@ class ConfigManager:
         except Exception as e:
             logger.warning(f"Could not load environment config: {e}")
     
-    def _deep_merge_config(self, base: Dict, override: Dict):
+    def _deep_merge_config(self, base: Dict, override: Dict) -> Dict:
         """Deep merge configuration dictionaries"""
         for key, value in override.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                 self._deep_merge_config(base[key], value)
             else:
                 base[key] = value
+        return base
     
     async def _initialize_validation_rules(self):
         """Initialize configuration validation rules"""
@@ -555,7 +556,12 @@ class ConfigManager:
                     }
             
             elif rule.rule_type == "range":
-                min_val, max_val = rule.constraint
+                constraint = rule.constraint
+                if isinstance(constraint, dict):
+                    min_val = constraint.get('min', float('-inf'))
+                    max_val = constraint.get('max', float('inf'))
+                else:
+                    min_val, max_val = constraint
                 if not (min_val <= value <= max_val):
                     return {
                         "valid": False,
@@ -601,11 +607,22 @@ class ConfigManager:
         """Get current deployment stage"""
         return self.deployment_stage
     
+    def _count_configs(self, config_dict: Dict[str, Any]) -> int:
+        """Recursively count all configuration values"""
+        count = 0
+        for key, value in config_dict.items():
+            if isinstance(value, dict):
+                count += self._count_configs(value)
+            else:
+                count += 1
+        return count
+    
     def get_config_summary(self) -> Dict[str, Any]:
         """Get configuration manager summary"""
         return {
             "environment": self.environment,
             "deployment_stage": self.deployment_stage,
+            "total_configs": self._count_configs(self.config_data),
             "config_sections": list(self.config_data.keys()),
             "feature_flags": self.feature_flags.copy(),
             "validation_rules_count": len(self.validation_rules),
@@ -618,9 +635,15 @@ class ConfigManager:
     async def cleanup(self):
         """Cleanup configuration manager resources"""
         try:
-            if self.watch_enabled:
-                self.observer.stop()
-                self.observer.join()
+            if self.watch_enabled and hasattr(self, 'observer') and self.observer:
+                try:
+                    self.observer.stop()
+                    if self.observer.is_alive():
+                        self.observer.join(timeout=2.0)
+                except Exception as e:
+                    logger.warning(f"Error stopping file observer: {e}")
+                finally:
+                    self.watch_enabled = False
             
             # Clear caches
             self.config_cache.clear()

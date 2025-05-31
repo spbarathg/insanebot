@@ -203,6 +203,10 @@ class AccessController:
         self.active_tokens = {}
         self.revoked_tokens = set()
         
+        # Add missing attributes expected by tests
+        self.tokens = {}  # For backward compatibility with tests
+        self.master_secret = os.getenv('JWT_SECRET', secrets.token_urlsafe(32))
+    
     def add_permission(self, permission: str, resource: str):
         """Add permission for resource"""
         self.permissions[resource].add(permission)

@@ -54,9 +54,21 @@ httpx>=0.25.0
 # Database for production (optional but recommended)
 SQLAlchemy>=2.0.0
 
+# Testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0
+pytest-html>=3.1.0
+watchdog>=3.0.0  # For config file watching in tests
+
 # Production upgrade script dependencies (already included above)
 # python-dotenv - for environment configuration
 # pathlib - built-in Python module
 # shutil - built-in Python module
 
 # Additional system dependencies
+aiosqlite==0.19.0  # Async SQLite support
+asyncpg==0.29.0    # Async PostgreSQL support
+redis==5.0.1       # Redis client

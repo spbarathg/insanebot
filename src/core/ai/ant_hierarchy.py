@@ -344,6 +344,11 @@ class BaseAnt:
         """Update last activity timestamp"""
         self.last_activity = time.time()
     
+    @property
+    def is_active(self) -> bool:
+        """Check if the ant is in active status"""
+        return self.status == AntStatus.ACTIVE
+    
     def get_status_summary(self) -> Dict[str, Any]:
         """Get comprehensive status summary with enhanced metrics"""
         try:
@@ -428,7 +433,19 @@ class AntPrincess(BaseAnt):
         self.max_position_multiplier = 1.0  # Adjusted by defense mode
         self.trading_enabled = True  # Can be disabled by defense mode
         self.defense_mode_overrides = {}  # Track defense system overrides
-        
+    
+    @property
+    def trades_completed(self) -> int:
+        """Get the number of completed trades - maps to performance.total_trades"""
+        return self.performance.total_trades
+    
+    @trades_completed.setter
+    def trades_completed(self, value: int):
+        """Set the number of completed trades - updates performance.total_trades"""
+        if value < 0:
+            raise ValueError("Trades completed cannot be negative")
+        self.performance.total_trades = value
+    
     async def initialize(self, grok_engine: GrokEngine, local_llm: LocalLLM):
         """Initialize the Princess with AI components and validation"""
         try:
@@ -444,6 +461,8 @@ class AntPrincess(BaseAnt):
             logger.info(f"Princess {self.ant_id} initialized with {self.capital.current_balance} SOL, "
                        f"target: {self.target_trades} trades, "
                        f"defense: {'✅ ACTIVE' if self.titan_shield else '❌ DISABLED'}")
+            
+            return True
             
         except Exception as e:
             logger.error(f"Princess {self.ant_id} initialization failed: {str(e)}")
