@@ -7,9 +7,14 @@ import json
 import logging
 import time
 import os
+import secrets
 from typing import Dict, List, Optional, Any, Union
 from dataclasses import dataclass, field
 from loguru import logger
+
+def secure_choice(seq):
+    """Secure random choice from sequence"""
+    return seq[secrets.randbelow(len(seq))]
 
 class JupiterRateLimiter:
     """Enhanced rate limiting for Jupiter API"""
@@ -536,7 +541,6 @@ class JupiterService:
                         valid_tokens.append(token)
                     
                     # Sort by popularity/liquidity if available, otherwise randomize
-                    import random
                     if len(valid_tokens) > count:
                         # Prefer well-known tokens first, then randomly select from the rest
                         popular_tokens = []
@@ -554,7 +558,10 @@ class JupiterService:
                         selected_tokens = popular_tokens[:count]
                         if len(selected_tokens) < count:
                             remaining_count = count - len(selected_tokens)
-                            random.shuffle(other_tokens)
+                            # Secure shuffle using Fisher-Yates algorithm
+                            for i in range(len(other_tokens)-1, 0, -1):
+                                j = secrets.randbelow(i + 1)
+                                other_tokens[i], other_tokens[j] = other_tokens[j], other_tokens[i]
                             selected_tokens.extend(other_tokens[:remaining_count])
                         
                         return selected_tokens[:count]

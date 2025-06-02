@@ -14,6 +14,7 @@ import base58
 import json
 import time
 import random
+import secrets
 
 class RaydiumDEX:
     """

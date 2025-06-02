@@ -206,9 +206,12 @@ class FoundingAntQueen(BaseAnt):
         """Manage Queen lifecycle events"""
         try:
             management_results = {
+                "queens_checked": len(self.queens),
                 "queens_retired": 0,
                 "underperforming_queens": [],
-                "high_performing_queens": []
+                "high_performing_queens": [],
+                "retirement_actions": [],
+                "merge_actions": []
             }
             
             # Identify underperforming Queens for potential retirement
@@ -216,15 +219,23 @@ class FoundingAntQueen(BaseAnt):
             high_performing = []
             
             for queen_id, queen in self.queens.items():
-                if queen.should_merge():  # Using merge logic for retirement decisions
-                    underperforming.append(queen_id)
-                elif queen.performance.win_rate > 70 and queen.performance.total_profit > 1.0:
-                    high_performing.append(queen_id)
+                # Handle async method calls safely
+                try:
+                    should_merge = await self._safe_should_merge(queen)
+                    if should_merge:  # Using merge logic for retirement decisions
+                        underperforming.append(queen_id)
+                    elif queen.performance.win_rate > 70 and queen.performance.total_profit > 1.0:
+                        high_performing.append(queen_id)
+                except Exception as e:
+                    logger.warning(f"Error checking queen {queen_id} lifecycle: {e}")
+                    continue
             
             # Retire underperforming Queens (reclaim capital)
             for queen_id in underperforming:
-                await self._retire_queen(queen_id)
-                management_results["queens_retired"] += 1
+                success = await self._retire_queen(queen_id)
+                if success:
+                    management_results["queens_retired"] += 1
+                    management_results["retirement_actions"].append(f"Retired {queen_id}")
             
             management_results["underperforming_queens"] = underperforming
             management_results["high_performing_queens"] = high_performing
@@ -234,6 +245,18 @@ class FoundingAntQueen(BaseAnt):
         except Exception as e:
             logger.error(f"Error managing Queen lifecycle: {e}")
             return {"error": str(e)}
+    
+    async def _safe_should_merge(self, queen) -> bool:
+        """Safely check if a queen should merge, handling both async and sync calls"""
+        try:
+            if hasattr(queen, 'should_merge'):
+                result = queen.should_merge()
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
+            return False
+        except Exception:
+            return False
     
     async def _retire_queen(self, queen_id: str) -> bool:
         """Retire a Queen and reclaim capital"""
@@ -245,8 +268,18 @@ class FoundingAntQueen(BaseAnt):
             
             # Get final capital from Queen (including worker capital)
             final_capital = queen.capital.current_balance
-            for worker in queen.workers.values():
-                final_capital += worker.capital.current_balance
+            
+            # Safely get workers and handle both dict and async responses
+            try:
+                workers = queen.workers
+                if asyncio.iscoroutine(workers):
+                    workers = await workers
+                
+                if hasattr(workers, 'values'):
+                    for worker in workers.values():
+                        final_capital += worker.capital.current_balance
+            except Exception as e:
+                logger.warning(f"Could not aggregate worker capital for {queen_id}: {e}")
             
             # Cleanup Queen
             await queen.cleanup()
@@ -282,7 +315,7 @@ class FoundingAntQueen(BaseAnt):
             initial_capital = self.config["split_threshold"]  # 20 SOL
             
             if not self.capital.allocate_capital(initial_capital):
-                return {"success": False, "reason": "Insufficient capital"}
+                return {"success": False, "reason": "insufficient_capital"}
             
             queen = AntQueen(queen_id, self.ant_id, initial_capital)
             
@@ -292,7 +325,7 @@ class FoundingAntQueen(BaseAnt):
                 self.system_metrics["queens_created"] += 1
                 
                 logger.info(f"FoundingAntQueen created new Queen {queen_id}")
-                return {"success": True, "queen_id": queen_id, "capital": initial_capital}
+                return {"success": True, "queen_id": queen_id, "capital_allocated": initial_capital}
             else:
                 self.capital.release_capital(initial_capital)
                 return {"success": False, "reason": "Queen initialization failed"}
@@ -316,12 +349,20 @@ class FoundingAntQueen(BaseAnt):
                 total_profit += queen.performance.total_profit
                 total_ants += 1  # Queen
                 
-                # Add Worker metrics
-                for worker in queen.workers.values():
-                    total_capital += worker.capital.current_balance
-                    total_trades += worker.performance.total_trades
-                    total_profit += worker.performance.total_profit
-                    total_ants += 1  # Worker
+                # Add Worker metrics safely
+                try:
+                    workers = queen.workers
+                    if asyncio.iscoroutine(workers):
+                        workers = await workers
+                    
+                    if hasattr(workers, 'values'):
+                        for worker in workers.values():
+                            total_capital += worker.capital.current_balance
+                            total_trades += worker.performance.total_trades
+                            total_profit += worker.performance.total_profit
+                            total_ants += 1  # Worker
+                except Exception as e:
+                    logger.warning(f"Could not aggregate worker metrics: {e}")
             
             self.system_metrics.update({
                 "total_ants": total_ants,
@@ -338,32 +379,55 @@ class FoundingAntQueen(BaseAnt):
     
     def _get_queens_status(self) -> Dict[str, Any]:
         """Get status of all Queens"""
+        queens_details = {}
+        
+        for queen_id, queen in self.queens.items():
+            try:
+                status_summary = queen.get_status_summary()
+                queens_details[queen_id] = {
+                    "status": queen.status.value,
+                    "capital": queen.capital.current_balance,
+                    "workers": len(getattr(queen, 'workers', {})),
+                    "profit": queen.performance.total_profit,
+                    "details": status_summary
+                }
+            except Exception as e:
+                logger.warning(f"Error getting status for queen {queen_id}: {e}")
+                queens_details[queen_id] = {
+                    "status": "error",
+                    "capital": 0.0,
+                    "workers": 0,
+                    "profit": 0.0,
+                    "error": str(e)
+                }
+        
         return {
-            queen_id: {
-                "status": queen.status.value,
-                "capital": queen.capital.current_balance,
-                "workers": len(queen.workers),
-                "profit": queen.performance.total_profit
-            }
-            for queen_id, queen in self.queens.items()
+            "total_queens": len(self.queens),
+            "active_queens": len([q for q in self.queens.values() if q.status == AntStatus.ACTIVE]),
+            "queen_details": queens_details
         }
     
     def get_system_status(self) -> Dict[str, Any]:
         """Get comprehensive system status"""
         base_status = self.get_status_summary()
         
-        base_status.update({
+        system_status = {
+            "founding_queen_id": self.ant_id,
+            "founding_queen_status": base_status,
             "system_metrics": self.system_metrics,
-            "queens_status": self._get_queens_status(),
+            "queens_overview": self._get_queens_status(),
             "system_health": {
                 "active_queens": len(self.queens),
                 "retired_queens": len(self.retired_queens),
                 "total_system_capital": self.system_metrics["total_capital"],
                 "system_profit": self.system_metrics["system_profit"]
             }
-        })
+        }
         
-        return base_status
+        # Include base status fields for compatibility
+        system_status.update(base_status)
+        
+        return system_status
     
     async def cleanup(self):
         """Cleanup all Queens and system resources"""

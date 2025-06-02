@@ -1,0 +1,37 @@
+{
+  "trading": {
+    "enabled": true,
+    "max_slippage": 0.02,
+    "min_liquidity": 10000,
+    "max_position_size": 0.1,
+    "stop_loss_percentage": 5.0,
+    "take_profit_percentage": 15.0,
+    "max_daily_trades": 50
+  },
+  "tokens": {
+    "blacklisted": [],
+    "whitelisted": [],
+    "min_market_cap": 1000000
+  },
+  "risk_management": {
+    "max_total_exposure": 1.0,
+    "emergency_stop_loss": 10.0,
+    "position_sizing": "dynamic",
+    "risk_per_trade": 0.02
+  },
+  "strategies": {
+    "ant_strategy": {
+      "enabled": true,
+      "allocation": 0.8
+    },
+    "smart_money": {
+      "enabled": true,
+      "allocation": 0.2
+    }
+  },
+  "execution": {
+    "priority_fee": 0.001,
+    "max_retries": 3,
+    "timeout": 30
+  }
+} 

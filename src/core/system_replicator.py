@@ -385,10 +385,8 @@ class WorkspaceManager:
             
             # Set appropriate permissions (Unix-like systems)
             if hasattr(os, 'chmod'):
-                try:
-                    os.chmod(workspace_path, 0o755)
-                except:
-                    pass  # Ignore permission errors on Windows
+                # Set secure directory permissions (accessible by owner only)
+                os.chmod(workspace_path, 0o700)
             
             logger.info(f"Created workspace for instance {instance_id} at {workspace_path}")
             return workspace_path

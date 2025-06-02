@@ -1,0 +1,47 @@
+# Trading Bot Configuration
+
+trading:
+  enabled: true
+  max_slippage: 0.02
+  min_liquidity: 10000
+  max_position_size: 0.1
+  stop_loss_percentage: 5.0
+  take_profit_percentage: 15.0
+
+solana:
+  rpc_url: "https://api.mainnet-beta.solana.com"
+  commitment: "confirmed"
+  timeout: 30
+
+logging:
+  level: "INFO"
+  format: "structured"
+  file_logging: true
+  console_logging: true
+
+monitoring:
+  health_check_interval: 30
+  metrics_enabled: true
+  discord_notifications: true
+
+risk_management:
+  max_daily_trades: 50
+  max_total_exposure: 1.0
+  emergency_stop_loss: 10.0
+
+api:
+  host: "localhost"
+  port: 8000
+  rate_limit: 100
+  auth_required: true
+
+backup:
+  enabled: true
+  retention_days: 30
+  compression: true
+  encryption: true
+
+security:
+  audit_logging: true
+  secrets_encryption: true
+  secure_headers: true 

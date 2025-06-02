@@ -15,6 +15,7 @@ import math
 from typing import Dict, List, Optional, Any, Tuple
 from collections import deque
 import random
+import secrets
 
 from .ml_types import SentimentResult, SentimentType
 
@@ -245,15 +246,15 @@ class SentimentAnalyzer:
             
             # Estimate mentions based on market metrics
             if market_cap > 10000000:  # Large caps get more attention
-                social_mentions = random.randint(100, 500)
+                social_mentions = secrets.randbelow(500 - 100 + 1) + 100
                 social_sentiment += 0.2
             elif market_cap > 1000000:
-                social_mentions = random.randint(50, 200)
+                social_mentions = secrets.randbelow(200 - 50 + 1) + 50
                 social_sentiment += 0.1
             elif market_cap > 100000:
-                social_mentions = random.randint(10, 100)
+                social_mentions = secrets.randbelow(100 - 10 + 1) + 10
             else:
-                social_mentions = random.randint(0, 20)
+                social_mentions = secrets.randbelow(20 - 0 + 1) + 0
                 social_sentiment -= 0.1
             
             # Volume-based sentiment (high volume = attention)

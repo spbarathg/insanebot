@@ -1,7 +1,8 @@
 """
-Tests package for Enhanced Ant Bot System
+Enhanced Ant Bot Test Suite
 
-This package contains comprehensive tests for the trading bot system.
+Comprehensive testing framework for production-ready Solana trading bot.
+Includes unit tests, integration tests, load tests, and security tests.
 """
 
 __version__ = "1.0.0" 

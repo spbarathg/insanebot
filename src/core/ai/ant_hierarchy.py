@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import math
 import random
+import secrets
 from abc import ABC, abstractmethod
 from collections import deque
 
@@ -609,7 +610,7 @@ class AntPrincess(BaseAnt):
             
             # For simulation - random profit/loss with improved validation
             success_probability = max(0.1, min(0.9, decision.get("confidence", 0.5)))
-            success = random.random() < success_probability
+            success = secrets.randbelow(10000) / 10000.0 < success_probability
             
             if success:
                 profit = decision["position_size"] * random.uniform(0.02, 0.15)  # 2-15% profit
@@ -755,7 +756,7 @@ class AntPrincess(BaseAnt):
             
             # For simulation - profit/loss based on confidence with defense adjustments
             success_probability = decision["confidence"] * 0.9  # Slightly reduce due to defense overhead
-            success = random.random() < success_probability
+            success = secrets.randbelow(10000) / 10000.0 < success_probability
             
             if success:
                 profit = adjusted_position_size * random.uniform(0.02, 0.15)  # 2-15% profit

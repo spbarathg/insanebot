@@ -16,7 +16,6 @@ from enum import Enum
 from collections import deque, defaultdict
 import redis.asyncio as redis
 from datetime import datetime, timedelta
-import pickle
 import traceback
 
 logger = logging.getLogger(__name__)
@@ -214,8 +213,28 @@ class MessageQueue:
     async def _enqueue_task_redis(self, task: Task):
         """Enqueue task using Redis backend"""
         try:
-            # Serialize task
-            task_data = pickle.dumps(task)
+            # Serialize task using JSON instead of pickle for security
+            task_dict = {
+                'task_id': task.task_id,
+                'queue_name': task.queue_name,
+                'function_name': task.function_name,
+                'args': task.args,
+                'kwargs': task.kwargs,
+                'priority': task.priority.value,
+                'max_retries': task.max_retries,
+                'retry_delay': task.retry_delay,
+                'timeout': task.timeout,
+                'scheduled_at': task.scheduled_at,
+                'created_at': task.created_at,
+                'started_at': task.started_at,
+                'completed_at': task.completed_at,
+                'status': task.status.value,
+                'result': task.result,
+                'error': task.error,
+                'retry_count': task.retry_count,
+                'metadata': task.metadata
+            }
+            task_data = json.dumps(task_dict).encode('utf-8')
             
             # Add to appropriate queue based on priority and scheduling
             if task.scheduled_at and task.scheduled_at > time.time():
@@ -346,7 +365,31 @@ class MessageQueue:
             result = await self.redis_client.zpopmax(f"queue:{queue_name}")
             if result:
                 task_data, _ = result[0]
-                return pickle.loads(task_data)
+                # Deserialize task using JSON instead of pickle for security
+                task_dict = json.loads(task_data.decode('utf-8'))
+                
+                # Recreate Task object from JSON data
+                task = Task(
+                    task_id=task_dict['task_id'],
+                    queue_name=task_dict['queue_name'],
+                    function_name=task_dict['function_name'],
+                    args=task_dict['args'],
+                    kwargs=task_dict['kwargs'],
+                    priority=TaskPriority(task_dict['priority']),
+                    max_retries=task_dict['max_retries'],
+                    retry_delay=task_dict['retry_delay'],
+                    timeout=task_dict['timeout'],
+                    scheduled_at=task_dict['scheduled_at'],
+                    created_at=task_dict['created_at'],
+                    started_at=task_dict['started_at'],
+                    completed_at=task_dict['completed_at'],
+                    status=TaskStatus(task_dict['status']),
+                    result=task_dict['result'],
+                    error=task_dict['error'],
+                    retry_count=task_dict['retry_count'],
+                    metadata=task_dict['metadata']
+                )
+                return task
             
             return None
             
@@ -593,11 +636,23 @@ class MessageQueue:
                 stats = await self.get_queue_stats()
                 await self.publish_event('queue_stats_updated', stats)
                 
-                await asyncio.sleep(self.config.get('stats_update_interval', 60.0))
+                try:
+                    await asyncio.sleep(self.config.get('stats_update_interval', 60.0))
+                except asyncio.CancelledError:
+                    break
                 
+            except asyncio.CancelledError:
+                logger.info("MessageQueue monitoring loop cancelled")
+                break
             except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
-                await asyncio.sleep(60.0)
+                if self.is_running:
+                    logger.error(f"Error in monitoring loop: {e}")
+                    try:
+                        await asyncio.sleep(60.0)
+                    except asyncio.CancelledError:
+                        break
+                else:
+                    break
     
     async def _update_queue_stats(self):
         """Update queue statistics"""
@@ -626,11 +681,23 @@ class MessageQueue:
                     if task.completed_at and (current_time - task.completed_at) > cleanup_age:
                         del self.failed_tasks[task_id]
                 
-                await asyncio.sleep(cleanup_age)
+                try:
+                    await asyncio.sleep(cleanup_age)
+                except asyncio.CancelledError:
+                    break
                 
+            except asyncio.CancelledError:
+                logger.info("MessageQueue cleanup loop cancelled")
+                break
             except Exception as e:
-                logger.error(f"Error in cleanup loop: {e}")
-                await asyncio.sleep(3600.0)
+                if self.is_running:
+                    logger.error(f"Error in cleanup loop: {e}")
+                    try:
+                        await asyncio.sleep(3600.0)
+                    except asyncio.CancelledError:
+                        break
+                else:
+                    break
     
     async def stop_workers(self):
         """Stop all workers"""

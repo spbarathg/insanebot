@@ -70,8 +70,8 @@ class TokenManager:
             # Then rename to final file (atomic operation on most filesystems)
             os.replace(temp_file, self.tokens_file)
             
-            # Set permissions to ensure it's readable and writable
-            os.chmod(self.tokens_file, 0o666)
+            # Set secure file permissions (readable/writable by owner only)
+            os.chmod(self.tokens_file, 0o600)
             
             logger.debug(f"Saved {len(self.known_tokens)} known tokens")
         except (IOError, PermissionError) as e:
@@ -95,8 +95,8 @@ class TokenManager:
             # Then rename to final file (atomic operation on most filesystems)
             os.replace(temp_file, self.tokens_file)
             
-            # Set permissions to ensure it's readable and writable
-            os.chmod(self.tokens_file, 0o666)
+            # Set secure file permissions (readable/writable by owner only)
+            os.chmod(self.tokens_file, 0o600)
             
             logger.debug(f"Saved {len(self.known_tokens)} known tokens asynchronously")
         except Exception as e:

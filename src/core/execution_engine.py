@@ -18,6 +18,7 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from dataclasses import dataclass, field
 from enum import Enum
 import random
+import secrets
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -575,7 +576,7 @@ class ExecutionEngine:
         """Execute trade atomically (all-or-nothing)"""
         try:
             # Simulate atomic execution
-            success = random.random() > 0.1  # 90% success rate
+            success = secrets.randbelow(10000) / 10000.0 > 0.1  # 90% success rate
             
             if success:
                 slippage = random.uniform(0, params.max_slippage)

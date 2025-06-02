@@ -1,0 +1,158 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'enhanced-ant-bot'
+    environment: 'production'
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Enhanced Ant Bot Main Application
+  - job_name: 'enhanced-ant-bot'
+    static_configs:
+      - targets: ['trading-bot:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+    scrape_timeout: 3s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: trading-bot:8080
+
+  # Trading Engine Metrics
+  - job_name: 'trading-engine'
+    static_configs:
+      - targets: ['trading-bot:8081']
+    metrics_path: '/trading/metrics'
+    scrape_interval: 5s
+    relabel_configs:
+      - target_label: component
+        replacement: trading_engine
+
+  # Execution Engine Metrics
+  - job_name: 'execution-engine'
+    static_configs:
+      - targets: ['trading-bot:8082']
+    metrics_path: '/execution/metrics'
+    scrape_interval: 1s  # High frequency for execution metrics
+    relabel_configs:
+      - target_label: component
+        replacement: execution_engine
+
+  # Risk Management Metrics
+  - job_name: 'risk-manager'
+    static_configs:
+      - targets: ['trading-bot:8083']
+    metrics_path: '/risk/metrics'
+    scrape_interval: 10s
+    relabel_configs:
+      - target_label: component
+        replacement: risk_manager
+
+  # Security System Metrics
+  - job_name: 'security-manager'
+    static_configs:
+      - targets: ['trading-bot:8084']
+    metrics_path: '/security/metrics'
+    scrape_interval: 5s
+    relabel_configs:
+      - target_label: component
+        replacement: security_manager
+
+  # Portfolio Manager Metrics
+  - job_name: 'portfolio-manager'
+    static_configs:
+      - targets: ['trading-bot:8085']
+    metrics_path: '/portfolio/metrics'
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: component
+        replacement: portfolio_manager
+
+  # Ant Colony Metrics
+  - job_name: 'ant-colony'
+    static_configs:
+      - targets: ['trading-bot:8086']
+    metrics_path: '/colony/metrics'
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: component
+        replacement: ant_colony
+
+  # Database Metrics (PostgreSQL)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: component
+        replacement: database
+
+  # Redis Metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: component
+        replacement: cache
+
+  # System Metrics (Node Exporter)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: component
+        replacement: system
+
+  # Container Metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 15s
+    relabel_configs:
+      - target_label: component
+        replacement: containers
+
+  # Solana Network Metrics
+  - job_name: 'solana-metrics'
+    static_configs:
+      - targets: ['trading-bot:8087']
+    metrics_path: '/solana/metrics'
+    scrape_interval: 10s
+    relabel_configs:
+      - target_label: component
+        replacement: solana_network
+
+  # External API Monitoring (Helius, Jupiter, etc.)
+  - job_name: 'external-apis'
+    static_configs:
+      - targets: ['trading-bot:8088']
+    metrics_path: '/external/metrics'
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: component
+        replacement: external_apis
+
+# Remote storage configuration for long-term retention
+remote_write:
+  - url: "http://prometheus-remote-storage:9201/write"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500 

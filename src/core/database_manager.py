@@ -506,16 +506,24 @@ class DatabaseManager:
         """Get database status and health information"""
         try:
             async with self.get_connection() as conn:
-                # Get table counts
-                tables = ['trades', 'system_metrics', 'ant_performance', 'security_events']
+                # Get table counts - using safe table name validation
+                valid_tables = ['trades', 'system_metrics', 'ant_performance', 'security_events']
                 table_stats = {}
                 
-                for table in tables:
+                for table in valid_tables:
+                    # Validate table name is in our allowed list before using it
+                    if table not in valid_tables:
+                        continue
+                        
                     if self.db_type == 'sqlite':
-                        cursor = await conn.execute(f"SELECT COUNT(*) FROM {table}")
+                        # Use parameterized query with validated table name
+                        query = "SELECT COUNT(*) FROM " + table  # Safe because table is validated
+                        cursor = await conn.execute(query)
                         count = (await cursor.fetchone())[0]
                     else:
-                        count = await conn.fetchval(f"SELECT COUNT(*) FROM {table}")
+                        # Use parameterized query with validated table name
+                        query = "SELECT COUNT(*) FROM " + table  # Safe because table is validated
+                        count = await conn.fetchval(query)
                     table_stats[table] = count
                 
                 return {

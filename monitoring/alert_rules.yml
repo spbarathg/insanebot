@@ -1,0 +1,387 @@
+groups:
+  # Critical System Alerts
+  - name: system_critical
+    interval: 30s
+    rules:
+      - alert: SystemDown
+        expr: up{job="enhanced-ant-bot"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Enhanced Ant Bot system is down"
+          description: "The main trading system has been down for more than 30 seconds"
+          runbook_url: "https://docs.antbot.local/runbooks/system-down"
+
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 85
+        for: 2m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 85% for more than 2 minutes on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) < 10
+        for: 1m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Available memory is below 10% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) < 10
+        for: 1m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical disk space"
+          description: "Disk space is below 10% on {{ $labels.instance }}"
+
+  # Trading System Alerts
+  - name: trading_critical
+    interval: 15s
+    rules:
+      - alert: TradingEngineDown
+        expr: up{job="trading-engine"} == 0
+        for: 15s
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "Trading engine is down"
+          description: "Trading engine has been unavailable for more than 15 seconds"
+
+      - alert: ExecutionLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(execution_duration_seconds_bucket[5m])) by (le)) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+          component: execution
+        annotations:
+          summary: "High execution latency"
+          description: "95th percentile execution latency is above 100ms"
+
+      - alert: ExecutionFailureRateHigh
+        expr: (rate(execution_failures_total[5m]) / rate(execution_attempts_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: execution
+        annotations:
+          summary: "High execution failure rate"
+          description: "Execution failure rate is above 5% for the last 5 minutes"
+
+      - alert: SlippageExcessive
+        expr: histogram_quantile(0.90, sum(rate(trade_slippage_percent_bucket[5m])) by (le)) > 0.02
+        for: 3m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Excessive slippage detected"
+          description: "90th percentile slippage is above 2% for the last 5 minutes"
+
+      - alert: TradingVolumeAnomalous
+        expr: abs(rate(trading_volume_total[1h]) - rate(trading_volume_total[1h] offset 24h)) > (2 * stddev_over_time(rate(trading_volume_total[1h])[7d]))
+        for: 5m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Anomalous trading volume"
+          description: "Trading volume deviates significantly from historical patterns"
+
+  # Risk Management Alerts
+  - name: risk_management
+    interval: 30s
+    rules:
+      - alert: PortfolioRiskHigh
+        expr: portfolio_risk_score > 0.8
+        for: 1m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "High portfolio risk detected"
+          description: "Portfolio risk score is above 0.8: {{ $value }}"
+
+      - alert: PositionSizeExceeded
+        expr: max(position_size_percent) > 0.05
+        for: 0s
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Position size limit exceeded"
+          description: "A position exceeds 5% of portfolio: {{ $value }}%"
+
+      - alert: DrawdownExcessive
+        expr: portfolio_drawdown_percent > 0.10
+        for: 2m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Excessive portfolio drawdown"
+          description: "Portfolio drawdown exceeds 10%: {{ $value }}%"
+
+      - alert: DailyLossLimitApproached
+        expr: daily_loss_percent > 0.04
+        for: 1m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "Daily loss limit approached"
+          description: "Daily losses approach 5% limit: {{ $value }}%"
+
+      - alert: CorrelationTooHigh
+        expr: max(position_correlation) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "High position correlation"
+          description: "Position correlation is too high: {{ $value }}"
+
+  # Security Alerts
+  - name: security_alerts
+    interval: 15s
+    rules:
+      - alert: SecurityThreatDetected
+        expr: increase(security_threats_total[5m]) > 5
+        for: 0s
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Security threats detected"
+          description: "Multiple security threats detected in the last 5 minutes"
+
+      - alert: AuthenticationFailures
+        expr: increase(authentication_failures_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Multiple authentication failures"
+          description: "More than 10 authentication failures in 5 minutes"
+
+      - alert: UnauthorizedAccessAttempt
+        expr: increase(unauthorized_access_attempts_total[1m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Unauthorized access attempt"
+          description: "Unauthorized access attempt detected from {{ $labels.source_ip }}"
+
+      - alert: SuspiciousAPIActivity
+        expr: rate(api_requests_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Suspicious API activity"
+          description: "API request rate exceeds normal patterns"
+
+  # External Dependencies
+  - name: external_dependencies
+    interval: 30s
+    rules:
+      - alert: HeliusAPIDown
+        expr: helius_api_availability < 0.95
+        for: 1m
+        labels:
+          severity: critical
+          component: external
+        annotations:
+          summary: "Helius API availability low"
+          description: "Helius API availability is below 95%: {{ $value }}"
+
+      - alert: JupiterAPIDown
+        expr: jupiter_api_availability < 0.90
+        for: 2m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "Jupiter API availability low"
+          description: "Jupiter API availability is below 90%: {{ $value }}"
+
+      - alert: SolanaRPCLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(solana_rpc_duration_seconds_bucket[5m])) by (le)) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "High Solana RPC latency"
+          description: "95th percentile Solana RPC latency is above 2 seconds"
+
+      - alert: ExternalAPIErrorRate
+        expr: (rate(external_api_errors_total[5m]) / rate(external_api_requests_total[5m])) > 0.10
+        for: 2m
+        labels:
+          severity: warning
+          component: external
+        annotations:
+          summary: "High external API error rate"
+          description: "External API error rate is above 10%"
+
+  # Database and Infrastructure
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 30 seconds"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 30 seconds"
+
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_activity_count > 80
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connections"
+          description: "Database connection count is high: {{ $value }}"
+
+      - alert: DatabaseQueryLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(database_query_duration_seconds_bucket[5m])) by (le)) > 1.0
+        for: 3m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database query latency"
+          description: "95th percentile database query latency is above 1 second"
+
+  # Application Performance
+  - name: application_performance
+    interval: 15s
+    rules:
+      - alert: ResponseTimeHigh
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API response time"
+          description: "95th percentile API response time is above 500ms"
+
+      - alert: ErrorRateHigh
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High error rate"
+          description: "API error rate is above 5%"
+
+      - alert: MemoryLeakSuspected
+        expr: increase(go_memstats_alloc_bytes[30m]) > 100 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "Potential memory leak"
+          description: "Memory usage increased by more than 100MB in 30 minutes"
+
+  # Ant Colony Specific
+  - name: ant_colony
+    interval: 30s
+    rules:
+      - alert: AntColonyUnhealthy
+        expr: ant_colony_health_score < 0.7
+        for: 2m
+        labels:
+          severity: warning
+          component: ant_colony
+        annotations:
+          summary: "Ant Colony health degraded"
+          description: "Ant Colony health score is below 0.7: {{ $value }}"
+
+      - alert: AntQueenFailure
+        expr: ant_queens_active_count < 1
+        for: 1m
+        labels:
+          severity: critical
+          component: ant_colony
+        annotations:
+          summary: "No active Ant Queens"
+          description: "All Ant Queens are inactive - trading may be impacted"
+
+      - alert: AntPrincessFailureRate
+        expr: (rate(ant_princess_failures_total[10m]) / rate(ant_princess_created_total[10m])) > 0.20
+        for: 3m
+        labels:
+          severity: warning
+          component: ant_colony
+        annotations:
+          summary: "High Ant Princess failure rate"
+          description: "Ant Princess failure rate is above 20%"
+
+  # Business Logic Alerts
+  - name: business_logic
+    interval: 60s
+    rules:
+      - alert: ProfitabilityDecline
+        expr: (avg_over_time(daily_profit_percent[7d]) - avg_over_time(daily_profit_percent[7d] offset 7d)) < -0.01
+        for: 1h
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "Profitability decline detected"
+          description: "Average daily profitability has declined compared to last week"
+
+      - alert: TradingInactive
+        expr: increase(trades_executed_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: warning
+          component: business
+        annotations:
+          summary: "No trades executed"
+          description: "No trades have been executed in the last 2 hours"
+
+      - alert: CapitalUtilizationLow
+        expr: capital_utilization_percent < 0.1
+        for: 1h
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "Low capital utilization"
+          description: "Capital utilization is below 10%: {{ $value }}%" 

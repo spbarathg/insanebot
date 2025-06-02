@@ -1,5 +1,5 @@
 """
-Integration tests for Enhanced Ant Bot System
+Integration tests for Enhanced Ant Bot.
 
-These tests verify that different components work together correctly.
+Tests system components working together with real dependencies.
 """ 

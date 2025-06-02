@@ -10,6 +10,79 @@ import os
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 from loguru import logger
+from dataclasses import dataclass
+from enum import Enum
+from collections import deque
+
+class CircuitState(Enum):
+    """Circuit breaker states"""
+    CLOSED = "closed"      # Normal operation
+    OPEN = "open"          # Failing, blocking requests
+    HALF_OPEN = "half_open"  # Testing if service recovered
+
+@dataclass
+class CircuitBreakerConfig:
+    """Circuit breaker configuration"""
+    failure_threshold: int = 5  # Failures before opening
+    recovery_timeout: int = 60  # Seconds before trying half-open
+    success_threshold: int = 3  # Successes needed to close from half-open
+    timeout_seconds: int = 30   # Request timeout
+
+class CircuitBreaker:
+    """Circuit breaker for API resilience"""
+    
+    def __init__(self, config: CircuitBreakerConfig):
+        self.config = config
+        self.state = CircuitState.CLOSED
+        self.failure_count = 0
+        self.success_count = 0
+        self.last_failure_time = 0
+        self.failure_history = deque(maxlen=100)
+        
+    async def call(self, func, *args, **kwargs):
+        """Execute function through circuit breaker"""
+        if self.state == CircuitState.OPEN:
+            if time.time() - self.last_failure_time > self.config.recovery_timeout:
+                self.state = CircuitState.HALF_OPEN
+                self.success_count = 0
+                logger.info("🔄 Circuit breaker moving to HALF_OPEN state")
+            else:
+                raise Exception("Circuit breaker is OPEN - service unavailable")
+        
+        try:
+            result = await asyncio.wait_for(
+                func(*args, **kwargs), 
+                timeout=self.config.timeout_seconds
+            )
+            
+            # Success handling
+            if self.state == CircuitState.HALF_OPEN:
+                self.success_count += 1
+                if self.success_count >= self.config.success_threshold:
+                    self.state = CircuitState.CLOSED
+                    self.failure_count = 0
+                    logger.info("✅ Circuit breaker CLOSED - service recovered")
+            
+            return result
+            
+        except Exception as e:
+            # Failure handling
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            self.failure_history.append({
+                'timestamp': time.time(),
+                'error': str(e)
+            })
+            
+            if (self.state == CircuitState.CLOSED and 
+                self.failure_count >= self.config.failure_threshold):
+                self.state = CircuitState.OPEN
+                logger.error(f"🚨 Circuit breaker OPENED - {self.failure_count} failures")
+            elif self.state == CircuitState.HALF_OPEN:
+                self.state = CircuitState.OPEN
+                logger.error("🚨 Circuit breaker back to OPEN - recovery failed")
+            
+            raise
 
 class HeliusAPIError(Exception):
     """Raised when Helius API calls fail"""
@@ -46,6 +119,18 @@ class HeliusService:
             logger.info("✅ Helius API key configured")
         
         logger.info("Helius Service initialized - REAL API MODE ONLY")
+        
+        # Circuit breaker for resilience
+        self.circuit_breaker = CircuitBreaker(CircuitBreakerConfig())
+        
+        # Connection management
+        self.request_count = 0
+        self.error_count = 0
+        
+        # Rate limiting
+        self.rate_limit_requests = 100  # per minute
+        self.rate_limit_window = 60
+        self.request_timestamps = deque(maxlen=self.rate_limit_requests)
     
     async def _make_api_request(self, endpoint: str, params: Dict = None, method: str = "GET") -> Optional[Dict]:
         """Make API request to Helius with real data only."""
@@ -654,3 +739,114 @@ class HeliusService:
                     loop.run_until_complete(self.session.close())
             except Exception:
                 pass  # Ignore cleanup errors 
+
+    def get_circuit_breaker_status(self) -> Dict[str, Any]:
+        """Get circuit breaker status"""
+        return {
+            "state": self.circuit_breaker.state.value,
+            "failure_count": self.circuit_breaker.failure_count,
+            "success_count": self.circuit_breaker.success_count,
+            "last_failure_time": self.circuit_breaker.last_failure_time,
+            "recent_failures": len(self.circuit_breaker.failure_history)
+        }
+    
+    async def cleanup(self):
+        """Clean up resources"""
+        if self.session:
+            await self.session.close()
+            logger.info("🧹 Helius Service cleaned up")
+    
+    async def get_network_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive network performance metrics"""
+        try:
+            current_time = time.time()
+            
+            # Circuit breaker metrics
+            cb_status = self.get_circuit_breaker_status()
+            
+            # Calculate average latency from recent requests
+            recent_latencies = [
+                h.get('latency', 0) for h in self.failure_history 
+                if current_time - h.get('timestamp', 0) < 300  # Last 5 minutes
+            ]
+            
+            avg_latency = sum(recent_latencies) / len(recent_latencies) if recent_latencies else 100
+            
+            # Network health score based on circuit breaker state and performance
+            if cb_status['state'] == 'closed':
+                health_score = 100 - (cb_status['failure_count'] * 5)  # Reduce by 5% per failure
+            elif cb_status['state'] == 'half_open':
+                health_score = 50  # Moderate score during testing
+            else:  # open
+                health_score = 10  # Very low score when circuit is open
+            
+            health_score = max(0, min(100, health_score))
+            
+            return {
+                "service_name": "helius",
+                "circuit_breaker_state": cb_status['state'],
+                "health_score": health_score,
+                "average_latency_ms": avg_latency,
+                "failure_count": cb_status['failure_count'],
+                "success_count": cb_status['success_count'],
+                "recent_failures": cb_status['recent_failures'],
+                "api_key_configured": self.api_key is not None,
+                "last_failure_time": cb_status['last_failure_time'],
+                "timestamp": current_time
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting network metrics: {str(e)}")
+            return {
+                "service_name": "helius",
+                "circuit_breaker_state": "unknown",
+                "health_score": 0,
+                "error": str(e),
+                "timestamp": time.time()
+            }
+    
+    async def test_connectivity(self) -> Dict[str, Any]:
+        """Test connectivity and measure response time"""
+        try:
+            start_time = time.time()
+            
+            # Use circuit breaker for the connectivity test
+            result = await self.circuit_breaker.call(self._test_api_endpoint)
+            
+            response_time = (time.time() - start_time) * 1000  # Convert to ms
+            
+            return {
+                "connected": True,
+                "response_time_ms": response_time,
+                "api_accessible": result.get('accessible', False),
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": str(e),
+                "response_time_ms": 0,
+                "api_accessible": False,
+                "timestamp": time.time()
+            }
+    
+    async def _test_api_endpoint(self) -> Dict[str, Any]:
+        """Test a simple API endpoint to verify connectivity"""
+        try:
+            # Test with a simple endpoint that doesn't require authentication
+            test_response = await self._make_api_request("ping", method="GET")
+            
+            if test_response is not None:
+                return {"accessible": True, "response": test_response}
+            else:
+                # Try alternative health check
+                if self.api_key:
+                    # Test with authentication if we have a key
+                    auth_response = await self._make_api_request("health", method="GET")
+                    return {"accessible": auth_response is not None, "response": auth_response}
+                else:
+                    return {"accessible": False, "reason": "No API key configured"}
+                    
+        except Exception as e:
+            return {"accessible": False, "error": str(e)} 

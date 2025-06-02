@@ -22,6 +22,8 @@ import hashlib
 from collections import deque, defaultdict
 import base58
 import struct
+import random
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,13 @@ class FailureReason(Enum):
     MEV_ATTACK = "mev_attack"
     PRIORITY_TOO_LOW = "priority_too_low"
 
+class MEVProtectionLevel(Enum):
+    """MEV protection strategies"""
+    BASIC = "basic"           # Standard priority fee escalation
+    ADVANCED = "advanced"     # Multi-RPC + timing randomization  
+    JITO_BUNDLE = "jito_bundle"  # Jito bundle protection
+    PRIVATE_POOL = "private_pool"  # Private mempool routing
+
 @dataclass
 class TransactionMetrics:
     """Real-time transaction execution metrics"""
@@ -67,6 +76,18 @@ class TransactionMetrics:
     mev_activity_level: float
     congestion_score: float
     measurement_time: float = field(default_factory=time.time)
+
+@dataclass
+class MEVProtectionConfig:
+    """MEV protection configuration"""
+    protection_level: MEVProtectionLevel = MEVProtectionLevel.ADVANCED
+    jito_tip_lamports: int = 50000  # 0.05 SOL tip for Jito
+    randomize_timing: bool = True
+    timing_variance_ms: int = 500
+    bundle_max_wait_ms: int = 2000
+    private_rpc_endpoints: List[str] = field(default_factory=list)
+    sandwich_detection_enabled: bool = True
+    front_run_protection: bool = True
 
 @dataclass
 class TransactionState:
@@ -349,11 +370,29 @@ class TransactionWarfareSystem:
         # Cancellation orders
         self.cancellation_orders: Dict[str, Dict] = {}
         
+        # PERFORMANCE OPTIMIZATION: Pre-built transaction cache
+        self.transaction_cache: Dict[str, Dict] = {}
+        self.cache_size_limit = 100
+        
+        # PERFORMANCE OPTIMIZATION: Connection pool
+        self.connection_pools: Dict[str, Any] = {}
+        self.keep_alive_sessions = True
+        
+        # PERFORMANCE OPTIMIZATION: Parallel execution settings
+        self.parallel_submission_count = 3  # Submit to 3 RPCs simultaneously
+        self.submission_timeout_ms = 50    # 50ms timeout for ultra-fast execution
+        self.confirmation_polling_interval_ms = 100  # Check every 100ms
+        
+        # MEV Protection
+        self.mev_config = MEVProtectionConfig()
+        
         # Performance tracking
         self.total_transactions = 0
         self.successful_transactions = 0
         self.failed_transactions = 0
         self.escalations_performed = 0
+        self.sub_100ms_executions = 0  # Track ultra-fast executions
+        self.execution_times = deque(maxlen=1000)  # Track execution performance
         
         # Configuration
         self.max_priority_fee_lamports = 100000  # 0.1 SOL
@@ -361,7 +400,7 @@ class TransactionWarfareSystem:
         self.max_retries = 5
         self.escalation_threshold_seconds = 10
         
-        logger.info("⚔️ Transaction Warfare System initialized - Battle-ready")
+        logger.info("⚔️ Transaction Warfare System initialized - Battle-ready with sub-100ms targeting")
     
     async def initialize(self):
         """Initialize the defense system (compatibility method)"""
@@ -578,10 +617,9 @@ class TransactionWarfareSystem:
             await asyncio.sleep(0.1 + rpc.average_latency / 1000)  # Convert ms to seconds
             
             # Simulate success/failure based on RPC health
-            import random
             success_probability = rpc.health_score
             
-            if random.random() < success_probability:
+            if secrets.randbelow(10000) / 10000.0 < success_probability:
                 # Simulate successful submission
                 signature = f"sig_{tx_state.transaction_id[:8]}_{int(time.time())}"
                 
@@ -614,7 +652,6 @@ class TransactionWarfareSystem:
             await asyncio.sleep(1)
             
             # Simulate confirmation check
-            import random
             network_metrics = self.network_monitor.get_network_metrics()
             
             # Higher chance of confirmation with better network conditions
@@ -627,7 +664,7 @@ class TransactionWarfareSystem:
             else:
                 confirmation_chance = 0.05
             
-            if random.random() < confirmation_chance:
+            if secrets.randbelow(10000) / 10000.0 < confirmation_chance:
                 logger.debug(f"✅ Transaction confirmed: {tx_state.signature[:16]}...")
                 return True
         
@@ -769,4 +806,307 @@ class TransactionWarfareSystem:
         # Reset escalation settings
         self.default_timeout_seconds = 30
         
-        logger.info("🔄 Network recovery attempt completed") 
+        logger.info("🔄 Network recovery attempt completed")
+    
+    async def pre_build_transaction(self, token_address: str, instruction_type: str, 
+                                  amount: float) -> Optional[str]:
+        """Pre-build and cache transaction for ultra-fast execution"""
+        try:
+            cache_key = f"{token_address}_{instruction_type}_{amount}"
+            
+            # Check if already cached
+            if cache_key in self.transaction_cache:
+                return cache_key
+            
+            # Build transaction components
+            pre_built_tx = {
+                "instruction_type": instruction_type,
+                "token_address": token_address,
+                "amount": amount,
+                "blockhash": await self._get_recent_blockhash(),
+                "fee_payer": await self._get_fee_payer_pubkey(),
+                "created_at": time.time(),
+                "expiry": time.time() + 60  # 60 second expiry
+            }
+            
+            # Cache the transaction
+            if len(self.transaction_cache) >= self.cache_size_limit:
+                # Remove oldest entry
+                oldest_key = min(self.transaction_cache.keys(), 
+                               key=lambda k: self.transaction_cache[k]["created_at"])
+                del self.transaction_cache[oldest_key]
+            
+            self.transaction_cache[cache_key] = pre_built_tx
+            
+            logger.debug(f"⚡ Pre-built transaction cached: {cache_key}")
+            return cache_key
+            
+        except Exception as e:
+            logger.error(f"❌ Transaction pre-building failed: {str(e)}")
+            return None
+    
+    async def execute_ultra_fast(self, cache_key: str, priority_fee: int = None) -> TransactionState:
+        """Execute pre-built transaction with sub-100ms targeting"""
+        start_time = time.time()
+        execution_start_ms = int(time.time() * 1000)
+        
+        try:
+            # Get pre-built transaction
+            if cache_key not in self.transaction_cache:
+                raise Exception(f"Transaction cache miss: {cache_key}")
+            
+            pre_built_tx = self.transaction_cache[cache_key]
+            
+            # Check if transaction is still valid
+            if time.time() > pre_built_tx["expiry"]:
+                del self.transaction_cache[cache_key]
+                raise Exception("Pre-built transaction expired")
+            
+            # Create transaction state
+            tx_id = f"fast_{int(time.time() * 1000000)}"  # Microsecond precision
+            
+            tx_state = TransactionState(
+                transaction_id=tx_id,
+                instruction_type=pre_built_tx["instruction_type"],
+                token_address=pre_built_tx["token_address"],
+                amount=pre_built_tx["amount"],
+                status=TransactionStatus.PENDING,
+                max_retries=2,  # Reduced retries for speed
+                priority_fee=priority_fee or self.mev_config.jito_tip_lamports
+            )
+            
+            # ULTRA-FAST PARALLEL SUBMISSION
+            healthy_rpcs = [rpc for rpc in self.rpc_endpoints if rpc.is_healthy][:self.parallel_submission_count]
+            
+            if not healthy_rpcs:
+                raise Exception("No healthy RPCs available")
+            
+            logger.debug(f"⚡ ULTRA-FAST EXECUTION: {tx_id[:8]} starting parallel submission to {len(healthy_rpcs)} RPCs")
+            
+            # Create parallel submission tasks
+            submission_tasks = []
+            for rpc in healthy_rpcs:
+                task = asyncio.create_task(
+                    self._ultra_fast_submit(rpc, tx_state, pre_built_tx)
+                )
+                submission_tasks.append(task)
+            
+            # Wait for first success or timeout
+            try:
+                # Ultra-short timeout for first submission
+                done, pending = await asyncio.wait_for(
+                    asyncio.wait(submission_tasks, return_when=asyncio.FIRST_COMPLETED),
+                    timeout=self.submission_timeout_ms / 1000
+                )
+                
+                # Cancel pending tasks
+                for task in pending:
+                    task.cancel()
+                
+                # Check if any succeeded
+                for task in done:
+                    success, signature = await task
+                    if success:
+                        tx_state.signature = signature
+                        tx_state.status = TransactionStatus.SUBMITTED
+                        
+                        # Fast confirmation check
+                        confirmed = await self._ultra_fast_confirmation(tx_state)
+                        
+                        if confirmed:
+                            execution_time_ms = int(time.time() * 1000) - execution_start_ms
+                            
+                            if execution_time_ms < 100:
+                                self.sub_100ms_executions += 1
+                                logger.info(f"🚀 SUB-100MS EXECUTION: {tx_id[:8]} completed in {execution_time_ms}ms")
+                            
+                            tx_state.status = TransactionStatus.CONFIRMED
+                            tx_state.confirmed_at = time.time()
+                            self.successful_transactions += 1
+                            
+                            # Track performance
+                            self.execution_times.append(execution_time_ms)
+                            
+                            return tx_state
+                
+            except asyncio.TimeoutError:
+                logger.warning(f"⚡ ULTRA-FAST TIMEOUT: {tx_id[:8]} exceeded {self.submission_timeout_ms}ms")
+            
+            # If ultra-fast failed, fallback to standard execution
+            logger.debug(f"⚡ Falling back to standard execution for {tx_id[:8]}")
+            return await self.execute_transaction(
+                pre_built_tx, 
+                pre_built_tx["instruction_type"],
+                pre_built_tx["token_address"],
+                pre_built_tx["amount"]
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Ultra-fast execution failed: {str(e)}")
+            tx_state.status = TransactionStatus.FAILED
+            return tx_state
+        
+        finally:
+            execution_time = time.time() - start_time
+            logger.debug(f"⚡ Ultra-fast execution attempt completed in {execution_time*1000:.1f}ms")
+    
+    async def _ultra_fast_submit(self, rpc: RPCEndpoint, tx_state: TransactionState, pre_built_tx: Dict) -> Tuple[bool, Optional[str]]:
+        """Ultra-fast transaction submission with MEV protection"""
+        start_time = time.time()
+        
+        try:
+            # Apply MEV protection timing randomization
+            if self.mev_config.randomize_timing:
+                delay_ms = random.randint(0, self.mev_config.timing_variance_ms)
+                await asyncio.sleep(delay_ms / 1000)
+            
+            # Simulate ultra-fast submission with MEV protection
+            logger.debug(f"⚡ Ultra-fast submit to {rpc.name} with MEV protection...")
+            
+            # Simulate network call with MEV protection overhead
+            base_latency = 0.05 + rpc.average_latency / 1000  # Convert ms to seconds
+            mev_overhead = 0.02 if self.mev_config.protection_level == MEVProtectionLevel.ADVANCED else 0.01
+            
+            await asyncio.sleep(base_latency + mev_overhead)
+            
+            # Enhanced success probability with MEV protection
+            success_probability = rpc.health_score * 0.95  # Slightly reduced due to MEV protection
+            
+            if secrets.randbelow(10000) / 10000.0 < success_probability:
+                # Generate signature with MEV protection indicators
+                signature = f"mev_protected_{tx_state.transaction_id[:8]}_{int(time.time() * 1000)}"
+                
+                latency = (time.time() - start_time) * 1000  # Convert to ms
+                rpc.record_success(latency)
+                
+                logger.debug(f"⚡✅ Ultra-fast MEV-protected submission successful: {signature[:16]}...")
+                return True, signature
+            else:
+                rpc.record_failure("MEV-protected submission failed")
+                return False, None
+                
+        except Exception as e:
+            logger.debug(f"💥 Ultra-fast MEV submission error: {str(e)}")
+            rpc.record_failure(str(e))
+            return False, None
+    
+    async def _ultra_fast_confirmation(self, tx_state: TransactionState) -> bool:
+        """Ultra-fast confirmation check with MEV awareness"""
+        if not tx_state.signature:
+            return False
+        
+        logger.debug(f"⚡ Ultra-fast confirmation check: {tx_state.signature[:16]}...")
+        
+        # Faster confirmation polling for MEV-protected transactions
+        max_attempts = 20  # 2 seconds total (100ms intervals)
+        
+        for attempt in range(max_attempts):
+            await asyncio.sleep(0.1)  # 100ms intervals
+            
+            # Simulate confirmation with MEV protection benefits
+            network_metrics = self.network_monitor.get_network_metrics()
+            
+            # MEV protection improves confirmation probability
+            if self.mev_config.protection_level == MEVProtectionLevel.JITO_BUNDLE:
+                confirmation_chance = 0.4  # Higher with Jito
+            elif self.mev_config.protection_level == MEVProtectionLevel.ADVANCED:
+                confirmation_chance = 0.3  # Higher with advanced protection
+            else:
+                confirmation_chance = 0.2  # Standard
+            
+            if secrets.randbelow(10000) / 10000.0 < confirmation_chance:
+                logger.debug(f"⚡✅ Ultra-fast MEV-protected confirmation: {tx_state.signature[:16]}...")
+                return True
+        
+        logger.debug(f"⚡⏰ Ultra-fast confirmation timeout: {tx_state.signature[:16]}...")
+        return False
+    
+    async def _get_recent_blockhash(self) -> str:
+        """Get recent blockhash for transaction building"""
+        try:
+            # This would integrate with actual Solana RPC
+            # For now, return a simulated blockhash
+            return f"blockhash_{int(time.time())}"
+        except Exception as e:
+            logger.error(f"❌ Error getting recent blockhash: {str(e)}")
+            return "fallback_blockhash"
+    
+    async def _get_fee_payer_pubkey(self) -> str:
+        """Get fee payer public key"""
+        try:
+            # This would integrate with actual wallet management
+            # For now, return a simulated pubkey
+            return "fee_payer_pubkey_placeholder"
+        except Exception as e:
+            logger.error(f"❌ Error getting fee payer pubkey: {str(e)}")
+            return "fallback_fee_payer"
+
+    async def execute_jito_bundle(self, transactions: List[Dict], tip_lamports: int = None) -> Dict[str, Any]:
+        """Execute transactions as Jito bundle for MEV protection"""
+        try:
+            if tip_lamports is None:
+                tip_lamports = self.mev_config.jito_tip_lamports
+            
+            bundle_id = f"jito_bundle_{int(time.time())}"
+            
+            logger.info(f"🎯 JITO BUNDLE EXECUTION: {len(transactions)} transactions, tip: {tip_lamports} lamports")
+            
+            # Simulate Jito bundle submission
+            start_time = time.time()
+            
+            # Bundle preparation
+            bundle_data = {
+                "bundle_id": bundle_id,
+                "transactions": transactions,
+                "tip_lamports": tip_lamports,
+                "max_wait_ms": self.mev_config.bundle_max_wait_ms
+            }
+            
+            # Simulate bundle processing
+            await asyncio.sleep(0.5)  # Bundle processing time
+            
+            # Simulate bundle success/failure
+            success_rate = 0.85  # Jito bundles have high success rate
+            
+            if secrets.randbelow(10000) / 10000.0 < success_rate:
+                execution_time = time.time() - start_time
+                
+                result = {
+                    "bundle_id": bundle_id,
+                    "status": "confirmed",
+                    "transactions_confirmed": len(transactions),
+                    "execution_time_ms": execution_time * 1000,
+                    "tip_paid": tip_lamports,
+                    "mev_protection": True
+                }
+                
+                logger.info(f"✅ JITO BUNDLE CONFIRMED: {bundle_id} in {execution_time*1000:.1f}ms")
+                return result
+            else:
+                logger.warning(f"❌ JITO BUNDLE FAILED: {bundle_id}")
+                return {
+                    "bundle_id": bundle_id,
+                    "status": "failed",
+                    "error": "Bundle execution failed",
+                    "mev_protection": True
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Jito bundle execution error: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "mev_protection": False
+            }
+
+    def get_mev_protection_status(self) -> Dict[str, Any]:
+        """Get MEV protection system status"""
+        return {
+            "protection_level": self.mev_config.protection_level.value,
+            "jito_tip_lamports": self.mev_config.jito_tip_lamports,
+            "timing_randomization": self.mev_config.randomize_timing,
+            "sandwich_detection": self.mev_config.sandwich_detection_enabled,
+            "front_run_protection": self.mev_config.front_run_protection,
+            "bundle_capability": self.mev_config.protection_level == MEVProtectionLevel.JITO_BUNDLE,
+            "protection_overhead_ms": self.mev_config.timing_variance_ms
+        } 

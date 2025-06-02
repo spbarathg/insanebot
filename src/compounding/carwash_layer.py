@@ -476,8 +476,8 @@ class CarwashLayer:
     async def _get_error_count(self) -> int:
         """Get current error count"""
         # Simulate error count
-        import random
-        return random.randint(0, 20)
+        import secrets
+        return secrets.randbelow(20) + 0
     
     async def _get_redundancy_score(self) -> float:
         """Get current redundancy score (0.0 to 1.0)"""

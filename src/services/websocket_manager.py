@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from collections import deque, defaultdict
 import random
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -363,7 +364,7 @@ class WebSocketManager:
                     await asyncio.sleep(self.fallback_poll_interval)
                     
                     # Periodically try to reconnect WebSocket
-                    if random.random() < 0.1:  # 10% chance each poll
+                    if secrets.randbelow(10000) / 10000.0 < 0.1:  # 10% chance each poll
                         if await self._connect_websocket(source_type, config):
                             logger.info(f"🔄 Restored WebSocket connection for {source_type.value}")
                             self.stream_status[source_type] = StreamStatus.CONNECTED
