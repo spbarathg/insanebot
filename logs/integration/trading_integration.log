@@ -1,0 +1,48 @@
+2025-06-02 00:42:09,990 | INFO | TRADING_DECISION: {
+  "timestamp": 1748805129.9904733,
+  "token_address": "",
+  "token_symbol": "USDC",
+  "decision": "buy",
+  "confidence": 0.75,
+  "signal_sources": {
+    "technical_analysis": 0.8,
+    "pump_fun_monitor": 0.7,
+    "smart_money_tracker": 0.6
+  },
+  "risk_assessment": {
+    "risk_score": 0.3,
+    "position_size": 0.02
+  },
+  "market_conditions": {
+    "volatility": "medium",
+    "liquidity": "high"
+  },
+  "reasoning": "Strong bullish signals from multiple sources",
+  "expected_profit": 0.05,
+  "position_size": 0.02
+}
+2025-06-02 00:42:10,996 | INFO | TRADE_EXECUTION: {
+  "timestamp": 1748805130.996709,
+  "token_address": "",
+  "token_symbol": "USDC",
+  "decision": "",
+  "execution_price": 1.25,
+  "actual_profit": 0.03,
+  "execution_time_ms": 120,
+  "success": true,
+  "error_message": null
+}
+2025-06-02 00:42:10,996 | INFO | PERFORMANCE_METRICS: {
+  "timestamp": 1748805130.9969075,
+  "total_trades": 10,
+  "successful_trades": 7,
+  "total_profit_sol": 0.25,
+  "total_profit_usd": 0.0,
+  "win_rate": 0.7,
+  "avg_profit_per_trade": 0.025,
+  "largest_win": 0.08,
+  "largest_loss": -0.02,
+  "sharpe_ratio": 0.0,
+  "max_drawdown": 0.0,
+  "avg_execution_time_ms": 0.0
+}

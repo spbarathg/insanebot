@@ -1,0 +1,23 @@
+2025-06-02 00:42:09,990 | INFO | {
+  "timestamp": 1748805129.9904733,
+  "token": "USDC",
+  "decision": "buy",
+  "confidence": 0.75,
+  "signals": {
+    "technical_analysis": 0.8,
+    "pump_fun_monitor": 0.7,
+    "smart_money_tracker": 0.6
+  },
+  "risk": {
+    "risk_score": 0.3,
+    "position_size": 0.02
+  },
+  "reasoning": "Strong bullish signals from multiple sources"
+}
+2025-06-02 00:42:09,995 | INFO | DECISION_ANALYSIS: {
+  "decision_quality": "medium",
+  "signal_diversity": 3,
+  "risk_reward_ratio": 0.16666666666666669,
+  "strongest_signal": "technical_analysis",
+  "signal_confidence": 0.8
+}

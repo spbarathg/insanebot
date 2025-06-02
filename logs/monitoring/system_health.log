@@ -1,0 +1,1 @@
+2025-06-02 00:42:10,024 | {"timestamp": 1748805130.0153027, "cpu_usage": 0.0, "memory_usage": 88.4, "disk_usage": 69.4, "network_latency": 50.0, "rpc_response_time": 100.0, "active_connections": 133, "error_rate": 0.02, "uptime_hours": 24.5}
